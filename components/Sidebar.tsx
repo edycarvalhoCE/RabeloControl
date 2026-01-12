@@ -13,7 +13,8 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setView }) => {
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: '📊', roles: [UserRole.MANAGER, UserRole.FINANCE] },
     { id: 'calendar', label: 'Calendário (Escala)', icon: '📅', roles: [UserRole.MANAGER] },
-    { id: 'bookings', label: 'Locações (Turismo)', icon: '🚌', roles: [UserRole.MANAGER] },
+    { id: 'bookings', label: 'Locações', icon: '🚌', roles: [UserRole.MANAGER] },
+    { id: 'travel-packages', label: 'Pacotes de Viagem', icon: '🏖️', roles: [UserRole.MANAGER, UserRole.FINANCE] },
     { id: 'charter', label: 'Fretamento', icon: '🏭', roles: [UserRole.MANAGER] },
     { id: 'vehicles', label: 'Veículos / Frota', icon: '🚐', roles: [UserRole.MANAGER] },
     { id: 'maintenance', label: 'Manutenção', icon: '🛠️', roles: [UserRole.MANAGER, UserRole.MECHANIC] },

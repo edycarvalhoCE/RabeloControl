@@ -12,6 +12,7 @@ import MaintenanceView from './components/MaintenanceView';
 import UsersView from './components/UsersView';
 import VehiclesView from './components/VehiclesView';
 import CharterView from './components/CharterView';
+import TravelPackagesView from './components/TravelPackagesView';
 import { useStore } from './services/store';
 
 const MainContent = () => {
@@ -42,6 +43,7 @@ const MainContent = () => {
       case 'dashboard': return <Dashboard />;
       case 'calendar': return <CalendarView />;
       case 'bookings': return <BookingsView />;
+      case 'travel-packages': return <TravelPackagesView />;
       case 'vehicles': return <VehiclesView />;
       case 'charter': return <CharterView />;
       case 'inventory': return <InventoryView />;

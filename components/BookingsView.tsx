@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useStore } from '../services/store';
-import { UserRole, Bus } from '../types';
+import { UserRole, Bus, Booking } from '../types';
 
 const BookingsView: React.FC = () => {
   const { bookings, buses, users, addBooking, updateBookingStatus, transactions } = useStore();
@@ -8,6 +8,7 @@ const BookingsView: React.FC = () => {
     busId: '',
     driverId: '',
     clientName: '',
+    clientPhone: '',
     destination: '',
     startTime: '',
     endTime: '',
@@ -50,7 +51,7 @@ const BookingsView: React.FC = () => {
     if (result.success) {
       setMsg({ type: 'success', text: result.message });
       setFormData({ 
-        busId: '', driverId: '', clientName: '', destination: '', startTime: '', endTime: '', value: 0,
+        busId: '', driverId: '', clientName: '', clientPhone: '', destination: '', startTime: '', endTime: '', value: 0,
         paymentStatus: 'PENDING', paymentDate: '',
         departureLocation: '', presentationTime: ''
       });
@@ -83,6 +84,91 @@ const BookingsView: React.FC = () => {
           t.type === 'EXPENSE' && 
           t.description.toLowerCase().includes(plate.toLowerCase())
       );
+  };
+
+  // PRINT SERVICE ORDER FUNCTION
+  const handlePrintOS = (booking: Booking) => {
+      const bus = buses.find(b => b.id === booking.busId);
+      const driver = users.find(u => u.id === booking.driverId);
+
+      const printContent = `
+        <html>
+        <head>
+            <title>Ordem de Serviço - ${booking.destination}</title>
+            <style>
+                body { font-family: Arial, sans-serif; padding: 20px; color: #000; }
+                .header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 20px; }
+                .header h1 { margin: 0; font-size: 24px; }
+                .header p { margin: 5px 0 0; }
+                .section { margin-bottom: 20px; }
+                .section h3 { background: #eee; padding: 5px; border-bottom: 1px solid #ccc; margin-bottom: 10px; font-size: 16px; text-transform: uppercase; }
+                .row { display: flex; margin-bottom: 8px; }
+                .label { font-weight: bold; width: 150px; }
+                .value { flex: 1; border-bottom: 1px dotted #ccc; }
+                .box { border: 2px solid #000; padding: 15px; margin-top: 30px; }
+                .km-row { display: flex; justify-content: space-between; margin-top: 20px; }
+                .km-field { width: 45%; border-bottom: 1px solid #000; padding-bottom: 5px; }
+                .footer { margin-top: 50px; text-align: center; font-size: 12px; }
+                @media print {
+                    body { -webkit-print-color-adjust: exact; }
+                }
+            </style>
+        </head>
+        <body>
+            <div class="header">
+                <h1>RabeloTour - ORDEM DE SERVIÇO</h1>
+                <p>Transporte e Turismo</p>
+            </div>
+
+            <div class="section">
+                <h3>Dados da Viagem</h3>
+                <div class="row"><span class="label">Destino:</span><span class="value">${booking.destination}</span></div>
+                <div class="row"><span class="label">Local de Saída:</span><span class="value">${booking.departureLocation}</span></div>
+                <div class="row"><span class="label">Horário de Saída:</span><span class="value">${new Date(booking.startTime).toLocaleString()}</span></div>
+                <div class="row"><span class="label">Apresentação:</span><span class="value">${new Date(booking.presentationTime).toLocaleString()} (Garagem)</span></div>
+                <div class="row"><span class="label">Retorno Previsto:</span><span class="value">${new Date(booking.endTime).toLocaleString()}</span></div>
+            </div>
+
+            <div class="section">
+                <h3>Cliente</h3>
+                <div class="row"><span class="label">Nome:</span><span class="value">${booking.clientName}</span></div>
+                <div class="row"><span class="label">Telefone:</span><span class="value">${booking.clientPhone || 'Não informado'}</span></div>
+            </div>
+
+            <div class="section">
+                <h3>Equipe e Veículo</h3>
+                <div class="row"><span class="label">Motorista:</span><span class="value">${driver?.name || '___________________________'}</span></div>
+                <div class="row"><span class="label">Veículo:</span><span class="value">${bus?.model} - Placa: ${bus?.plate}</span></div>
+            </div>
+
+            <div class="box">
+                <h3 style="border:none; background:none; padding:0; margin:0 0 10px 0;">CONTROLE DE QUILOMETRAGEM</h3>
+                <div class="km-row">
+                    <div class="km-field">KM INICIAL: </div>
+                    <div class="km-field">KM FINAL: </div>
+                </div>
+                <div style="margin-top: 30px;">
+                    <p>Observações do Motorista:</p>
+                    <div style="height: 50px; border-bottom: 1px solid #ccc; margin-top: 10px;"></div>
+                    <div style="height: 50px; border-bottom: 1px solid #ccc; margin-top: 10px;"></div>
+                </div>
+            </div>
+
+            <div class="footer">
+                <p>_____________________________________________</p>
+                <p>Assinatura do Motorista</p>
+            </div>
+            
+            <script>window.print();</script>
+        </body>
+        </html>
+      `;
+
+      const win = window.open('', '', 'width=800,height=600');
+      if (win) {
+          win.document.write(printContent);
+          win.document.close();
+      }
   };
 
   return (
@@ -201,7 +287,7 @@ const BookingsView: React.FC = () => {
                     </span>
                     <h3 className="font-semibold text-lg text-slate-900">{booking.destination}</h3>
                   </div>
-                  <p className="text-slate-600 text-sm">Cliente: <span className="font-medium text-slate-800">{booking.clientName}</span></p>
+                  <p className="text-slate-600 text-sm">Cliente: <span className="font-medium text-slate-800">{booking.clientName}</span> {booking.clientPhone && <span className="text-xs text-slate-400">({booking.clientPhone})</span>}</p>
                   
                   <div className="mt-3 flex flex-wrap gap-4 text-sm text-slate-500">
                     <div className="flex items-center gap-1 bg-slate-50 px-2 py-1 rounded">
@@ -278,11 +364,19 @@ const BookingsView: React.FC = () => {
                          </span>
                      )}
                   </div>
+                  
+                  {/* GENERATE OS BUTTON */}
+                  <button 
+                    onClick={() => handlePrintOS(booking)}
+                    className="w-full mt-3 bg-slate-800 text-white text-xs py-2 rounded hover:bg-slate-700 flex items-center justify-center gap-1 font-bold"
+                  >
+                      🖨️ Imprimir OS
+                  </button>
 
                   {booking.status === 'CONFIRMED' && (
                     <button 
                         onClick={() => updateBookingStatus(booking.id, 'CANCELLED')}
-                        className="text-xs text-red-500 hover:text-red-700 mt-3 underline block w-full text-right"
+                        className="text-xs text-red-500 hover:text-red-700 mt-2 underline block w-full text-right"
                     >
                         Cancelar Viagem
                     </button>
@@ -310,6 +404,15 @@ const BookingsView: React.FC = () => {
               type="text" name="clientName" value={formData.clientName} onChange={handleChange}
               className="w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
               placeholder="Nome da empresa ou pessoa"
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Telefone do Cliente</label>
+            <input 
+              type="text" name="clientPhone" value={formData.clientPhone} onChange={handleChange}
+              className="w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
+              placeholder="(00) 00000-0000"
               required
             />
           </div>

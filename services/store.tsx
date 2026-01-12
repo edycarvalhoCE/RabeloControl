@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { User, Bus, Booking, Part, Transaction, TimeOff, UserRole, DriverDocument, MaintenanceRecord, PurchaseRequest, MaintenanceReport, CharterContract } from '../types';
+import { User, Bus, Booking, Part, Transaction, TimeOff, UserRole, DriverDocument, MaintenanceRecord, PurchaseRequest, MaintenanceReport, CharterContract, TravelPackage, PackagePassenger, PackagePayment, Client } from '../types';
 import { MOCK_USERS, MOCK_BUSES, MOCK_PARTS } from '../constants';
 
 interface StoreContextType {
@@ -15,6 +15,10 @@ interface StoreContextType {
   purchaseRequests: PurchaseRequest[];
   maintenanceReports: MaintenanceReport[];
   charterContracts: CharterContract[];
+  travelPackages: TravelPackage[];
+  packagePassengers: PackagePassenger[];
+  packagePayments: PackagePayment[];
+  clients: Client[];
   
   // Actions
   switchUser: (userId: string) => void;
@@ -36,6 +40,15 @@ interface StoreContextType {
   addBus: (bus: Omit<Bus, 'id' | 'status'>) => void;
   updateBusStatus: (id: string, status: Bus['status']) => void;
   addCharterContract: (contract: Omit<CharterContract, 'id' | 'status'>) => void;
+  addTravelPackage: (pkg: Omit<TravelPackage, 'id' | 'status'>) => void;
+  
+  // Updated Action for Package Sale
+  registerPackageSale: (
+      clientData: Omit<Client, 'id'>, 
+      saleData: Omit<PackagePassenger, 'id' | 'clientId' | 'paidAmount' | 'status' | 'titularName' | 'titularCpf'>
+  ) => void;
+  
+  addPackagePayment: (payment: Omit<PackagePayment, 'id'>) => void;
 }
 
 const StoreContext = createContext<StoreContextType | undefined>(undefined);
@@ -51,7 +64,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   const [parts, setParts] = useState<Part[]>(MOCK_PARTS);
   const [bookings, setBookings] = useState<Booking[]>([
     {
-      id: 'bk1', busId: 'b1', driverId: 'u3', clientName: 'Turismo Sol', destination: 'Praia Grande',
+      id: 'bk1', busId: 'b1', driverId: 'u3', clientName: 'Turismo Sol', clientPhone: '(11) 99999-0000', destination: 'Praia Grande',
       startTime: new Date(Date.now() + 86400000).toISOString(),
       endTime: new Date(Date.now() + 172800000).toISOString(),
       value: 3500, status: 'CONFIRMED',
@@ -71,6 +84,16 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   const [purchaseRequests, setPurchaseRequests] = useState<PurchaseRequest[]>([]);
   const [maintenanceReports, setMaintenanceReports] = useState<MaintenanceReport[]>([]);
   const [charterContracts, setCharterContracts] = useState<CharterContract[]>([]);
+  
+  // New States for Travel Packages & Clients
+  const [clients, setClients] = useState<Client[]>([
+    { id: 'c1', name: 'Maria Silva', cpf: '12345678900', rg: '1234567', birthDate: '1980-05-15', phone: '11999998888', address: 'Rua das Flores, 123' }
+  ]);
+  const [travelPackages, setTravelPackages] = useState<TravelPackage[]>([
+      { id: 'tp1', title: 'Trem das Montanhas', date: '2026-01-27', adultPrice: 2526.00, childPrice: 1768.20, seniorPrice: 2300.00, status: 'OPEN' }
+  ]);
+  const [packagePassengers, setPackagePassengers] = useState<PackagePassenger[]>([]);
+  const [packagePayments, setPackagePayments] = useState<PackagePayment[]>([]);
 
   const switchUser = (userId: string) => {
     const user = users.find(u => u.id === userId);
@@ -257,6 +280,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                       busId: contract.busId,
                       driverId: contract.driverId,
                       clientName: contract.clientName,
+                      clientPhone: '', // Charter usually doesn't need this per trip, but can be added
                       destination: `${contract.route} (Manhã)`,
                       startTime: startMorning.toISOString(),
                       endTime: endMorning.toISOString(),
@@ -280,6 +304,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                     busId: contract.busId,
                     driverId: contract.driverId,
                     clientName: contract.clientName,
+                    clientPhone: '',
                     destination: `${contract.route} (Tarde)`,
                     startTime: startAfternoon.toISOString(),
                     endTime: endAfternoon.toISOString(),
@@ -297,14 +322,74 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
           currentDate.setDate(currentDate.getDate() + 1);
       }
 
-      // Add all generated bookings to state, skipping availability check for simplicity (assuming manager knows what they are doing with contract)
       setBookings(prev => [...prev, ...generatedBookings]);
+  };
+
+  const addTravelPackage = (pkg: Omit<TravelPackage, 'id' | 'status'>) => {
+    setTravelPackages(prev => [...prev, { ...pkg, id: Math.random().toString(36).substr(2, 9), status: 'OPEN' }]);
+  };
+
+  const registerPackageSale = (
+      clientData: Omit<Client, 'id'>, 
+      saleData: Omit<PackagePassenger, 'id' | 'clientId' | 'paidAmount' | 'status' | 'titularName' | 'titularCpf'>
+  ) => {
+    // 1. Check if client exists or create new
+    let clientId = '';
+    const existingClient = clients.find(c => c.cpf === clientData.cpf);
+    
+    if (existingClient) {
+        clientId = existingClient.id;
+        // Update client info if provided
+        setClients(prev => prev.map(c => c.id === clientId ? { ...c, ...clientData } : c));
+    } else {
+        clientId = Math.random().toString(36).substr(2, 9);
+        setClients(prev => [...prev, { ...clientData, id: clientId }]);
+    }
+
+    // 2. Register Sale (Passenger Record)
+    setPackagePassengers(prev => [...prev, {
+        ...saleData,
+        id: Math.random().toString(36).substr(2, 9),
+        clientId,
+        titularName: clientData.name,
+        titularCpf: clientData.cpf,
+        paidAmount: 0,
+        status: 'PENDING'
+    }]);
+  };
+
+  const addPackagePayment = (payment: Omit<PackagePayment, 'id'>) => {
+      // 1. Add Payment Record
+      setPackagePayments(prev => [...prev, { ...payment, id: Math.random().toString(36).substr(2, 9) }]);
+      
+      // 2. Update Passenger Status and Paid Amount
+      setPackagePassengers(prev => prev.map(p => {
+          if (p.id === payment.passengerId) {
+              const newPaidAmount = p.paidAmount + payment.amount;
+              const newStatus = newPaidAmount >= p.agreedPrice ? 'PAID' : 'PARTIAL';
+              return { ...p, paidAmount: newPaidAmount, status: newStatus };
+          }
+          return p;
+      }));
+
+      // 3. Add Income to Company Financials
+      const passenger = packagePassengers.find(p => p.id === payment.passengerId);
+      const pkg = travelPackages.find(tp => tp.id === passenger?.packageId);
+      
+      addTransaction({
+          type: 'INCOME',
+          status: 'COMPLETED',
+          category: 'Pacotes de Viagem',
+          amount: payment.amount,
+          date: payment.date,
+          description: `Pagamento Pacote: ${pkg?.title} - Passageiro: ${passenger?.titularName} (${payment.method})`
+      });
   };
 
   return (
     <StoreContext.Provider value={{
-      currentUser, users, buses, bookings, parts, transactions, timeOffs, documents, maintenanceRecords, purchaseRequests, maintenanceReports, charterContracts,
-      switchUser, addUser, addBooking, updateBookingStatus, addPart, updateStock, addTransaction, addTimeOff, updateTimeOffStatus, addDocument, deleteDocument, addMaintenanceRecord, addPurchaseRequest, updatePurchaseRequestStatus, addMaintenanceReport, updateMaintenanceReportStatus, addBus, updateBusStatus, addCharterContract
+      currentUser, users, buses, bookings, parts, transactions, timeOffs, documents, maintenanceRecords, purchaseRequests, maintenanceReports, charterContracts, travelPackages, packagePassengers, packagePayments, clients,
+      switchUser, addUser, addBooking, updateBookingStatus, addPart, updateStock, addTransaction, addTimeOff, updateTimeOffStatus, addDocument, deleteDocument, addMaintenanceRecord, addPurchaseRequest, updatePurchaseRequestStatus, addMaintenanceReport, updateMaintenanceReportStatus, addBus, updateBusStatus, addCharterContract, addTravelPackage, registerPackageSale, addPackagePayment
     }}>
       {children}
     </StoreContext.Provider>

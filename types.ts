@@ -46,6 +46,7 @@ export interface Booking {
   busId: string;
   driverId: string | null;
   clientName: string;
+  clientPhone?: string; // Contact phone for Service Order
   destination: string;
   startTime: string; // ISO Date
   endTime: string;   // ISO Date
@@ -119,4 +120,59 @@ export interface CharterContract {
   startDate: string; // ISO Date
   endDate: string; // ISO Date
   status: 'ACTIVE' | 'ENDED';
+}
+
+// --- New Types for Travel Packages & Clients ---
+
+export interface Client {
+  id: string;
+  name: string;
+  cpf: string;
+  rg: string;
+  birthDate: string;
+  phone: string;
+  address: string;
+  notes?: string;
+}
+
+export interface TravelPackage {
+  id: string;
+  title: string; // e.g., "Trem das Montanhas"
+  date: string; // ISO Date
+  adultPrice: number;
+  childPrice: number;
+  seniorPrice: number; // Melhor Idade
+  status: 'OPEN' | 'CLOSED';
+}
+
+export interface PackagePassenger {
+  id: string;
+  packageId: string;
+  clientId: string; // Link to Client
+  
+  // Sale Details
+  titularName: string;
+  titularCpf: string;
+  
+  // Quantities
+  qtdAdult: number;
+  qtdChild: number;
+  qtdSenior: number;
+  
+  // Financials
+  agreedPrice: number; // Total to pay after discount
+  discount: number;
+  paidAmount: number;
+  
+  status: 'PENDING' | 'PARTIAL' | 'PAID';
+}
+
+export interface PackagePayment {
+  id: string;
+  passengerId: string;
+  amount: number;
+  date: string;
+  method: 'PIX' | 'DINHEIRO' | 'CARTAO_CREDITO' | 'CARTAO_DEBITO';
+  installments?: number; // If credit card
+  notes?: string;
 }
