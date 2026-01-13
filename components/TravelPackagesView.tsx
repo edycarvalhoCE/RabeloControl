@@ -58,6 +58,25 @@ const TravelPackagesView: React.FC = () => {
       }
   };
 
+  // Currency Handlers
+  const handlePkgPriceChange = (field: 'adultPrice' | 'childPrice' | 'seniorPrice', valueStr: string) => {
+      const digits = valueStr.replace(/\D/g, "");
+      const realValue = Number(digits) / 100;
+      setNewPkg(prev => ({ ...prev, [field]: realValue }));
+  };
+
+  const handleDiscountChange = (valueStr: string) => {
+      const digits = valueStr.replace(/\D/g, "");
+      const realValue = Number(digits) / 100;
+      setSaleForm(prev => ({ ...prev, discount: realValue }));
+  };
+
+  const handlePaymentAmountChange = (valueStr: string) => {
+      const digits = valueStr.replace(/\D/g, "");
+      const realValue = Number(digits) / 100;
+      setNewPayment(prev => ({ ...prev, amount: realValue }));
+  };
+
   const handleRegisterSale = (e: React.FormEvent) => {
       e.preventDefault();
       if(selectedPackage) {
@@ -74,7 +93,7 @@ const TravelPackagesView: React.FC = () => {
           // 2. Check Discount Authorization
           if (saleForm.discount > 0) {
               const authorized = window.confirm(
-                  `ATENÇÃO: Você está aplicando um desconto de R$ ${saleForm.discount.toFixed(2)}.\n\n` + 
+                  `ATENÇÃO: Você está aplicando um desconto de R$ ${saleForm.discount.toLocaleString('pt-BR', {minimumFractionDigits: 2})}.\n\n` + 
                   `Todo desconto deve ser AUTORIZADO pelo gestor.\n` + 
                   `Confirma que você possui esta autorização?`
               );
@@ -159,9 +178,9 @@ const TravelPackagesView: React.FC = () => {
                           <p className="opacity-90 mt-1">📅 Saída: {new Date(selectedPackage.date).toLocaleDateString()}</p>
                       </div>
                       <div className="text-right text-xs md:text-sm bg-white/10 p-3 rounded-lg backdrop-blur-sm space-y-1">
-                          <p>Adulto: <span className="font-bold">R$ {selectedPackage.adultPrice.toFixed(2)}</span></p>
-                          <p>Criança: <span className="font-bold">R$ {selectedPackage.childPrice.toFixed(2)}</span></p>
-                          <p>Melhor Idade: <span className="font-bold">R$ {selectedPackage.seniorPrice.toFixed(2)}</span></p>
+                          <p>Adulto: <span className="font-bold">R$ {selectedPackage.adultPrice.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span></p>
+                          <p>Criança: <span className="font-bold">R$ {selectedPackage.childPrice.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span></p>
+                          <p>Melhor Idade: <span className="font-bold">R$ {selectedPackage.seniorPrice.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span></p>
                       </div>
                   </div>
 
@@ -245,15 +264,20 @@ const TravelPackagesView: React.FC = () => {
                                           </div>
                                       </div>
                                       <div className="flex justify-between items-center border-t border-slate-100 pt-2">
-                                          <div>
+                                          <div className="flex flex-col">
                                               <label className="text-xs font-bold text-slate-500 mr-2">Desconto (R$)</label>
-                                              <input type="number" min="0" step="0.01" className="border p-1 rounded w-24 text-right text-red-600 font-medium" 
-                                                value={saleForm.discount} onChange={e => setSaleForm({...saleForm, discount: parseFloat(e.target.value) || 0})}
+                                              <input 
+                                                type="text" 
+                                                inputMode="numeric"
+                                                className="border p-1 rounded w-32 text-right text-red-600 font-medium" 
+                                                value={saleForm.discount.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
+                                                onChange={e => handleDiscountChange(e.target.value)}
+                                                placeholder="0,00"
                                               />
                                           </div>
                                           <div className="text-right">
                                               <span className="text-xs text-slate-500 block">Total a Pagar</span>
-                                              <span className="text-lg font-bold text-emerald-600">R$ {currentFinal.toFixed(2)}</span>
+                                              <span className="text-lg font-bold text-emerald-600">R$ {currentFinal.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
                                           </div>
                                       </div>
                                   </div>
@@ -294,8 +318,8 @@ const TravelPackagesView: React.FC = () => {
                                                   <span className={`block text-xs font-bold mb-1 ${p.status === 'PAID' ? 'text-emerald-600' : p.status === 'PARTIAL' ? 'text-blue-600' : 'text-orange-500'}`}>
                                                       {p.status === 'PAID' ? 'QUITADO' : p.status === 'PARTIAL' ? 'PARCIAL' : 'PENDENTE'}
                                                   </span>
-                                                  <p className="font-bold text-slate-800">R$ {p.agreedPrice.toFixed(2)}</p>
-                                                  {p.discount > 0 && <p className="text-xs text-red-500">- Desc: R$ {p.discount.toFixed(2)}</p>}
+                                                  <p className="font-bold text-slate-800">R$ {p.agreedPrice.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</p>
+                                                  {p.discount > 0 && <p className="text-xs text-red-500">- Desc: R$ {p.discount.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</p>}
                                               </div>
                                           </div>
                                           
@@ -304,7 +328,7 @@ const TravelPackagesView: React.FC = () => {
                                                   <div className={`h-2.5 rounded-full ${progress === 100 ? 'bg-emerald-500' : 'bg-blue-500'}`} style={{width: `${progress}%`}}></div>
                                               </div>
                                               <span className="text-xs font-bold text-slate-600 whitespace-nowrap">
-                                                  Pago: R$ {p.paidAmount.toFixed(2)}
+                                                  Pago: R$ {p.paidAmount.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
                                               </span>
                                           </div>
                                           
@@ -356,16 +380,23 @@ const TravelPackagesView: React.FC = () => {
                           </div>
                           <div className="p-6">
                               <p className="text-sm text-slate-500 mb-1">Titular: <span className="font-bold text-slate-800">{selectedPassengerForPayment.titularName}</span></p>
-                              <p className="text-sm text-slate-500 mb-4">Restante a Pagar: <span className="font-bold text-red-600">R$ {(selectedPassengerForPayment.agreedPrice - selectedPassengerForPayment.paidAmount).toFixed(2)}</span></p>
+                              <p className="text-sm text-slate-500 mb-4">Restante a Pagar: <span className="font-bold text-red-600">R$ {(selectedPassengerForPayment.agreedPrice - selectedPassengerForPayment.paidAmount).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span></p>
                               
                               <form onSubmit={handleRegisterPayment} className="space-y-3">
                                   <div>
                                       <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Valor (R$)</label>
-                                      <input 
-                                        type="number" step="0.01" required
-                                        value={newPayment.amount} onChange={e => setNewPayment({...newPayment, amount: parseFloat(e.target.value)})}
-                                        className="w-full border p-2 rounded"
-                                      />
+                                      <div className="flex items-center border border-slate-300 rounded overflow-hidden bg-white focus-within:ring-2 focus-within:ring-emerald-500">
+                                          <span className="bg-slate-100 text-slate-600 px-3 py-2 font-bold border-r border-slate-300">R$</span>
+                                          <input 
+                                            type="text"
+                                            inputMode="numeric"
+                                            required
+                                            value={newPayment.amount.toLocaleString('pt-BR', {minimumFractionDigits: 2})} 
+                                            onChange={e => handlePaymentAmountChange(e.target.value)}
+                                            className="w-full p-2 outline-none text-right font-bold text-slate-800"
+                                            placeholder="0,00"
+                                          />
+                                      </div>
                                   </div>
                                   <div>
                                       <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Data</label>
@@ -433,7 +464,7 @@ const TravelPackagesView: React.FC = () => {
                                                     <span className="text-xs text-slate-500">{pkg ? new Date(pkg.date).toLocaleDateString() : 'N/A'}</span>
                                                 </div>
                                                 <p className="text-xs text-slate-500 mt-1">
-                                                    {p.qtdAdult} Ad, {p.qtdChild} Cri, {p.qtdSenior} Ido • Total: R$ {p.agreedPrice.toFixed(2)}
+                                                    {p.qtdAdult} Ad, {p.qtdChild} Cri, {p.qtdSenior} Ido • Total: R$ {p.agreedPrice.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
                                                 </p>
                                             </div>
                                         )
@@ -489,27 +520,48 @@ const TravelPackagesView: React.FC = () => {
                     <div className="grid grid-cols-3 gap-4">
                         <div>
                             <label className="block text-sm font-medium text-slate-700 mb-1">Adulto (R$)</label>
-                            <input 
-                                type="number" step="0.01" value={newPkg.adultPrice} onChange={e => setNewPkg({...newPkg, adultPrice: parseFloat(e.target.value)})}
-                                required
-                                className="w-full border p-2 rounded focus:ring-2 focus:ring-emerald-500 outline-none"
-                            />
+                            <div className="flex items-center border border-slate-300 rounded overflow-hidden bg-white focus-within:ring-2 focus-within:ring-emerald-500">
+                                <span className="bg-slate-100 text-slate-600 px-2 py-2 font-bold border-r border-slate-300 text-xs">R$</span>
+                                <input 
+                                    type="text" 
+                                    inputMode="numeric"
+                                    required
+                                    value={newPkg.adultPrice.toLocaleString('pt-BR', {minimumFractionDigits: 2})} 
+                                    onChange={e => handlePkgPriceChange('adultPrice', e.target.value)}
+                                    className="w-full p-2 outline-none text-right font-bold text-slate-800 text-sm"
+                                    placeholder="0,00"
+                                />
+                            </div>
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-slate-700 mb-1">Criança (R$)</label>
-                            <input 
-                                type="number" step="0.01" value={newPkg.childPrice} onChange={e => setNewPkg({...newPkg, childPrice: parseFloat(e.target.value)})}
-                                required
-                                className="w-full border p-2 rounded focus:ring-2 focus:ring-emerald-500 outline-none"
-                            />
+                            <div className="flex items-center border border-slate-300 rounded overflow-hidden bg-white focus-within:ring-2 focus-within:ring-emerald-500">
+                                <span className="bg-slate-100 text-slate-600 px-2 py-2 font-bold border-r border-slate-300 text-xs">R$</span>
+                                <input 
+                                    type="text" 
+                                    inputMode="numeric"
+                                    required
+                                    value={newPkg.childPrice.toLocaleString('pt-BR', {minimumFractionDigits: 2})} 
+                                    onChange={e => handlePkgPriceChange('childPrice', e.target.value)}
+                                    className="w-full p-2 outline-none text-right font-bold text-slate-800 text-sm"
+                                    placeholder="0,00"
+                                />
+                            </div>
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-slate-700 mb-1">Melhor Idade (R$)</label>
-                            <input 
-                                type="number" step="0.01" value={newPkg.seniorPrice} onChange={e => setNewPkg({...newPkg, seniorPrice: parseFloat(e.target.value)})}
-                                required
-                                className="w-full border p-2 rounded focus:ring-2 focus:ring-emerald-500 outline-none"
-                            />
+                            <div className="flex items-center border border-slate-300 rounded overflow-hidden bg-white focus-within:ring-2 focus-within:ring-emerald-500">
+                                <span className="bg-slate-100 text-slate-600 px-2 py-2 font-bold border-r border-slate-300 text-xs">R$</span>
+                                <input 
+                                    type="text" 
+                                    inputMode="numeric"
+                                    required
+                                    value={newPkg.seniorPrice.toLocaleString('pt-BR', {minimumFractionDigits: 2})} 
+                                    onChange={e => handlePkgPriceChange('seniorPrice', e.target.value)}
+                                    className="w-full p-2 outline-none text-right font-bold text-slate-800 text-sm"
+                                    placeholder="0,00"
+                                />
+                            </div>
                         </div>
                     </div>
                     <button type="submit" className="w-full bg-slate-800 text-white py-2 rounded font-bold hover:bg-slate-700">
@@ -528,31 +580,35 @@ const TravelPackagesView: React.FC = () => {
                         onClick={() => setSelectedPackage(pkg)}
                         className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden cursor-pointer hover:shadow-md transition-all group"
                     >
-                        <div className="bg-slate-100 p-4 border-b border-slate-200 group-hover:bg-emerald-50 transition-colors">
-                            <h3 className="text-lg font-bold text-slate-800">{pkg.title}</h3>
-                            <p className="text-sm text-slate-500">📅 {new Date(pkg.date).toLocaleDateString()}</p>
-                        </div>
-                        <div className="p-4 space-y-2">
-                            <div className="flex justify-between text-sm">
-                                <span className="text-slate-500">Adulto:</span>
-                                <span className="font-bold text-slate-700">R$ {pkg.adultPrice.toFixed(2)}</span>
+                        <div className="h-2 w-full bg-emerald-500 group-hover:bg-emerald-400 transition-colors"></div>
+                        <div className="p-5">
+                            <h3 className="text-xl font-bold text-slate-800 mb-1">{pkg.title}</h3>
+                            <p className="text-sm text-slate-500 mb-3">
+                                📅 {new Date(pkg.date).toLocaleDateString()}
+                            </p>
+                            
+                            <div className="flex flex-wrap gap-2 text-xs font-medium text-slate-600 mb-4">
+                                <span className="bg-slate-100 px-2 py-1 rounded">Adulto: R$ {pkg.adultPrice.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                                <span className="bg-slate-100 px-2 py-1 rounded">Criança: R$ {pkg.childPrice.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
                             </div>
-                            <div className="flex justify-between text-sm">
-                                <span className="text-slate-500">Criança:</span>
-                                <span className="font-bold text-slate-700">R$ {pkg.childPrice.toFixed(2)}</span>
-                            </div>
-                            <div className="flex justify-between text-sm">
-                                <span className="text-slate-500">Melhor Idade:</span>
-                                <span className="font-bold text-slate-700">R$ {pkg.seniorPrice?.toFixed(2) || '0.00'}</span>
-                            </div>
-                            <div className="pt-3 border-t border-slate-100 flex justify-between items-center">
-                                <span className="text-xs font-bold uppercase text-slate-400">Vendas</span>
-                                <span className="bg-emerald-100 text-emerald-700 px-2 py-1 rounded text-xs font-bold">{paxCount} Contratos</span>
+
+                            <div className="flex justify-between items-center pt-3 border-t border-slate-100">
+                                <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full">
+                                    {paxCount} Passageiros
+                                </span>
+                                <span className="text-slate-400 text-sm group-hover:translate-x-1 transition-transform">
+                                    Gerenciar &rarr;
+                                </span>
                             </div>
                         </div>
                     </div>
-                );
+                )
             })}
+            {travelPackages.length === 0 && (
+                <div className="col-span-full text-center py-12 bg-white rounded-xl border-2 border-dashed border-slate-200 text-slate-400">
+                    <p>Nenhum pacote de viagem cadastrado.</p>
+                </div>
+            )}
         </div>
     </div>
   );

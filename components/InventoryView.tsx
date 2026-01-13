@@ -17,6 +17,13 @@ const InventoryView: React.FC = () => {
     setNewPart({ name: '', quantity: 0, minQuantity: 5, price: 0 });
   };
 
+  const handlePriceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    const digits = value.replace(/\D/g, "");
+    const realValue = Number(digits) / 100;
+    setNewPart(prev => ({ ...prev, price: realValue }));
+  };
+
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex flex-col md:flex-row justify-between items-center gap-4">
@@ -72,11 +79,20 @@ const InventoryView: React.FC = () => {
                     value={newPart.minQuantity || ''} onChange={e => setNewPart({...newPart, minQuantity: parseInt(e.target.value)})}
                     className="border p-2 rounded"
                     />
-                    <input 
-                    type="number" placeholder="Preço Unitário" step="0.01" required
-                    value={newPart.price || ''} onChange={e => setNewPart({...newPart, price: parseFloat(e.target.value)})}
-                    className="border p-2 rounded"
-                    />
+                    
+                    <div className="flex items-center border border-slate-300 rounded overflow-hidden bg-white focus-within:ring-2 focus-within:ring-blue-500">
+                        <span className="bg-slate-100 text-slate-600 px-2 py-2 font-bold border-r border-slate-300 text-sm">R$</span>
+                        <input 
+                            type="text" 
+                            inputMode="numeric"
+                            required 
+                            value={newPart.price.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} 
+                            onChange={handlePriceChange}
+                            className="w-full p-2 outline-none text-right font-bold text-slate-800"
+                            placeholder="0,00"
+                        />
+                    </div>
+
                     <button type="submit" className="md:col-span-4 bg-green-600 text-white py-2 rounded hover:bg-green-700">Salvar Item</button>
                 </form>
                 </div>
@@ -97,7 +113,7 @@ const InventoryView: React.FC = () => {
                     {parts.map(part => (
                     <tr key={part.id} className="hover:bg-slate-50">
                         <td className="p-4 font-medium text-slate-800">{part.name}</td>
-                        <td className="p-4 text-slate-600">R$ {part.price.toFixed(2)}</td>
+                        <td className="p-4 text-slate-600">{part.price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
                         <td className="p-4 text-center">
                         <span className="font-bold text-lg">{part.quantity}</span>
                         <span className="text-xs text-slate-400 block">Min: {part.minQuantity}</span>

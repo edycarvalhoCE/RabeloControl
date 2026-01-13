@@ -67,6 +67,10 @@ const Dashboard: React.FC = () => {
     return `${day}/${month}/${year}`;
   };
 
+  const formatCurrency = (value: number) => {
+      return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  };
+
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex justify-between items-center bg-white p-6 rounded-xl shadow-sm border border-slate-200">
@@ -106,7 +110,7 @@ const Dashboard: React.FC = () => {
           <div className="absolute top-0 right-0 w-16 h-16 bg-green-50 rounded-bl-full -mr-2 -mt-2"></div>
           <p className="text-slate-500 text-sm font-medium z-10 relative">Saldo em Caixa</p>
           <p className={`text-2xl font-bold mt-2 z-10 relative ${profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-            R$ {profit.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+            {formatCurrency(profit)}
           </p>
         </div>
         <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
@@ -167,10 +171,17 @@ const Dashboard: React.FC = () => {
                       <BarChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
                           <CartesianGrid strokeDasharray="3 3" vertical={false} />
                           <XAxis dataKey="name" axisLine={false} tickLine={false} />
-                          <YAxis axisLine={false} tickLine={false} />
+                          <YAxis 
+                            axisLine={false} 
+                            tickLine={false} 
+                            // Format: R$ 1.000 instead of 1k
+                            tickFormatter={(val) => `R$ ${val.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}`} 
+                            width={80}
+                          />
                           <Tooltip 
                             contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
                             cursor={{ fill: '#f3f4f6' }}
+                            formatter={(value: number) => [formatCurrency(value), 'Valor']}
                           />
                           <Bar dataKey="amount" fill="#3b82f6" radius={[4, 4, 0, 0]} barSize={60} />
                       </BarChart>
