@@ -24,6 +24,27 @@ const BookingsView: React.FC = () => {
 
   const drivers = users.filter(u => u.role === UserRole.DRIVER);
 
+  // --- TRANSLATION HELPER ---
+  const getStatusLabel = (status: string) => {
+      switch (status) {
+          case 'CONFIRMED': return 'Confirmado';
+          case 'PENDING': return 'Pendente';
+          case 'COMPLETED': return 'Concluído';
+          case 'CANCELLED': return 'Cancelado';
+          default: return status;
+      }
+  };
+
+  const getStatusColor = (status: string) => {
+      switch (status) {
+          case 'CONFIRMED': return 'bg-green-100 text-green-700 border-green-200';
+          case 'PENDING': return 'bg-yellow-100 text-yellow-700 border-yellow-200';
+          case 'COMPLETED': return 'bg-blue-100 text-blue-700 border-blue-200';
+          case 'CANCELLED': return 'bg-red-100 text-red-700 border-red-200';
+          default: return 'bg-gray-100 text-gray-700';
+      }
+  };
+
   // --- SAFE HELPERS ---
   const safeDate = (dateStr: string | null | undefined, options?: Intl.DateTimeFormatOptions) => {
       if (!dateStr) return 'N/A';
@@ -241,7 +262,7 @@ const BookingsView: React.FC = () => {
                     Número: <strong>${booking.id.slice(0, 6).toUpperCase()}</strong>
                 </div>
                  <div style="border: 1px solid #000; padding: 2px 10px; display: inline-block; margin-left: 5px;">
-                    Valor: <strong>R$ ${booking.value.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</strong>
+                    Valor: <strong>${booking.value.toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'})}</strong>
                 </div>
              </div>
           </div>
@@ -527,8 +548,8 @@ const BookingsView: React.FC = () => {
               <div key={booking.id} className="bg-white p-5 rounded-lg shadow-sm border border-slate-200 flex flex-col md:flex-row justify-between items-start gap-4">
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-1">
-                    <span className={`px-2 py-1 rounded text-xs font-bold ${booking.status === 'CONFIRMED' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'}`}>
-                      {booking.status}
+                    <span className={`px-2 py-1 rounded text-xs font-bold border ${getStatusColor(booking.status)}`}>
+                      {getStatusLabel(booking.status)}
                     </span>
                     <h3 className="font-semibold text-lg text-slate-900">{booking.destination}</h3>
                   </div>
@@ -564,7 +585,9 @@ const BookingsView: React.FC = () => {
                 </div>
 
                 <div className="text-right border-t md:border-t-0 md:border-l border-slate-100 pt-4 md:pt-0 md:pl-4 min-w-[150px]">
-                  <p className="text-lg font-bold text-blue-600">R$ {booking.value.toLocaleString('pt-BR')}</p>
+                  <p className="text-lg font-bold text-blue-600">
+                      {booking.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                  </p>
                   
                   <div className="mt-2 text-xs mb-3">
                      {booking.paymentStatus === 'PAID' ? (
