@@ -266,14 +266,17 @@ const TravelPackagesView: React.FC = () => {
                                       <div className="flex justify-between items-center border-t border-slate-100 pt-2">
                                           <div className="flex flex-col">
                                               <label className="text-xs font-bold text-slate-500 mr-2">Desconto (R$)</label>
-                                              <input 
-                                                type="text" 
-                                                inputMode="numeric"
-                                                className="border p-1 rounded w-32 text-right text-red-600 font-medium" 
-                                                value={saleForm.discount.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
-                                                onChange={e => handleDiscountChange(e.target.value)}
-                                                placeholder="0,00"
-                                              />
+                                              <div className="flex items-center border border-slate-300 rounded overflow-hidden bg-white focus-within:ring-2 focus-within:ring-emerald-500 w-32">
+                                                  <span className="bg-slate-100 text-slate-600 px-2 py-1 font-bold border-r border-slate-300 text-xs">R$</span>
+                                                  <input 
+                                                    type="text" 
+                                                    inputMode="numeric"
+                                                    className="p-1 outline-none text-right font-medium text-red-600 w-full" 
+                                                    value={saleForm.discount.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
+                                                    onChange={e => handleDiscountChange(e.target.value)}
+                                                    placeholder="0,00"
+                                                  />
+                                              </div>
                                           </div>
                                           <div className="text-right">
                                               <span className="text-xs text-slate-500 block">Total a Pagar</span>
