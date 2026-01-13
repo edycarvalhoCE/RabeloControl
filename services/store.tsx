@@ -239,8 +239,38 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   const addBooking = async (bookingData: Omit<Booking, 'id' | 'status'>): Promise<{ success: boolean; message: string }> => {
     if (!isConfigured) return { success: false, message: "Banco de dados desconectado." };
     
+    // 1. Check Bus Availability
     if (!checkAvailability(bookingData.busId, bookingData.startTime, bookingData.endTime)) {
       return { success: false, message: 'Conflito: Este ônibus já está alugado neste período!' };
+    }
+
+    // 2. Check Driver Availability (Safety Lock)
+    if (bookingData.driverId) {
+        const tripStart = new Date(bookingData.startTime).getTime();
+        const tripEnd = new Date(bookingData.endTime).getTime();
+
+        const driverConflict = timeOffs.find(t => {
+            // Check only approved time offs for this driver
+            if (t.driverId !== bookingData.driverId || t.status !== 'APPROVED') return false;
+            
+            // Time Off Date Range (Assuming full day)
+            // Fix: Create dates explicitly from YYYY-MM-DD to avoid timezone shifts
+            const [y, m, d] = t.date.split('-').map(Number);
+            const offStart = new Date(y, m - 1, d, 0, 0, 0).getTime();
+            const offEnd = new Date(y, m - 1, d, 23, 59, 59).getTime();
+
+            // Check if Trip overlaps with Time Off
+            return (tripStart <= offEnd && tripEnd >= offStart);
+        });
+
+        if (driverConflict) {
+            // Helper to format date
+            const dateStr = driverConflict.date.split('-').reverse().join('/');
+            return { 
+                success: false, 
+                message: `Motorista Indisponível! Ele está de ${driverConflict.type} no dia ${dateStr}. Cancele a folga primeiro.` 
+            };
+        }
     }
 
     const newBooking = { ...bookingData, status: 'CONFIRMED' };

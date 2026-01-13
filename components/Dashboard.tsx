@@ -4,7 +4,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { getFinancialInsight } from '../services/geminiService';
 
 const Dashboard: React.FC = () => {
-  const { bookings, transactions, buses, parts, currentUser, users } = useStore();
+  const { bookings, transactions, buses, parts, currentUser, users, timeOffs, updateTimeOffStatus } = useStore();
   const [insight, setInsight] = useState<string>('');
   const [loadingAi, setLoadingAi] = useState(false);
 
@@ -55,6 +55,17 @@ const Dashboard: React.FC = () => {
       const end = new Date(b.endTime);
       return b.status === 'CONFIRMED' && now >= start && now <= end;
   });
+
+  // Recent and Upcoming Time Offs (Approved & Pending)
+  const sortedTimeOffs = timeOffs
+    .sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+    .slice(0, 10); // Show last 10 records
+
+  const formatDateString = (dateStr: string) => {
+    if(!dateStr) return '';
+    const [year, month, day] = dateStr.split('-');
+    return `${day}/${month}/${year}`;
+  };
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -112,82 +123,137 @@ const Dashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* ACTIVE TRIPS SECTION */}
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-          <div className="p-4 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
-              <h3 className="font-bold text-slate-800 flex items-center gap-2">
-                  <span className="animate-pulse w-3 h-3 bg-green-500 rounded-full inline-block"></span>
-                  Veículos em Viagem Agora
-              </h3>
-              <span className="text-xs text-slate-500">Atualizado: {new Date().toLocaleTimeString()}</span>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          
+          {/* CHARTS COLUMN */}
+          <div className="lg:col-span-2 space-y-6">
+               {/* ACTIVE TRIPS SECTION */}
+               <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                    <div className="p-4 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
+                        <h3 className="font-bold text-slate-800 flex items-center gap-2">
+                            <span className="animate-pulse w-3 h-3 bg-green-500 rounded-full inline-block"></span>
+                            Veículos em Viagem Agora
+                        </h3>
+                        <span className="text-xs text-slate-500">Atualizado: {new Date().toLocaleTimeString()}</span>
+                    </div>
+                    <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {currentTrips.length === 0 ? (
+                            <p className="text-slate-500 col-span-2 text-center py-4">Nenhum veículo em rota no momento.</p>
+                        ) : (
+                            currentTrips.map(trip => {
+                                const bus = buses.find(b => b.id === trip.busId);
+                                const driver = users.find(u => u.id === trip.driverId);
+                                return (
+                                    <div key={trip.id} className="border border-green-200 bg-green-50 p-4 rounded-lg">
+                                        <div className="flex justify-between items-start mb-2">
+                                            <h4 className="font-bold text-green-900">{trip.destination}</h4>
+                                            <span className="bg-green-200 text-green-800 text-xs px-2 py-1 rounded font-bold">EM ROTA</span>
+                                        </div>
+                                        <div className="text-sm space-y-1">
+                                            <p><span className="font-semibold">Bus:</span> {bus?.model} ({bus?.plate})</p>
+                                            <p><span className="font-semibold">Motorista:</span> {driver?.name || 'N/A'}</p>
+                                            <p className="text-xs text-slate-500 mt-2">Retorno: {new Date(trip.endTime).toLocaleString()}</p>
+                                        </div>
+                                    </div>
+                                );
+                            })
+                        )}
+                    </div>
+                </div>
+
+              <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 h-80">
+                  <h3 className="text-lg font-semibold text-slate-700 mb-4">Fluxo de Caixa</h3>
+                  <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                          <XAxis dataKey="name" axisLine={false} tickLine={false} />
+                          <YAxis axisLine={false} tickLine={false} />
+                          <Tooltip 
+                            contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                            cursor={{ fill: '#f3f4f6' }}
+                          />
+                          <Bar dataKey="amount" fill="#3b82f6" radius={[4, 4, 0, 0]} barSize={60} />
+                      </BarChart>
+                  </ResponsiveContainer>
+              </div>
           </div>
-          <div className="p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {currentTrips.length === 0 ? (
-                  <p className="text-slate-500 col-span-3 text-center py-4">Nenhum veículo em rota no momento.</p>
-              ) : (
-                  currentTrips.map(trip => {
-                      const bus = buses.find(b => b.id === trip.busId);
-                      const driver = users.find(u => u.id === trip.driverId);
-                      return (
-                          <div key={trip.id} className="border border-green-200 bg-green-50 p-4 rounded-lg">
-                              <div className="flex justify-between items-start mb-2">
-                                  <h4 className="font-bold text-green-900">{trip.destination}</h4>
-                                  <span className="bg-green-200 text-green-800 text-xs px-2 py-1 rounded font-bold">EM ROTA</span>
-                              </div>
-                              <div className="text-sm space-y-1">
-                                  <p><span className="font-semibold">Bus:</span> {bus?.model} ({bus?.plate})</p>
-                                  <p><span className="font-semibold">Motorista:</span> {driver?.name || 'N/A'}</p>
-                                  <p className="text-xs text-slate-500 mt-2">Retorno: {new Date(trip.endTime).toLocaleString()}</p>
-                              </div>
+
+          {/* RIGHT COLUMN (Pie Chart + Time Off History) */}
+          <div className="space-y-6">
+              <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 h-80">
+                  <h3 className="text-lg font-semibold text-slate-700 mb-4">Status da Frota</h3>
+                  <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                          <Pie
+                              data={busStatusData}
+                              innerRadius={60}
+                              outerRadius={80}
+                              paddingAngle={5}
+                              dataKey="value"
+                          >
+                              {busStatusData.map((entry, index) => (
+                                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                              ))}
+                          </Pie>
+                          <Tooltip />
+                      </PieChart>
+                  </ResponsiveContainer>
+                  <div className="flex justify-center gap-4 text-sm text-slate-600 mt-[-20px]">
+                      {busStatusData.map((entry, index) => (
+                          <div key={index} className="flex items-center gap-1">
+                              <div className="w-3 h-3 rounded-full" style={{ backgroundColor: COLORS[index] }}></div>
+                              {entry.name}: {entry.value}
                           </div>
-                      );
-                  })
-              )}
-          </div>
-      </div>
+                      ))}
+                  </div>
+              </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 h-80">
-              <h3 className="text-lg font-semibold text-slate-700 mb-4">Fluxo de Caixa</h3>
-              <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                      <XAxis dataKey="name" axisLine={false} tickLine={false} />
-                      <YAxis axisLine={false} tickLine={false} />
-                      <Tooltip 
-                        contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                        cursor={{ fill: '#f3f4f6' }}
-                      />
-                      <Bar dataKey="amount" fill="#3b82f6" radius={[4, 4, 0, 0]} barSize={60} />
-                  </BarChart>
-              </ResponsiveContainer>
-          </div>
-
-          <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 h-80">
-              <h3 className="text-lg font-semibold text-slate-700 mb-4">Status da Frota</h3>
-              <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                      <Pie
-                          data={busStatusData}
-                          innerRadius={60}
-                          outerRadius={80}
-                          paddingAngle={5}
-                          dataKey="value"
-                      >
-                          {busStatusData.map((entry, index) => (
-                              <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                          ))}
-                      </Pie>
-                      <Tooltip />
-                  </PieChart>
-              </ResponsiveContainer>
-              <div className="flex justify-center gap-4 text-sm text-slate-600 mt-[-20px]">
-                  {busStatusData.map((entry, index) => (
-                      <div key={index} className="flex items-center gap-1">
-                          <div className="w-3 h-3 rounded-full" style={{ backgroundColor: COLORS[index] }}></div>
-                          {entry.name}: {entry.value}
-                      </div>
-                  ))}
+              {/* TIME OFF HISTORY */}
+              <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                   <div className="p-4 bg-slate-50 border-b border-slate-200">
+                       <h3 className="font-bold text-slate-700">Histórico de Folgas e Férias</h3>
+                   </div>
+                   <div className="max-h-80 overflow-y-auto divide-y divide-slate-100">
+                       {sortedTimeOffs.length === 0 ? (
+                           <p className="p-4 text-center text-slate-500 text-sm">Nenhum registro recente.</p>
+                       ) : (
+                           sortedTimeOffs.map(t => {
+                               const driver = users.find(u => u.id === t.driverId);
+                               return (
+                                   <div key={t.id} className="p-3 flex justify-between items-center hover:bg-slate-50">
+                                       <div>
+                                           <p className="text-sm font-bold text-slate-800">{driver?.name}</p>
+                                           <p className="text-xs text-slate-500">{t.type} • {formatDateString(t.date)}</p>
+                                       </div>
+                                       <div className="text-right">
+                                           {t.status === 'APPROVED' && (
+                                               <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded font-bold">Aprovado</span>
+                                           )}
+                                           {t.status === 'PENDING' && (
+                                               <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded font-bold">Pendente</span>
+                                           )}
+                                            {t.status === 'REJECTED' && (
+                                               <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded font-bold">Recusado</span>
+                                           )}
+                                           {/* Cancel Button (To free up driver) */}
+                                           {t.status === 'APPROVED' && (
+                                               <button 
+                                                    onClick={() => {
+                                                        if(window.confirm(`Deseja cancelar a folga de ${driver?.name}? O motorista ficará disponível novamente.`)) {
+                                                            updateTimeOffStatus(t.id, 'REJECTED');
+                                                        }
+                                                    }}
+                                                    className="block text-[10px] text-red-500 hover:underline mt-1 cursor-pointer"
+                                               >
+                                                   Cancelar Folga
+                                               </button>
+                                           )}
+                                       </div>
+                                   </div>
+                               );
+                           })
+                       )}
+                   </div>
               </div>
           </div>
       </div>
