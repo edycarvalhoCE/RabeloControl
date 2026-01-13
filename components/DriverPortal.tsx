@@ -1,12 +1,16 @@
 import React, { useState } from 'react';
 import { useStore } from '../services/store';
 import CalendarView from './CalendarView';
+import { Booking } from '../types';
 
 const DriverPortal: React.FC = () => {
   const { currentUser, bookings, timeOffs, addTimeOff, documents, buses, addMaintenanceReport, maintenanceReports } = useStore();
   const [requestDate, setRequestDate] = useState('');
   const [requestType, setRequestType] = useState<'FOLGA' | 'FERIAS'>('FOLGA');
   const [activeTab, setActiveTab] = useState<'schedule' | 'documents' | 'requests' | 'report'>('schedule');
+
+  // Trip Details Modal State
+  const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
 
   // Maintenance Report State
   const [reportForm, setReportForm] = useState({ busId: '', type: 'MECANICA', description: '', date: new Date().toISOString().split('T')[0] });
@@ -44,11 +48,24 @@ const DriverPortal: React.FC = () => {
       }
   };
 
+  const handleBookingClick = (booking: Booking) => {
+      setSelectedBooking(booking);
+  };
+
   // HELPER: Format date string YYYY-MM-DD to DD/MM/YYYY manually to avoid timezone bugs
   const formatDateString = (dateStr: string) => {
       if(!dateStr) return '';
       const [year, month, day] = dateStr.split('-');
       return `${day}/${month}/${year}`;
+  };
+
+  // Helper for DateTime display
+  const formatDateTime = (isoString: string) => {
+      if (!isoString) return 'N/A';
+      try {
+          const d = new Date(isoString);
+          return d.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+      } catch (e) { return isoString; }
   };
 
   const getStatusBadge = (status: string) => {
@@ -111,7 +128,7 @@ const DriverPortal: React.FC = () => {
         {activeTab === 'schedule' && (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <div className="lg:col-span-2">
-                     <CalendarView />
+                     <CalendarView onEventClick={handleBookingClick} />
                 </div>
                 <div className="space-y-4">
                     <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
@@ -123,10 +140,14 @@ const DriverPortal: React.FC = () => {
                             <p className="text-slate-500 italic">Nenhuma viagem agendada no momento.</p>
                         ) : (
                             myBookings.slice(0, 3).map(booking => (
-                                <div key={booking.id} className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 border-l-4 border-l-blue-500">
+                                <div 
+                                    key={booking.id} 
+                                    onClick={() => handleBookingClick(booking)}
+                                    className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 border-l-4 border-l-blue-500 cursor-pointer hover:shadow-md transition-shadow"
+                                >
                                     <div className="flex justify-between items-start mb-2">
                                         <h3 className="font-bold text-base">{booking.destination}</h3>
-                                        <span className="text-xs font-semibold bg-blue-50 text-blue-600 px-2 py-1 rounded">Confirmado</span>
+                                        <span className="text-xs font-semibold bg-blue-50 text-blue-600 px-2 py-1 rounded">Ver Detalhes</span>
                                     </div>
                                     <div className="text-xs text-slate-600 space-y-1">
                                         <p>📅 {new Date(booking.startTime).toLocaleDateString()} - {new Date(booking.startTime).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</p>
@@ -135,6 +156,69 @@ const DriverPortal: React.FC = () => {
                                 </div>
                             ))
                         )}
+                    </div>
+                </div>
+            </div>
+        )}
+
+        {/* TRIP DETAILS MODAL */}
+        {selectedBooking && (
+            <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" onClick={() => setSelectedBooking(null)}>
+                <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full overflow-hidden animate-fade-in" onClick={e => e.stopPropagation()}>
+                    <div className="bg-slate-800 p-4 flex justify-between items-center text-white">
+                        <h3 className="font-bold text-lg">Detalhes da Viagem</h3>
+                        <button onClick={() => setSelectedBooking(null)} className="text-slate-400 hover:text-white font-bold text-xl">&times;</button>
+                    </div>
+                    <div className="p-6 space-y-4">
+                        <div className="flex items-start gap-4 mb-2">
+                            <div className="bg-blue-100 p-3 rounded-lg">
+                                <span className="text-2xl">🚌</span>
+                            </div>
+                            <div>
+                                <h2 className="text-2xl font-bold text-slate-800">{selectedBooking.destination}</h2>
+                                {(() => {
+                                    const bus = buses.find(b => b.id === selectedBooking.busId);
+                                    return bus ? <p className="text-slate-600 font-medium">{bus.plate} - {bus.model}</p> : null;
+                                })()}
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4 bg-slate-50 p-3 rounded-lg border border-slate-100">
+                            <div>
+                                <p className="text-xs text-slate-500 font-bold uppercase">Saída</p>
+                                <p className="text-sm font-semibold text-slate-800">{formatDateTime(selectedBooking.startTime)}</p>
+                            </div>
+                            <div>
+                                <p className="text-xs text-slate-500 font-bold uppercase">Retorno</p>
+                                <p className="text-sm font-semibold text-slate-800">{formatDateTime(selectedBooking.endTime)}</p>
+                            </div>
+                            <div className="col-span-2">
+                                <p className="text-xs text-slate-500 font-bold uppercase">Local de Apresentação</p>
+                                <p className="text-sm text-slate-800">{selectedBooking.presentationTime ? formatDateTime(selectedBooking.presentationTime) : formatDateTime(selectedBooking.startTime)} - {selectedBooking.departureLocation || 'Garagem'}</p>
+                            </div>
+                        </div>
+
+                        <div className="space-y-2">
+                            <div>
+                                <p className="text-xs text-slate-500 font-bold uppercase">Cliente / Contratante</p>
+                                <p className="text-sm font-medium">{selectedBooking.clientName}</p>
+                                {selectedBooking.clientPhone && <p className="text-sm text-blue-600">{selectedBooking.clientPhone}</p>}
+                            </div>
+                            
+                            {selectedBooking.observations && (
+                                <div className="bg-yellow-50 p-3 rounded border border-yellow-100">
+                                    <p className="text-xs text-yellow-700 font-bold uppercase mb-1">Observações / Instruções</p>
+                                    <p className="text-sm text-slate-700 whitespace-pre-wrap">{selectedBooking.observations}</p>
+                                </div>
+                            )}
+                        </div>
+
+                        <button 
+                            onClick={() => setSelectedBooking(null)}
+                            className="w-full bg-slate-800 text-white py-3 rounded-lg font-bold hover:bg-slate-700 mt-2"
+                        >
+                            Fechar Detalhes
+                        </button>
                     </div>
                 </div>
             </div>

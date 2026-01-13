@@ -1,8 +1,12 @@
 import React, { useState } from 'react';
 import { useStore } from '../services/store';
-import { UserRole } from '../types';
+import { UserRole, Booking } from '../types';
 
-const CalendarView: React.FC = () => {
+interface CalendarViewProps {
+  onEventClick?: (booking: Booking) => void;
+}
+
+const CalendarView: React.FC<CalendarViewProps> = ({ onEventClick }) => {
   const { bookings, timeOffs, users, currentUser, addTimeOff, updateTimeOffStatus } = useStore();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [showModal, setShowModal] = useState(false);
@@ -136,18 +140,28 @@ const CalendarView: React.FC = () => {
             ))}
             
             {days.map(day => {
-                const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                // IMPORTANT: Create date using local year, month, day to correspond to calendar visual
+                const cellDate = new Date(year, month, day, 12, 0, 0); 
+                // Format string for simple comparisons (YYYY-MM-DD)
+                const cellDateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
                 
                 // Filter Events
                 const dayBookings = bookings.filter(b => {
                    if (b.status === 'CANCELLED') return false;
-                   const start = new Date(b.startTime).setHours(0,0,0,0);
-                   const end = new Date(b.endTime).setHours(23,59,59,999);
-                   const current = new Date(dateStr).setHours(12,0,0,0);
-                   return current >= start && current <= end;
+                   // Parse booking times, ensuring we handle them correctly
+                   const start = new Date(b.startTime);
+                   const end = new Date(b.endTime);
+                   
+                   // Reset hours to compare purely by date overlap
+                   start.setHours(0,0,0,0);
+                   end.setHours(23,59,59,999);
+                   
+                   // Cell date needs to be within start and end (inclusive)
+                   // We use the cellDate (noon) to be safe against DST shifts
+                   return cellDate >= start && cellDate <= end;
                 });
 
-                const dayTimeOffs = timeOffs.filter(t => t.date === dateStr && t.status === 'APPROVED');
+                const dayTimeOffs = timeOffs.filter(t => t.date === cellDateStr && t.status === 'APPROVED');
 
                 // For drivers, filter only their own events
                 const visibleBookings = currentUser.role === UserRole.DRIVER 
@@ -158,9 +172,11 @@ const CalendarView: React.FC = () => {
                     ? dayTimeOffs.filter(t => t.driverId === currentUser.id) 
                     : dayTimeOffs;
 
+                const isToday = new Date().getDate() === day && new Date().getMonth() === month && new Date().getFullYear() === year;
+
                 return (
-                    <div key={day} className="bg-white min-h-[100px] p-2 hover:bg-slate-50 transition-colors">
-                        <span className={`text-sm font-semibold ${new Date().getDate() === day && new Date().getMonth() === month ? 'bg-blue-600 text-white w-6 h-6 flex items-center justify-center rounded-full' : 'text-slate-700'}`}>
+                    <div key={day} className={`bg-white min-h-[100px] p-2 hover:bg-slate-50 transition-colors ${isToday ? 'bg-blue-50/30' : ''}`}>
+                        <span className={`text-sm font-semibold ${isToday ? 'bg-blue-600 text-white w-6 h-6 flex items-center justify-center rounded-full shadow-sm' : 'text-slate-700'}`}>
                             {day}
                         </span>
                         
@@ -168,7 +184,7 @@ const CalendarView: React.FC = () => {
                             {visibleTimeOffs.map(t => {
                                 const driver = users.find(u => u.id === t.driverId);
                                 return (
-                                    <div key={t.id} className="text-[10px] bg-yellow-100 text-yellow-800 px-1 py-0.5 rounded truncate" title={`${t.type} - ${driver?.name}`}>
+                                    <div key={t.id} className="text-[10px] bg-yellow-100 text-yellow-800 px-1 py-0.5 rounded truncate font-medium border border-yellow-200" title={`${t.type} - ${driver?.name}`}>
                                         🚫 {canManage ? driver?.name.split(' ')[0] : 'Folga'}
                                     </div>
                                 );
@@ -176,7 +192,21 @@ const CalendarView: React.FC = () => {
                             {visibleBookings.map(b => {
                                 const driver = users.find(u => u.id === b.driverId);
                                 return (
-                                    <div key={b.id} className="text-[10px] bg-blue-100 text-blue-800 px-1 py-0.5 rounded truncate" title={`${b.destination} - ${driver?.name || 'S/ Motorista'}`}>
+                                    <div 
+                                        key={b.id} 
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            if (onEventClick) onEventClick(b);
+                                        }}
+                                        className={`text-[10px] px-2 py-1 rounded truncate font-medium border cursor-pointer hover:opacity-80 transition-opacity ${
+                                            onEventClick ? 'cursor-pointer' : ''
+                                        } ${
+                                            b.driverId === currentUser.id && currentUser.role === UserRole.DRIVER 
+                                            ? 'bg-blue-600 text-white border-blue-700' // Highlight own trips
+                                            : 'bg-blue-100 text-blue-800 border-blue-200'
+                                        }`} 
+                                        title={`${b.destination} - ${driver?.name || 'S/ Motorista'}`}
+                                    >
                                         🚌 {canManage ? `${b.destination} (${driver?.name.split(' ')[0] || '?'})` : b.destination}
                                     </div>
                                 );
