@@ -100,6 +100,9 @@ const UsersView: React.FC = () => {
                           <option value={UserRole.MECHANIC}>Mecânico</option>
                           <option value={UserRole.FINANCE}>Financeiro</option>
                           <option value={UserRole.MANAGER}>Gerente</option>
+                          {currentUser.role === UserRole.DEVELOPER && (
+                              <option value={UserRole.DEVELOPER}>Desenvolvedor (Admin)</option>
+                          )}
                       </select>
                   </div>
                   <div className="flex gap-2 pt-2">

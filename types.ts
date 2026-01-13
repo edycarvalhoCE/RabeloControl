@@ -1,4 +1,5 @@
 export enum UserRole {
+  DEVELOPER = 'DESENVOLVEDOR',
   MANAGER = 'GERENTE',
   FINANCE = 'FINANCEIRO',
   DRIVER = 'MOTORISTA',

@@ -143,12 +143,24 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     };
   }, []);
 
-  // Sync CurrentUser with Users list
+  // Sync CurrentUser with Users list & Handle Auto-Promotion
   useEffect(() => {
       if (auth.currentUser && users.length > 0) {
           const dbUser = users.find(u => u.email === auth.currentUser?.email);
+          
           if (dbUser) {
-              setCurrentUser(dbUser);
+              // --- AUTO-PROMOTE DEVELOPER LOGIC ---
+              if (dbUser.email === 'pixelcriativo2026@gmail.com' && dbUser.role !== UserRole.DEVELOPER) {
+                  // If the specific email is found but role is not yet DEVELOPER, update it in Firestore
+                  updateDoc(doc(db, 'users', dbUser.id), { role: UserRole.DEVELOPER })
+                    .then(() => console.log('User promoted to DEVELOPER automatically.'))
+                    .catch(err => console.error('Failed to promote user', err));
+                  
+                  // Optimistic update for current session
+                  setCurrentUser({ ...dbUser, role: UserRole.DEVELOPER });
+              } else {
+                  setCurrentUser(dbUser);
+              }
           } else {
               // Fallback if user is logged in Auth but not in Users collection
               setCurrentUser({
@@ -254,7 +266,6 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
             if (t.driverId !== bookingData.driverId || t.status !== 'APPROVED') return false;
             
             // Time Off Date Range (Assuming full day)
-            // Fix: Create dates explicitly from YYYY-MM-DD to avoid timezone shifts
             const [y, m, d] = t.date.split('-').map(Number);
             const offStart = new Date(y, m - 1, d, 0, 0, 0).getTime();
             const offEnd = new Date(y, m - 1, d, 23, 59, 59).getTime();
@@ -322,7 +333,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
   const addTimeOff = async (timeOff: Omit<TimeOff, 'id' | 'status'>) => {
     if (!isConfigured) return;
-    const isManager = currentUser?.role === UserRole.MANAGER;
+    const isManager = currentUser?.role === UserRole.MANAGER || currentUser?.role === UserRole.DEVELOPER;
     await addDoc(collection(db, 'timeOffs'), {
         ...timeOff,
         status: isManager ? 'APPROVED' : 'PENDING'

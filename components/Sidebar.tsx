@@ -14,24 +14,25 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setView, isMobileOpen, s
   const [copyMsg, setCopyMsg] = useState('');
 
   const menuItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: '📊', roles: [UserRole.MANAGER, UserRole.FINANCE] },
-    { id: 'calendar', label: 'Calendário (Escala)', icon: '📅', roles: [UserRole.MANAGER] },
-    { id: 'bookings', label: 'Locações', icon: '🚌', roles: [UserRole.MANAGER] },
-    { id: 'travel-packages', label: 'Pacotes de Viagem', icon: '🏖️', roles: [UserRole.MANAGER, UserRole.FINANCE] },
-    { id: 'charter', label: 'Fretamento', icon: '🏭', roles: [UserRole.MANAGER] },
-    { id: 'vehicles', label: 'Veículos / Frota', icon: '🚐', roles: [UserRole.MANAGER] },
-    { id: 'maintenance', label: 'Manutenção', icon: '🛠️', roles: [UserRole.MANAGER, UserRole.MECHANIC] },
-    { id: 'inventory', label: 'Estoque de Peças', icon: '🔧', roles: [UserRole.MANAGER, UserRole.MECHANIC] },
-    { id: 'documents', label: 'Documentos', icon: '📂', roles: [UserRole.MANAGER] },
-    { id: 'finance', label: 'Financeiro (Caixa)', icon: '💰', roles: [UserRole.MANAGER, UserRole.FINANCE] },
-    { id: 'users', label: 'Usuários', icon: '👥', roles: [UserRole.MANAGER] },
-    { id: 'driver-portal', label: 'Minha Escala', icon: 'steering-wheel', roles: [UserRole.DRIVER] },
+    { id: 'dashboard', label: 'Dashboard', icon: '📊', roles: [UserRole.MANAGER, UserRole.FINANCE, UserRole.DEVELOPER] },
+    { id: 'calendar', label: 'Calendário (Escala)', icon: '📅', roles: [UserRole.MANAGER, UserRole.DEVELOPER] },
+    { id: 'bookings', label: 'Locações', icon: '🚌', roles: [UserRole.MANAGER, UserRole.DEVELOPER] },
+    { id: 'travel-packages', label: 'Pacotes de Viagem', icon: '🏖️', roles: [UserRole.MANAGER, UserRole.FINANCE, UserRole.DEVELOPER] },
+    { id: 'charter', label: 'Fretamento', icon: '🏭', roles: [UserRole.MANAGER, UserRole.DEVELOPER] },
+    { id: 'vehicles', label: 'Veículos / Frota', icon: '🚐', roles: [UserRole.MANAGER, UserRole.DEVELOPER] },
+    { id: 'maintenance', label: 'Manutenção', icon: '🛠️', roles: [UserRole.MANAGER, UserRole.MECHANIC, UserRole.DEVELOPER] },
+    { id: 'inventory', label: 'Estoque de Peças', icon: '🔧', roles: [UserRole.MANAGER, UserRole.MECHANIC, UserRole.DEVELOPER] },
+    { id: 'documents', label: 'Documentos', icon: '📂', roles: [UserRole.MANAGER, UserRole.DEVELOPER] },
+    { id: 'finance', label: 'Financeiro (Caixa)', icon: '💰', roles: [UserRole.MANAGER, UserRole.FINANCE, UserRole.DEVELOPER] },
+    { id: 'users', label: 'Usuários', icon: '👥', roles: [UserRole.MANAGER, UserRole.DEVELOPER] },
+    { id: 'driver-portal', label: 'Minha Escala', icon: 'steering-wheel', roles: [UserRole.DRIVER, UserRole.DEVELOPER] },
   ];
 
   const filteredMenu = menuItems.filter(item => item.roles.includes(currentUser.role));
 
   const getRoleLabel = (role: UserRole) => {
     switch (role) {
+      case UserRole.DEVELOPER: return 'Desenvolvedor';
       case UserRole.MANAGER: return 'Gerente';
       case UserRole.FINANCE: return 'Financeiro';
       case UserRole.DRIVER: return 'Motorista';

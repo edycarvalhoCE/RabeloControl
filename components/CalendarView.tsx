@@ -52,6 +52,8 @@ const CalendarView: React.FC = () => {
     }
   };
 
+  const canManage = currentUser.role === UserRole.MANAGER || currentUser.role === UserRole.DEVELOPER;
+
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex flex-col md:flex-row justify-between items-center gap-4">
@@ -59,7 +61,7 @@ const CalendarView: React.FC = () => {
             📅 Calendário de Escala
         </h2>
         
-        {currentUser.role === UserRole.MANAGER && (
+        {canManage && (
             <button 
                 onClick={() => setShowModal(true)}
                 className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm"
@@ -69,8 +71,8 @@ const CalendarView: React.FC = () => {
         )}
       </div>
 
-      {/* PENDING REQUESTS PANEL (Manager Only) */}
-      {currentUser.role === UserRole.MANAGER && pendingTimeOffs.length > 0 && (
+      {/* PENDING REQUESTS PANEL (Manager/Dev Only) */}
+      {canManage && pendingTimeOffs.length > 0 && (
           <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-6 shadow-sm">
               <h3 className="text-lg font-bold text-yellow-800 mb-4 flex items-center gap-2">
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
@@ -167,7 +169,7 @@ const CalendarView: React.FC = () => {
                                 const driver = users.find(u => u.id === t.driverId);
                                 return (
                                     <div key={t.id} className="text-[10px] bg-yellow-100 text-yellow-800 px-1 py-0.5 rounded truncate" title={`${t.type} - ${driver?.name}`}>
-                                        🚫 {currentUser.role === UserRole.MANAGER ? driver?.name.split(' ')[0] : 'Folga'}
+                                        🚫 {canManage ? driver?.name.split(' ')[0] : 'Folga'}
                                     </div>
                                 );
                             })}
@@ -175,7 +177,7 @@ const CalendarView: React.FC = () => {
                                 const driver = users.find(u => u.id === b.driverId);
                                 return (
                                     <div key={b.id} className="text-[10px] bg-blue-100 text-blue-800 px-1 py-0.5 rounded truncate" title={`${b.destination} - ${driver?.name || 'S/ Motorista'}`}>
-                                        🚌 {currentUser.role === UserRole.MANAGER ? `${b.destination} (${driver?.name.split(' ')[0] || '?'})` : b.destination}
+                                        🚌 {canManage ? `${b.destination} (${driver?.name.split(' ')[0] || '?'})` : b.destination}
                                     </div>
                                 );
                             })}
