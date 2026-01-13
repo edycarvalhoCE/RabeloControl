@@ -9,7 +9,8 @@ const BookingsView: React.FC = () => {
   const [filters, setFilters] = useState({
       client: '',
       busId: '',
-      date: '',
+      startDate: '',
+      endDate: '',
       status: ''
   });
 
@@ -396,9 +397,19 @@ const BookingsView: React.FC = () => {
       const matchStatus = filters.status ? b.status === filters.status : true;
       
       let matchDate = true;
-      if (filters.date) {
-          const bookingDate = b.startTime.split('T')[0];
-          matchDate = bookingDate === filters.date;
+      // Date Range Filter (Overlap Logic)
+      if (filters.startDate || filters.endDate) {
+          const tripStart = new Date(b.startTime).getTime();
+          const tripEnd = new Date(b.endTime).getTime();
+
+          // If no start date selected, assume minus infinity (anytime before)
+          const filterStart = filters.startDate ? new Date(filters.startDate).setHours(0,0,0,0) : -8640000000000000;
+          // If no end date selected, assume plus infinity (anytime after)
+          const filterEnd = filters.endDate ? new Date(filters.endDate).setHours(23,59,59,999) : 8640000000000000;
+
+          // Check if the trip overlaps with the selected filter window
+          // TripStart <= FilterEnd AND TripEnd >= FilterStart
+          matchDate = tripStart <= filterEnd && tripEnd >= filterStart;
       }
 
       return matchClient && matchBus && matchDate && matchStatus;
@@ -523,34 +534,55 @@ const BookingsView: React.FC = () => {
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" /></svg>
                 Filtrar Viagens
             </h3>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <input 
-                    type="date" 
-                    value={filters.date} 
-                    onChange={e => setFilters({...filters, date: e.target.value})}
-                    className="border p-2 rounded text-sm w-full"
-                />
-                <select 
-                    value={filters.busId} 
-                    onChange={e => setFilters({...filters, busId: e.target.value})}
-                    className="border p-2 rounded text-sm w-full"
-                >
-                    <option value="">Todos Veículos</option>
-                    {buses.map(b => <option key={b.id} value={b.id}>{b.plate}</option>)}
-                </select>
-                <input 
-                    type="text" 
-                    placeholder="Nome do Cliente"
-                    value={filters.client} 
-                    onChange={e => setFilters({...filters, client: e.target.value})}
-                    className="border p-2 rounded text-sm w-full"
-                />
-                <button 
-                    onClick={() => setFilters({client: '', busId: '', date: '', status: ''})}
-                    className="text-xs text-blue-600 hover:underline text-center flex items-center justify-center"
-                >
-                    Limpar Filtros
-                </button>
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                <div className="col-span-1">
+                     <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1">De (Início)</label>
+                     <input 
+                        type="date" 
+                        value={filters.startDate} 
+                        onChange={e => setFilters({...filters, startDate: e.target.value})}
+                        className="border p-2 rounded text-sm w-full"
+                    />
+                </div>
+                <div className="col-span-1">
+                     <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1">Até (Fim)</label>
+                     <input 
+                        type="date" 
+                        value={filters.endDate} 
+                        onChange={e => setFilters({...filters, endDate: e.target.value})}
+                        className="border p-2 rounded text-sm w-full"
+                    />
+                </div>
+                
+                <div className="col-span-2 md:col-span-1">
+                     <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1">Veículo</label>
+                    <select 
+                        value={filters.busId} 
+                        onChange={e => setFilters({...filters, busId: e.target.value})}
+                        className="border p-2 rounded text-sm w-full"
+                    >
+                        <option value="">Todos</option>
+                        {buses.map(b => <option key={b.id} value={b.id}>{b.plate}</option>)}
+                    </select>
+                </div>
+                <div className="col-span-2 md:col-span-1">
+                     <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1">Cliente</label>
+                    <input 
+                        type="text" 
+                        placeholder="Nome..."
+                        value={filters.client} 
+                        onChange={e => setFilters({...filters, client: e.target.value})}
+                        className="border p-2 rounded text-sm w-full"
+                    />
+                </div>
+                <div className="col-span-2 md:col-span-1 flex items-end">
+                    <button 
+                        onClick={() => setFilters({client: '', busId: '', startDate: '', endDate: '', status: ''})}
+                        className="text-xs bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold py-2.5 px-4 rounded w-full border border-slate-300 transition-colors"
+                    >
+                        Limpar
+                    </button>
+                </div>
             </div>
         </div>
 
@@ -632,7 +664,7 @@ const BookingsView: React.FC = () => {
           })}
           {filteredBookings.length === 0 && (
             <div className="text-center text-slate-500 py-10 bg-white rounded-lg border border-dashed border-slate-300">
-                Nenhuma locação encontrada com estes filtros.
+                Nenhuma locação encontrada no período selecionado.
             </div>
           )}
         </div>
