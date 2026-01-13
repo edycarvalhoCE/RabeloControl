@@ -60,6 +60,7 @@ export interface Booking {
   departureLocation: string;
   presentationTime: string; // ISO Date (Garage presentation)
   type?: 'TURISMO' | 'FRETAMENTO'; // Distinguish between types
+  observations?: string; // New field for OS notes
 }
 
 export interface TimeOff {

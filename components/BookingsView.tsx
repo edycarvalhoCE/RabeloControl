@@ -3,7 +3,9 @@ import { useStore } from '../services/store';
 import { UserRole, Bus, Booking } from '../types';
 
 const BookingsView: React.FC = () => {
-  const { bookings, buses, users, addBooking, updateBooking, updateBookingStatus, transactions } = useStore();
+  const { bookings, buses, users, addBooking, updateBooking, updateBookingStatus } = useStore();
+  
+  // --- FORM STATE ---
   const [formData, setFormData] = useState({
     busId: '',
     driverId: '',
@@ -16,9 +18,18 @@ const BookingsView: React.FC = () => {
     paymentStatus: 'PENDING' as 'PAID' | 'PENDING' | 'SCHEDULED',
     paymentDate: '',
     departureLocation: '',
-    presentationTime: ''
+    presentationTime: '',
+    observations: '' // New Field
   });
   
+  // --- FILTER STATE ---
+  const [filters, setFilters] = useState({
+      client: '',
+      busId: '',
+      date: '',
+      status: ''
+  });
+
   const [editingBookingId, setEditingBookingId] = useState<string | null>(null);
   const [msg, setMsg] = useState<{ type: 'success' | 'error', text: string } | null>(null);
   const [showConflictModal, setShowConflictModal] = useState(false);
@@ -27,16 +38,14 @@ const BookingsView: React.FC = () => {
 
   const drivers = users.filter(u => u.role === UserRole.DRIVER);
 
-  // Helper function to safely format dates and avoid crashes
+  // --- SAFE HELPERS ---
   const safeDate = (dateStr: string | null | undefined, options?: Intl.DateTimeFormatOptions) => {
       if (!dateStr) return 'N/A';
       try {
           const date = new Date(dateStr);
           if (isNaN(date.getTime())) return 'Data Inválida';
           return date.toLocaleDateString('pt-BR', options);
-      } catch (e) {
-          return 'Erro Data';
-      }
+      } catch (e) { return 'Erro Data'; }
   };
 
   const safeTime = (dateStr: string | null | undefined) => {
@@ -45,13 +54,12 @@ const BookingsView: React.FC = () => {
           const date = new Date(dateStr);
           if (isNaN(date.getTime())) return '';
           return date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-      } catch (e) {
-          return '';
-      }
+      } catch (e) { return ''; }
   };
 
+  // --- ACTIONS ---
+
   const handleEdit = (booking: Booking) => {
-    // Safe slicing for form inputs
     const safeStart = booking.startTime && booking.startTime.length >= 16 ? booking.startTime.slice(0, 16) : '';
     const safeEnd = booking.endTime && booking.endTime.length >= 16 ? booking.endTime.slice(0, 16) : '';
     const safePresentation = booking.presentationTime && booking.presentationTime.length >= 16 ? booking.presentationTime.slice(0, 16) : '';
@@ -69,7 +77,8 @@ const BookingsView: React.FC = () => {
       paymentStatus: booking.paymentStatus,
       paymentDate: safePaymentDate,
       departureLocation: booking.departureLocation || '',
-      presentationTime: safePresentation
+      presentationTime: safePresentation,
+      observations: booking.observations || ''
     });
     setEditingBookingId(booking.id);
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -80,19 +89,14 @@ const BookingsView: React.FC = () => {
     setFormData({ 
       busId: '', driverId: '', clientName: '', clientPhone: '', destination: '', startTime: '', endTime: '', value: 0,
       paymentStatus: 'PENDING', paymentDate: '',
-      departureLocation: '', presentationTime: ''
+      departureLocation: '', presentationTime: '', observations: ''
     });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.busId || !formData.startTime || !formData.endTime) {
-        setMsg({ type: 'error', text: 'Preencha os campos obrigatórios (Destino, Datas, Ônibus).' });
-        return;
-    }
-
-    if (formData.paymentStatus !== 'PENDING' && !formData.paymentDate) {
-        setMsg({ type: 'error', text: 'Informe a data do pagamento/vencimento.' });
+        setMsg({ type: 'error', text: 'Preencha os campos obrigatórios.' });
         return;
     }
 
@@ -101,7 +105,7 @@ const BookingsView: React.FC = () => {
         driverId: formData.driverId || null,
         paymentDate: formData.paymentDate || null,
         departureLocation: formData.departureLocation || 'Garagem',
-        presentationTime: formData.presentationTime || formData.startTime // Fallback if user left empty
+        presentationTime: formData.presentationTime || formData.startTime
     };
 
     let result;
@@ -126,7 +130,7 @@ const BookingsView: React.FC = () => {
     }
   };
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     if (name === 'paymentStatus' && value === 'PENDING') {
          setFormData(prev => ({ ...prev, [name]: value, paymentDate: '' }));
@@ -144,26 +148,70 @@ const BookingsView: React.FC = () => {
 
       const printContent = `
         <html><head><title>OS - ${booking.destination}</title>
-        <style>body{font-family:Arial,sans-serif;padding:20px;color:#000}.header{text-align:center;border-bottom:2px solid #000;margin-bottom:20px}.row{display:flex;margin-bottom:8px}.label{font-weight:bold;width:150px}.value{flex:1;border-bottom:1px dotted #ccc}.box{border:2px solid #000;padding:15px;margin-top:30px}</style>
+        <style>
+            body{font-family:Arial,sans-serif;padding:20px;color:#000}
+            .header{text-align:center;border-bottom:2px solid #000;margin-bottom:20px;padding-bottom:10px}
+            .row{display:flex;margin-bottom:8px;border-bottom:1px dotted #ccc;padding-bottom:2px}
+            .label{font-weight:bold;width:160px;display:inline-block}
+            .value{flex:1;font-weight:normal}
+            .box{border:2px solid #000;padding:10px;margin-top:20px}
+            .obs-box{background:#f0f0f0;padding:10px;margin-top:20px;border:1px solid #ccc;min-height:60px}
+            h3 {margin: 15px 0 5px 0; font-size: 16px; text-transform:uppercase; background:#eee; padding:5px;}
+        </style>
         </head><body>
             <div class="header"><h1>RabeloTour - ORDEM DE SERVIÇO</h1></div>
+            
             <h3>Dados da Viagem</h3>
             <div class="row"><span class="label">Destino:</span><span class="value">${booking.destination}</span></div>
             <div class="row"><span class="label">Saída:</span><span class="value">${sStart} - ${booking.departureLocation}</span></div>
-            <div class="row"><span class="label">Apresentação:</span><span class="value">${sPres}</span></div>
-            <div class="row"><span class="label">Retorno:</span><span class="value">${sEnd}</span></div>
+            <div class="row"><span class="label">Apresentação:</span><span class="value">${sPres} (Garagem)</span></div>
+            <div class="row"><span class="label">Previsão Retorno:</span><span class="value">${sEnd}</span></div>
+            
             <h3>Cliente</h3>
             <div class="row"><span class="label">Nome:</span><span class="value">${booking.clientName}</span></div>
             <div class="row"><span class="label">Telefone:</span><span class="value">${booking.clientPhone || '-'}</span></div>
+            
             <h3>Veículo e Motorista</h3>
             <div class="row"><span class="label">Veículo:</span><span class="value">${bus?.plate} - ${bus?.model}</span></div>
             <div class="row"><span class="label">Motorista:</span><span class="value">${driver?.name || '__________________'}</span></div>
-            <div class="box"><h3>KM Inicial: _______ KM Final: _______</h3><br/><br/>Assinatura: ________________________</div>
+            
+            <h3>Observações / Instruções</h3>
+            <div class="obs-box">
+                ${booking.observations ? booking.observations.replace(/\n/g, '<br>') : 'Nenhuma observação registrada.'}
+            </div>
+
+            <div class="box">
+                <strong>CONTROLE DE QUILOMETRAGEM</strong><br/><br/>
+                <div style="display:flex; justify-content:space-between">
+                    <span>KM Inicial: _______________</span>
+                    <span>KM Final: _______________</span>
+                    <span>Total Percorrido: _______________</span>
+                </div>
+                <br/><br/>
+                Assinatura do Motorista: _____________________________________________
+            </div>
+            
             <script>window.print();</script>
         </body></html>`;
       const win = window.open('', '', 'width=800,height=600');
       if (win) { win.document.write(printContent); win.document.close(); }
   };
+
+  // --- FILTER LOGIC ---
+  const filteredBookings = bookings.filter(b => {
+      const matchClient = filters.client ? b.clientName.toLowerCase().includes(filters.client.toLowerCase()) : true;
+      const matchBus = filters.busId ? b.busId === filters.busId : true;
+      const matchStatus = filters.status ? b.status === filters.status : true;
+      
+      let matchDate = true;
+      if (filters.date) {
+          // Compare simple string YYYY-MM-DD
+          const bookingDate = b.startTime.split('T')[0];
+          matchDate = bookingDate === filters.date;
+      }
+
+      return matchClient && matchBus && matchDate && matchStatus;
+  }).sort((a,b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime());
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-fade-in relative">
@@ -195,11 +243,52 @@ const BookingsView: React.FC = () => {
         </div>
       )}
 
-      {/* LIST */}
+      {/* LIST SECTION (LEFT) */}
       <div className="lg:col-span-2 space-y-6">
-        <h2 className="text-2xl font-bold text-slate-800">Escala de Locações</h2>
+        
+        {/* FILTERS BAR */}
+        <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+            <h3 className="text-sm font-bold text-slate-700 uppercase mb-3 flex items-center gap-2">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" /></svg>
+                Filtrar Viagens
+            </h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <input 
+                    type="date" 
+                    value={filters.date} 
+                    onChange={e => setFilters({...filters, date: e.target.value})}
+                    className="border p-2 rounded text-sm w-full"
+                />
+                <select 
+                    value={filters.busId} 
+                    onChange={e => setFilters({...filters, busId: e.target.value})}
+                    className="border p-2 rounded text-sm w-full"
+                >
+                    <option value="">Todos Veículos</option>
+                    {buses.map(b => <option key={b.id} value={b.id}>{b.plate}</option>)}
+                </select>
+                <input 
+                    type="text" 
+                    placeholder="Nome do Cliente"
+                    value={filters.client} 
+                    onChange={e => setFilters({...filters, client: e.target.value})}
+                    className="border p-2 rounded text-sm w-full"
+                />
+                <button 
+                    onClick={() => setFilters({client: '', busId: '', date: '', status: ''})}
+                    className="text-xs text-blue-600 hover:underline text-center flex items-center justify-center"
+                >
+                    Limpar Filtros
+                </button>
+            </div>
+        </div>
+
+        <h2 className="text-xl font-bold text-slate-800">
+            Locações Encontradas ({filteredBookings.length})
+        </h2>
+        
         <div className="grid gap-4">
-          {bookings.map(booking => {
+          {filteredBookings.map(booking => {
             const bus = buses.find(b => b.id === booking.busId);
             const driver = users.find(u => u.id === booking.driverId);
             const isEditing = editingBookingId === booking.id;
@@ -266,11 +355,15 @@ const BookingsView: React.FC = () => {
               </div>
             );
           })}
-          {bookings.length === 0 && <p className="text-center text-slate-500 py-10">Nenhuma locação encontrada.</p>}
+          {filteredBookings.length === 0 && (
+            <div className="text-center text-slate-500 py-10 bg-white rounded-lg border border-dashed border-slate-300">
+                Nenhuma locação encontrada com estes filtros.
+            </div>
+          )}
         </div>
       </div>
 
-      {/* FORM */}
+      {/* FORM SECTION (RIGHT) */}
       <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 h-fit sticky top-6">
         <div className="flex justify-between items-center mb-4">
             <h3 className="text-xl font-bold text-slate-800">{editingBookingId ? 'Editar Locação' : 'Nova Locação'}</h3>
@@ -280,9 +373,16 @@ const BookingsView: React.FC = () => {
         {msg && <div className={`p-3 rounded mb-4 text-sm ${msg.type === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>{msg.text}</div>}
         
         <form onSubmit={handleSubmit} className="space-y-4">
-            <input name="clientName" value={formData.clientName} onChange={handleChange} placeholder="Cliente" className="w-full border p-2 rounded" required />
-            <input name="clientPhone" value={formData.clientPhone} onChange={handleChange} placeholder="Telefone" className="w-full border p-2 rounded" />
-            <input name="destination" value={formData.destination} onChange={handleChange} placeholder="Destino" className="w-full border p-2 rounded" required />
+            <div>
+                <label className="text-xs font-bold text-slate-500 uppercase">Dados do Cliente</label>
+                <input name="clientName" value={formData.clientName} onChange={handleChange} placeholder="Nome do Cliente" className="w-full border p-2 rounded mt-1" required />
+                <input name="clientPhone" value={formData.clientPhone} onChange={handleChange} placeholder="Telefone" className="w-full border p-2 rounded mt-2" />
+            </div>
+
+            <div>
+                <label className="text-xs font-bold text-slate-500 uppercase">Detalhes da Viagem</label>
+                <input name="destination" value={formData.destination} onChange={handleChange} placeholder="Destino" className="w-full border p-2 rounded mt-1" required />
+            </div>
             
             <div className="grid grid-cols-2 gap-2">
                 <div><label className="text-xs font-bold">Início</label><input type="datetime-local" name="startTime" value={formData.startTime} onChange={handleChange} className="w-full border p-2 rounded" required /></div>
@@ -303,6 +403,17 @@ const BookingsView: React.FC = () => {
                 <option value="">Selecione o Motorista</option>
                 {drivers.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
             </select>
+
+            <div>
+                <label className="text-xs font-bold text-slate-500 uppercase">Observações (Para a OS)</label>
+                <textarea 
+                    name="observations" 
+                    value={formData.observations} 
+                    onChange={handleChange} 
+                    placeholder="Ex: Pegar passageiros extra na praça; Levar água; Cliente VIP..." 
+                    className="w-full border p-2 rounded mt-1 h-20 resize-none text-sm" 
+                />
+            </div>
 
             <div className="border-t pt-4">
                 <label className="block text-sm font-bold mb-2">Financeiro</label>
