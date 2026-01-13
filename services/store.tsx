@@ -5,7 +5,7 @@ import { MOCK_USERS, MOCK_BUSES, MOCK_PARTS } from '../constants';
 // Firebase Imports
 import { db, auth, isConfigured } from './firebase';
 import { 
-  collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, setDoc, query, where, writeBatch 
+  collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, setDoc, query, where, writeBatch, getDocs
 } from 'firebase/firestore';
 import { 
   signInWithEmailAndPassword, signOut, onAuthStateChanged, createUserWithEmailAndPassword, updateProfile 
@@ -39,6 +39,7 @@ interface StoreContextType {
   updateUser: (id: string, data: Partial<User>) => Promise<void>;
   deleteUser: (id: string) => Promise<void>;
   addBooking: (booking: Omit<Booking, 'id' | 'status'>) => Promise<{ success: boolean; message: string }>;
+  updateBooking: (id: string, data: Partial<Booking>) => Promise<{ success: boolean; message: string }>;
   updateBookingStatus: (id: string, status: Booking['status']) => void;
   addPart: (part: Omit<Part, 'id'>) => void;
   updateStock: (id: string, quantityDelta: number) => void;
@@ -237,10 +238,13 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       await deleteDoc(doc(db, 'users', id));
   };
 
-  const checkAvailability = (busId: string, start: string, end: string): boolean => {
+  const checkAvailability = (busId: string, start: string, end: string, excludeBookingId?: string): boolean => {
     const startDate = new Date(start).getTime();
     const endDate = new Date(end).getTime();
     return !bookings.some(b => {
+      // Exclude the booking being edited
+      if (excludeBookingId && b.id === excludeBookingId) return false;
+      
       if (b.busId !== busId || b.status === 'CANCELLED') return false;
       const bStart = new Date(b.startTime).getTime();
       const bEnd = new Date(b.endTime).getTime();
@@ -256,30 +260,26 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       return { success: false, message: 'Conflito: Este ônibus já está alugado neste período!' };
     }
 
-    // 2. Check Driver Availability (Safety Lock)
+    // 2. Check Driver Availability
     if (bookingData.driverId) {
         const tripStart = new Date(bookingData.startTime).getTime();
         const tripEnd = new Date(bookingData.endTime).getTime();
 
         const driverConflict = timeOffs.find(t => {
-            // Check only approved time offs for this driver
             if (t.driverId !== bookingData.driverId || t.status !== 'APPROVED') return false;
             
-            // Time Off Date Range (Assuming full day)
             const [y, m, d] = t.date.split('-').map(Number);
             const offStart = new Date(y, m - 1, d, 0, 0, 0).getTime();
             const offEnd = new Date(y, m - 1, d, 23, 59, 59).getTime();
 
-            // Check if Trip overlaps with Time Off
             return (tripStart <= offEnd && tripEnd >= offStart);
         });
 
         if (driverConflict) {
-            // Helper to format date
             const dateStr = driverConflict.date.split('-').reverse().join('/');
             return { 
                 success: false, 
-                message: `Motorista Indisponível! Ele está de ${driverConflict.type} no dia ${dateStr}. Cancele a folga primeiro.` 
+                message: `Motorista Indisponível! Ele está de ${driverConflict.type} no dia ${dateStr}.` 
             };
         }
     }
@@ -305,6 +305,96 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     }
 
     return { success: true, message: 'Agendamento salvo na nuvem!' };
+  };
+
+  const updateBooking = async (id: string, data: Partial<Booking>): Promise<{ success: boolean; message: string }> => {
+    if (!isConfigured) return { success: false, message: "Banco de dados desconectado." };
+
+    // 1. Check Availability if Bus or Time Changed
+    // We assume if busId or time is passed, it changed.
+    const currentBooking = bookings.find(b => b.id === id);
+    if (!currentBooking) return { success: false, message: "Viagem não encontrada." };
+
+    const busIdToCheck = data.busId || currentBooking.busId;
+    const startToCheck = data.startTime || currentBooking.startTime;
+    const endToCheck = data.endTime || currentBooking.endTime;
+
+    if (!checkAvailability(busIdToCheck, startToCheck, endToCheck, id)) {
+         return { success: false, message: 'Conflito: Este ônibus já está alugado no novo horário!' };
+    }
+
+    // 2. Check Driver Conflicts if changed
+    const driverIdToCheck = data.driverId !== undefined ? data.driverId : currentBooking.driverId; // could be null
+    if (driverIdToCheck) {
+        const tripStart = new Date(startToCheck).getTime();
+        const tripEnd = new Date(endToCheck).getTime();
+
+        const driverConflict = timeOffs.find(t => {
+            if (t.driverId !== driverIdToCheck || t.status !== 'APPROVED') return false;
+            const [y, m, d] = t.date.split('-').map(Number);
+            const offStart = new Date(y, m - 1, d, 0, 0, 0).getTime();
+            const offEnd = new Date(y, m - 1, d, 23, 59, 59).getTime();
+            return (tripStart <= offEnd && tripEnd >= offStart);
+        });
+         if (driverConflict) {
+            const dateStr = driverConflict.date.split('-').reverse().join('/');
+            return { 
+                success: false, 
+                message: `Motorista Indisponível! Ele está de ${driverConflict.type} no dia ${dateStr}.` 
+            };
+        }
+    }
+
+    // 3. Update Booking
+    await updateDoc(doc(db, 'bookings', id), data);
+
+    // 4. Try Update Related Transaction (Sync Finance)
+    // Only if critical financial fields changed
+    if (data.value !== undefined || data.clientName || data.destination || data.paymentStatus || data.paymentDate) {
+        try {
+            const q = query(collection(db, 'transactions'), where('relatedBookingId', '==', id));
+            const querySnapshot = await getDocs(q);
+            
+            if (!querySnapshot.empty) {
+                // Assuming 1:1 relation mainly
+                const transDoc = querySnapshot.docs[0];
+                const newValue = data.value !== undefined ? data.value : transDoc.data().amount;
+                const newClient = data.clientName || currentBooking.clientName;
+                const newDest = data.destination || currentBooking.destination;
+                const newStatus = data.paymentStatus || currentBooking.paymentStatus;
+                
+                let transStatus = newStatus === 'PAID' ? 'COMPLETED' : 'PENDING';
+                let transDesc = `Locação: ${newClient} - ${newDest}`;
+                if (newStatus === 'SCHEDULED') transDesc += " (Agendado)";
+
+                await updateDoc(doc(db, 'transactions', transDoc.id), {
+                    amount: newValue,
+                    description: transDesc,
+                    status: transStatus,
+                    date: data.paymentDate || transDoc.data().date
+                });
+            } else if (data.value && data.value > 0 && data.paymentStatus !== 'PENDING') {
+                // If it didn't have a transaction but now should (e.g. was pending, now paid)
+                let transStatus = data.paymentStatus === 'PAID' ? 'COMPLETED' : 'PENDING';
+                let transDesc = `Locação: ${data.clientName || currentBooking.clientName} - ${data.destination || currentBooking.destination}`;
+                if (data.paymentStatus === 'SCHEDULED') transDesc += " (Agendado)";
+
+                 await addDoc(collection(db, 'transactions'), {
+                    type: 'INCOME',
+                    status: transStatus,
+                    category: 'Locação',
+                    amount: data.value,
+                    date: data.paymentDate || new Date().toISOString(),
+                    description: transDesc,
+                    relatedBookingId: id
+                });
+            }
+        } catch (e) {
+            console.error("Failed to sync transaction:", e);
+        }
+    }
+
+    return { success: true, message: 'Viagem atualizada com sucesso!' };
   };
 
   const updateBookingStatus = async (id: string, status: Booking['status']) => {
@@ -571,7 +661,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   return (
     <StoreContext.Provider value={{
       currentUser: currentUser!, isAuthenticated, users, buses, bookings, parts, transactions, timeOffs, documents, maintenanceRecords, purchaseRequests, maintenanceReports, charterContracts, travelPackages, packagePassengers, packagePayments, clients,
-      switchUser, addUser, updateUser, deleteUser, addBooking, updateBookingStatus, addPart, updateStock, addTransaction, addTimeOff, updateTimeOffStatus, addDocument, deleteDocument, addMaintenanceRecord, addPurchaseRequest, updatePurchaseRequestStatus, addMaintenanceReport, updateMaintenanceReportStatus, addBus, updateBusStatus, addCharterContract, addTravelPackage, registerPackageSale, addPackagePayment, 
+      switchUser, addUser, updateUser, deleteUser, addBooking, updateBooking, updateBookingStatus, addPart, updateStock, addTransaction, addTimeOff, updateTimeOffStatus, addDocument, deleteDocument, addMaintenanceRecord, addPurchaseRequest, updatePurchaseRequestStatus, addMaintenanceReport, updateMaintenanceReportStatus, addBus, updateBusStatus, addCharterContract, addTravelPackage, registerPackageSale, addPackagePayment, 
       login, logout, register, seedDatabase
     }}>
       {children}

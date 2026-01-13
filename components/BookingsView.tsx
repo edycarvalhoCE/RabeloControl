@@ -3,7 +3,7 @@ import { useStore } from '../services/store';
 import { UserRole, Bus, Booking } from '../types';
 
 const BookingsView: React.FC = () => {
-  const { bookings, buses, users, addBooking, updateBookingStatus, transactions } = useStore();
+  const { bookings, buses, users, addBooking, updateBooking, updateBookingStatus, transactions } = useStore();
   const [formData, setFormData] = useState({
     busId: '',
     driverId: '',
@@ -19,6 +19,9 @@ const BookingsView: React.FC = () => {
     presentationTime: ''
   });
   
+  // State for Editing
+  const [editingBookingId, setEditingBookingId] = useState<string | null>(null);
+
   const [msg, setMsg] = useState<{ type: 'success' | 'error', text: string } | null>(null);
   
   // Conflict Popup State
@@ -29,6 +32,42 @@ const BookingsView: React.FC = () => {
   const [selectedBus, setSelectedBus] = useState<Bus | null>(null);
 
   const drivers = users.filter(u => u.role === UserRole.DRIVER);
+
+  const handleEdit = (booking: Booking) => {
+    // Format ISO dates to datetime-local input format (YYYY-MM-DDTHH:mm)
+    // Note: slice(0, 16) works if the ISO string is proper.
+    
+    // Safely extract date part for payment date (YYYY-MM-DD)
+    const paymentDateVal = booking.paymentDate ? booking.paymentDate.split('T')[0] : '';
+
+    setFormData({
+      busId: booking.busId,
+      driverId: booking.driverId || '',
+      clientName: booking.clientName,
+      clientPhone: booking.clientPhone || '',
+      destination: booking.destination,
+      startTime: booking.startTime.slice(0, 16),
+      endTime: booking.endTime.slice(0, 16),
+      value: booking.value,
+      paymentStatus: booking.paymentStatus,
+      paymentDate: paymentDateVal,
+      departureLocation: booking.departureLocation,
+      presentationTime: booking.presentationTime.slice(0, 16)
+    });
+    setEditingBookingId(booking.id);
+    
+    // Scroll to top
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleCancelEdit = () => {
+    setEditingBookingId(null);
+    setFormData({ 
+      busId: '', driverId: '', clientName: '', clientPhone: '', destination: '', startTime: '', endTime: '', value: 0,
+      paymentStatus: 'PENDING', paymentDate: '',
+      departureLocation: '', presentationTime: ''
+    });
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -42,19 +81,26 @@ const BookingsView: React.FC = () => {
         return;
     }
 
-    const result = await addBooking({
-      ...formData,
-      driverId: formData.driverId || null,
-      paymentDate: formData.paymentDate || null
-    });
+    let result;
+    if (editingBookingId) {
+        // UPDATE MODE
+        result = await updateBooking(editingBookingId, {
+            ...formData,
+            driverId: formData.driverId || null,
+            paymentDate: formData.paymentDate || null
+        });
+    } else {
+        // CREATE MODE
+        result = await addBooking({
+            ...formData,
+            driverId: formData.driverId || null,
+            paymentDate: formData.paymentDate || null
+        });
+    }
 
     if (result.success) {
       setMsg({ type: 'success', text: result.message });
-      setFormData({ 
-        busId: '', driverId: '', clientName: '', clientPhone: '', destination: '', startTime: '', endTime: '', value: 0,
-        paymentStatus: 'PENDING', paymentDate: '',
-        departureLocation: '', presentationTime: ''
-      });
+      handleCancelEdit(); // Reset form
       setTimeout(() => setMsg(null), 3000);
     } else {
       if (result.message.includes('Conflito')) {
@@ -151,7 +197,7 @@ const BookingsView: React.FC = () => {
             </div>
 
             <div class="box">
-                <h3 style="border:none; background:none; padding:0; margin:0 0 10px 0;">CONTROLE DE QUILOMETRAGEM</h3>
+                <h3 style="border:none; background:none; padding:0; margin:0 10px 0;">CONTROLE DE QUILOMETRAGEM</h3>
                 <div class="km-row">
                     <div class="km-field">KM INICIAL: </div>
                     <div class="km-field">KM FINAL: </div>
@@ -276,10 +322,9 @@ const BookingsView: React.FC = () => {
                     </div>
                 </div>
             </div>
-        </div>
-      )}
+        )}
 
-      {/* List of Bookings */}
+        {/* List of Bookings */}
       <div className="lg:col-span-2 space-y-6">
         <h2 className="text-2xl font-bold text-slate-800">Escala de Locações</h2>
         <div className="grid gap-4">
@@ -288,7 +333,7 @@ const BookingsView: React.FC = () => {
             const driver = users.find(u => u.id === booking.driverId);
             
             return (
-              <div key={booking.id} className="bg-white p-5 rounded-lg shadow-sm border border-slate-200 flex flex-col md:flex-row justify-between items-start gap-4">
+              <div key={booking.id} className={`bg-white p-5 rounded-lg shadow-sm border border-slate-200 flex flex-col md:flex-row justify-between items-start gap-4 ${editingBookingId === booking.id ? 'ring-2 ring-blue-500' : ''}`}>
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-1">
                     <span className={`px-2 py-1 rounded text-xs font-bold ${booking.status === 'CONFIRMED' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'}`}>
@@ -375,12 +420,21 @@ const BookingsView: React.FC = () => {
                   </div>
                   
                   {/* GENERATE OS BUTTON */}
-                  <button 
-                    onClick={() => handlePrintOS(booking)}
-                    className="w-full mt-3 bg-slate-800 text-white text-xs py-2 rounded hover:bg-slate-700 flex items-center justify-center gap-1 font-bold"
-                  >
-                      🖨️ Imprimir OS
-                  </button>
+                  <div className="space-y-2 mt-3">
+                      <button 
+                        onClick={() => handlePrintOS(booking)}
+                        className="w-full bg-slate-800 text-white text-xs py-2 rounded hover:bg-slate-700 flex items-center justify-center gap-1 font-bold"
+                      >
+                          🖨️ Imprimir OS
+                      </button>
+
+                      <button 
+                        onClick={() => handleEdit(booking)}
+                        className="w-full bg-blue-100 text-blue-700 text-xs py-2 rounded hover:bg-blue-200 flex items-center justify-center gap-1 font-bold"
+                      >
+                          ✏️ Editar
+                      </button>
+                  </div>
 
                   {booking.status === 'CONFIRMED' && (
                     <button 
@@ -400,7 +454,15 @@ const BookingsView: React.FC = () => {
 
       {/* New Booking Form */}
       <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 h-fit sticky top-6">
-        <h3 className="text-xl font-bold text-slate-800 mb-4">Nova Locação</h3>
+        <div className="flex justify-between items-center mb-4">
+            <h3 className="text-xl font-bold text-slate-800">
+                {editingBookingId ? 'Editar Locação' : 'Nova Locação'}
+            </h3>
+            {editingBookingId && (
+                <button onClick={handleCancelEdit} className="text-xs text-red-500 hover:underline">Cancelar Edição</button>
+            )}
+        </div>
+
         {msg && (
             <div className={`p-3 rounded-lg text-sm mb-4 ${msg.type === 'success' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
                 {msg.text}
@@ -486,7 +548,7 @@ const BookingsView: React.FC = () => {
             >
               <option value="">Selecione um veículo</option>
               {buses.map(bus => (
-                <option key={bus.id} value={bus.id} disabled={bus.status === 'MAINTENANCE'}>
+                <option key={bus.id} value={bus.id} disabled={bus.status === 'MAINTENANCE' && bus.id !== formData.busId}>
                   {bus.plate} - {bus.model} {bus.status === 'MAINTENANCE' ? '(Manutenção)' : ''}
                 </option>
               ))}
@@ -547,9 +609,9 @@ const BookingsView: React.FC = () => {
 
           <button 
             type="submit" 
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 rounded-lg transition-colors shadow-md"
+            className={`w-full text-white font-semibold py-2 rounded-lg transition-colors shadow-md ${editingBookingId ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-blue-600 hover:bg-blue-700'}`}
           >
-            Agendar Locação
+            {editingBookingId ? 'Salvar Alterações' : 'Agendar Locação'}
           </button>
         </form>
       </div>
