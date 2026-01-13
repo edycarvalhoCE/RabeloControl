@@ -36,6 +36,8 @@ interface StoreContextType {
   logout: () => void;
   switchUser: (userId: string) => void;
   addUser: (user: Omit<User, 'id' | 'avatar'>) => void;
+  updateUser: (id: string, data: Partial<User>) => Promise<void>;
+  deleteUser: (id: string) => Promise<void>;
   addBooking: (booking: Omit<Booking, 'id' | 'status'>) => Promise<{ success: boolean; message: string }>;
   updateBookingStatus: (id: string, status: Booking['status']) => void;
   addPart: (part: Omit<Part, 'id'>) => void;
@@ -149,7 +151,6 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
               setCurrentUser(dbUser);
           } else {
               // Fallback if user is logged in Auth but not in Users collection
-              // This creates a temporary profile so the app doesn't hang forever if the user isn't in DB
               setCurrentUser({
                   id: auth.currentUser.uid,
                   name: auth.currentUser.displayName || 'Usuário',
@@ -212,6 +213,16 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
           ...userData,
           avatar: `https://ui-avatars.com/api/?name=${userData.name}&background=random`
       });
+  };
+
+  const updateUser = async (id: string, data: Partial<User>) => {
+      if (!isConfigured) return;
+      await updateDoc(doc(db, 'users', id), data);
+  };
+
+  const deleteUser = async (id: string) => {
+      if (!isConfigured) return;
+      await deleteDoc(doc(db, 'users', id));
   };
 
   const checkAvailability = (busId: string, start: string, end: string): boolean => {
@@ -519,7 +530,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   return (
     <StoreContext.Provider value={{
       currentUser: currentUser!, isAuthenticated, users, buses, bookings, parts, transactions, timeOffs, documents, maintenanceRecords, purchaseRequests, maintenanceReports, charterContracts, travelPackages, packagePassengers, packagePayments, clients,
-      switchUser, addUser, addBooking, updateBookingStatus, addPart, updateStock, addTransaction, addTimeOff, updateTimeOffStatus, addDocument, deleteDocument, addMaintenanceRecord, addPurchaseRequest, updatePurchaseRequestStatus, addMaintenanceReport, updateMaintenanceReportStatus, addBus, updateBusStatus, addCharterContract, addTravelPackage, registerPackageSale, addPackagePayment, 
+      switchUser, addUser, updateUser, deleteUser, addBooking, updateBookingStatus, addPart, updateStock, addTransaction, addTimeOff, updateTimeOffStatus, addDocument, deleteDocument, addMaintenanceRecord, addPurchaseRequest, updatePurchaseRequestStatus, addMaintenanceReport, updateMaintenanceReportStatus, addBus, updateBusStatus, addCharterContract, addTravelPackage, registerPackageSale, addPackagePayment, 
       login, logout, register, seedDatabase
     }}>
       {children}

@@ -32,6 +32,13 @@ const CalendarView: React.FC = () => {
   const days = Array.from({ length: daysInMonth }, (_, i) => i + 1);
   const padding = Array.from({ length: firstDay }, (_, i) => i);
 
+  // HELPER: Format date string YYYY-MM-DD to DD/MM/YYYY manually to avoid timezone bugs
+  const formatDateString = (dateStr: string) => {
+    if(!dateStr) return '';
+    const [year, month, day] = dateStr.split('-');
+    return `${day}/${month}/${year}`;
+  };
+
   const handleAddFolga = (e: React.FormEvent) => {
     e.preventDefault();
     if(newTimeOff.driverId && newTimeOff.date) {
@@ -77,7 +84,7 @@ const CalendarView: React.FC = () => {
                               <div>
                                   <p className="font-bold text-slate-800">{driver?.name}</p>
                                   <p className="text-sm text-slate-600">
-                                      {t.type} • {new Date(t.date).toLocaleDateString()}
+                                      {t.type} • {formatDateString(t.date)}
                                   </p>
                               </div>
                               <div className="flex gap-2">

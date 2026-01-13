@@ -1,16 +1,29 @@
 import { GoogleGenAI } from "@google/genai";
 
 export const getFinancialInsight = async (summary: string): Promise<string> => {
-  // Check if process is defined (avoids ReferenceError in some browser builds)
-  const apiKey = (typeof process !== 'undefined' && process.env) ? process.env.API_KEY : '';
+  // Safe check for API Key in different environments (Vite vs Node)
+  let apiKey = '';
+  
+  try {
+    // @ts-ignore
+    if (typeof import.meta !== 'undefined' && import.meta.env) {
+      // @ts-ignore
+      apiKey = import.meta.env.VITE_API_KEY || import.meta.env.API_KEY;
+    } 
+    // Fallback for standard process.env
+    else if (typeof process !== 'undefined' && process.env) {
+      apiKey = process.env.API_KEY || '';
+    }
+  } catch (e) {
+    console.warn("Could not read env vars");
+  }
   
   if (!apiKey) {
       console.warn("Gemini API Key missing");
-      return "Configuração de IA ausente. Verifique as variáveis de ambiente.";
+      return "Configuração de IA ausente. Verifique as variáveis de ambiente na Vercel (API_KEY).";
   }
   
   try {
-    // Initialize inside the function to avoid top-level crashes
     const ai = new GoogleGenAI({ apiKey });
     
     const response = await ai.models.generateContent({

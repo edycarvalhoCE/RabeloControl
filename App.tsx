@@ -28,6 +28,7 @@ const MainContent = () => {
   };
 
   const [currentView, setCurrentView] = useState('dashboard');
+  const [isMobileOpen, setIsMobileOpen] = useState(false);
 
   // React to auth changes and role changes
   React.useEffect(() => {
@@ -71,13 +72,31 @@ const MainContent = () => {
   };
 
   return (
-    <div className="flex min-h-screen bg-slate-100 font-sans text-slate-900">
-      <Sidebar currentView={currentView} setView={setCurrentView} />
-      <main className="flex-1 p-8 overflow-y-auto h-screen">
-        <div className="max-w-7xl mx-auto">
-          {renderView()}
+    <div className="flex h-screen bg-slate-100 font-sans text-slate-900 overflow-hidden">
+      <Sidebar 
+        currentView={currentView} 
+        setView={setCurrentView} 
+        isMobileOpen={isMobileOpen}
+        setIsMobileOpen={setIsMobileOpen}
+      />
+      
+      <div className="flex-1 flex flex-col h-full overflow-hidden">
+        {/* Mobile Header */}
+        <div className="md:hidden bg-slate-900 text-white p-4 flex justify-between items-center shadow-md shrink-0">
+            <div className="font-extrabold text-xl">
+                Rabelo<span className="text-blue-500">Tour</span>
+            </div>
+            <button onClick={() => setIsMobileOpen(true)} className="p-2">
+                <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16m-7 6h7" /></svg>
+            </button>
         </div>
-      </main>
+
+        <main className="flex-1 overflow-y-auto p-4 md:p-8">
+          <div className="max-w-7xl mx-auto">
+            {renderView()}
+          </div>
+        </main>
+      </div>
     </div>
   );
 };

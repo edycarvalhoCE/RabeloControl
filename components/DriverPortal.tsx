@@ -44,6 +44,13 @@ const DriverPortal: React.FC = () => {
       }
   };
 
+  // HELPER: Format date string YYYY-MM-DD to DD/MM/YYYY manually to avoid timezone bugs
+  const formatDateString = (dateStr: string) => {
+      if(!dateStr) return '';
+      const [year, month, day] = dateStr.split('-');
+      return `${day}/${month}/${year}`;
+  };
+
   const getStatusBadge = (status: string) => {
     switch(status) {
         case 'APPROVED': return <span className="px-2 py-1 rounded text-xs font-bold bg-green-100 text-green-700">Aprovado</span>;
@@ -206,7 +213,8 @@ const DriverPortal: React.FC = () => {
                             <div key={t.id} className="bg-slate-50 p-3 rounded flex justify-between items-center text-sm border border-slate-200">
                                 <div>
                                     <span className="font-semibold block text-slate-800">{t.type}</span>
-                                    <span className="text-slate-500">{new Date(t.date).toLocaleDateString()}</span>
+                                    {/* Use format function to fix date display */}
+                                    <span className="text-slate-500">{formatDateString(t.date)}</span>
                                 </div>
                                 {getStatusBadge(t.status)}
                             </div>
