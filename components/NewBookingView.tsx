@@ -39,16 +39,15 @@ const NewBookingView: React.FC = () => {
     }
   };
 
-  // Special handler for Currency Input (ATM Style)
+  // Robust ATM-style currency handler
   const handleCurrencyChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    let inputValue = e.target.value;
-    // Remove all non-digits
-    inputValue = inputValue.replace(/\D/g, "");
+    const value = e.target.value;
+    // Remove everything that is not a digit
+    const digits = value.replace(/\D/g, "");
+    // Convert to number (cents -> float)
+    const realValue = Number(digits) / 100;
     
-    // Convert to float (cents)
-    const numericValue = inputValue ? parseInt(inputValue, 10) / 100 : 0;
-
-    setFormData(prev => ({ ...prev, value: numericValue }));
+    setFormData(prev => ({ ...prev, value: realValue }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -229,14 +228,18 @@ const NewBookingView: React.FC = () => {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
                         <label className="block text-sm font-medium text-slate-700 mb-1">Valor Total</label>
-                        <input 
-                            type="text" 
-                            name="value" 
-                            value={formData.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} 
-                            onChange={handleCurrencyChange} 
-                            className="w-full border p-2 rounded font-bold text-slate-800" 
-                            placeholder="R$ 0,00" 
-                        />
+                        <div className="flex items-center border border-slate-300 rounded-lg overflow-hidden bg-white focus-within:ring-2 focus-within:ring-blue-500">
+                            <span className="bg-slate-100 text-slate-600 px-3 py-2 font-bold border-r border-slate-300">R$</span>
+                            <input 
+                                type="text" 
+                                inputMode="numeric"
+                                name="value" 
+                                value={formData.value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} 
+                                onChange={handleCurrencyChange} 
+                                className="w-full p-2 outline-none text-right font-bold text-slate-800" 
+                                placeholder="0,00" 
+                            />
+                        </div>
                     </div>
                     <div>
                         <label className="block text-sm font-medium text-slate-700 mb-1">Status Pagamento</label>

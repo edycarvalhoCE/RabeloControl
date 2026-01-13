@@ -109,14 +109,10 @@ const BookingsView: React.FC = () => {
 
   // Special handler for Currency Input (ATM Style) for Edit Modal
   const handleEditCurrencyChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    let inputValue = e.target.value;
-    // Remove all non-digits
-    inputValue = inputValue.replace(/\D/g, "");
-    
-    // Convert to float (cents)
-    const numericValue = inputValue ? parseInt(inputValue, 10) / 100 : 0;
-
-    setEditForm((prev: any) => ({ ...prev, value: numericValue }));
+    const value = e.target.value;
+    const digits = value.replace(/\D/g, "");
+    const realValue = Number(digits) / 100;
+    setEditForm((prev: any) => ({ ...prev, value: realValue }));
   };
 
   const handleEditSubmit = async (e: React.FormEvent) => {
@@ -476,14 +472,18 @@ const BookingsView: React.FC = () => {
                       <textarea name="observations" value={editForm.observations} onChange={handleEditChange} placeholder="Observações..." className="w-full border p-2 rounded h-20" />
 
                       <div className="border-t pt-4 grid grid-cols-2 gap-4">
-                          <input 
-                              type="text" 
-                              name="value" 
-                              value={editForm.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} 
-                              onChange={handleEditCurrencyChange}
-                              className="w-full border p-2 rounded font-bold text-slate-800" 
-                              placeholder="R$ 0,00" 
-                          />
+                          <div className="flex items-center border border-slate-300 rounded-lg overflow-hidden bg-white focus-within:ring-2 focus-within:ring-blue-500">
+                              <span className="bg-slate-100 text-slate-600 px-3 py-2 font-bold border-r border-slate-300">R$</span>
+                              <input 
+                                  type="text"
+                                  inputMode="numeric"
+                                  name="value" 
+                                  value={editForm.value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} 
+                                  onChange={handleEditCurrencyChange}
+                                  className="w-full p-2 outline-none text-right font-bold text-slate-800" 
+                                  placeholder="0,00" 
+                              />
+                          </div>
                           <select name="paymentStatus" value={editForm.paymentStatus} onChange={handleEditChange} className="w-full border p-2 rounded">
                               <option value="PENDING">Pendente</option>
                               <option value="PAID">Pago</option>

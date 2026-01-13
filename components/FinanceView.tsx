@@ -30,14 +30,10 @@ const FinanceView: React.FC = () => {
 
   // Special handler for Currency Input (ATM Style)
   const handleCurrencyChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    let inputValue = e.target.value;
-    // Remove all non-digits
-    inputValue = inputValue.replace(/\D/g, "");
-    
-    // Convert to float (cents)
-    const numericValue = inputValue ? parseInt(inputValue, 10) / 100 : 0;
-
-    setNewTrans(prev => ({ ...prev, amount: numericValue }));
+    const value = e.target.value;
+    const digits = value.replace(/\D/g, "");
+    const realValue = Number(digits) / 100;
+    setNewTrans(prev => ({ ...prev, amount: realValue }));
   };
 
   const currentBalance = realizedTransactions
@@ -206,14 +202,18 @@ const FinanceView: React.FC = () => {
                 </div>
                 <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">Valor (R$)</label>
-                    <input 
-                        type="text" 
-                        required 
-                        value={newTrans.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} 
-                        onChange={handleCurrencyChange}
-                        className="w-full border p-2 rounded focus:ring-2 focus:ring-blue-500 outline-none font-bold text-slate-800"
-                        placeholder="R$ 0,00"
-                    />
+                    <div className="flex items-center border border-slate-300 rounded-lg overflow-hidden bg-white focus-within:ring-2 focus-within:ring-blue-500">
+                        <span className="bg-slate-100 text-slate-600 px-3 py-2 font-bold border-r border-slate-300">R$</span>
+                        <input 
+                            type="text" 
+                            inputMode="numeric"
+                            required 
+                            value={newTrans.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} 
+                            onChange={handleCurrencyChange}
+                            className="w-full p-2 outline-none text-right font-bold text-slate-800"
+                            placeholder="0,00"
+                        />
+                    </div>
                 </div>
                 <button type="submit" className="w-full bg-slate-800 text-white font-bold py-3 rounded hover:bg-slate-700 transition-colors">
                     Registrar Agora
