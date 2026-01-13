@@ -34,11 +34,11 @@ const BookingsView: React.FC = () => {
   const drivers = users.filter(u => u.role === UserRole.DRIVER);
 
   const handleEdit = (booking: Booking) => {
-    // Format ISO dates to datetime-local input format (YYYY-MM-DDTHH:mm)
-    // Note: slice(0, 16) works if the ISO string is proper.
-    
-    // Safely extract date part for payment date (YYYY-MM-DD)
-    const paymentDateVal = booking.paymentDate ? booking.paymentDate.split('T')[0] : '';
+    // Safety check for date fields to prevent crash on old records
+    const safeStart = booking.startTime ? booking.startTime.slice(0, 16) : '';
+    const safeEnd = booking.endTime ? booking.endTime.slice(0, 16) : '';
+    const safePresentation = booking.presentationTime ? booking.presentationTime.slice(0, 16) : '';
+    const safePaymentDate = booking.paymentDate ? booking.paymentDate.split('T')[0] : '';
 
     setFormData({
       busId: booking.busId,
@@ -46,13 +46,13 @@ const BookingsView: React.FC = () => {
       clientName: booking.clientName,
       clientPhone: booking.clientPhone || '',
       destination: booking.destination,
-      startTime: booking.startTime.slice(0, 16),
-      endTime: booking.endTime.slice(0, 16),
+      startTime: safeStart,
+      endTime: safeEnd,
       value: booking.value,
       paymentStatus: booking.paymentStatus,
-      paymentDate: paymentDateVal,
-      departureLocation: booking.departureLocation,
-      presentationTime: booking.presentationTime.slice(0, 16)
+      paymentDate: safePaymentDate,
+      departureLocation: booking.departureLocation || '',
+      presentationTime: safePresentation
     });
     setEditingBookingId(booking.id);
     
@@ -145,6 +145,10 @@ const BookingsView: React.FC = () => {
   const handlePrintOS = (booking: Booking) => {
       const bus = buses.find(b => b.id === booking.busId);
       const driver = users.find(u => u.id === booking.driverId);
+      
+      const safeStart = booking.startTime ? new Date(booking.startTime).toLocaleString() : 'N/A';
+      const safeEnd = booking.endTime ? new Date(booking.endTime).toLocaleString() : 'N/A';
+      const safePresentation = booking.presentationTime ? new Date(booking.presentationTime).toLocaleString() : 'N/A';
 
       const printContent = `
         <html>
@@ -178,10 +182,10 @@ const BookingsView: React.FC = () => {
             <div class="section">
                 <h3>Dados da Viagem</h3>
                 <div class="row"><span class="label">Destino:</span><span class="value">${booking.destination}</span></div>
-                <div class="row"><span class="label">Local de Saída:</span><span class="value">${booking.departureLocation}</span></div>
-                <div class="row"><span class="label">Horário de Saída:</span><span class="value">${new Date(booking.startTime).toLocaleString()}</span></div>
-                <div class="row"><span class="label">Apresentação:</span><span class="value">${new Date(booking.presentationTime).toLocaleString()} (Garagem)</span></div>
-                <div class="row"><span class="label">Retorno Previsto:</span><span class="value">${new Date(booking.endTime).toLocaleString()}</span></div>
+                <div class="row"><span class="label">Local de Saída:</span><span class="value">${booking.departureLocation || 'Não informado'}</span></div>
+                <div class="row"><span class="label">Horário de Saída:</span><span class="value">${safeStart}</span></div>
+                <div class="row"><span class="label">Apresentação:</span><span class="value">${safePresentation} (Garagem)</span></div>
+                <div class="row"><span class="label">Retorno Previsto:</span><span class="value">${safeEnd}</span></div>
             </div>
 
             <div class="section">
@@ -280,343 +284,4 @@ const BookingsView: React.FC = () => {
                         </div>
                         <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
                             <span className="text-xs font-bold text-slate-500 uppercase">Status Atual</span>
-                            <p className={`text-xl font-bold ${selectedBus.status === 'AVAILABLE' ? 'text-green-600' : selectedBus.status === 'MAINTENANCE' ? 'text-red-600' : 'text-blue-600'}`}>
-                                {selectedBus.status === 'AVAILABLE' ? 'Disponível' : selectedBus.status === 'MAINTENANCE' ? 'Em Manutenção' : 'Em Viagem'}
-                            </p>
-                        </div>
-                    </div>
-
-                    <h3 className="text-lg font-bold text-slate-800 mb-3 border-b pb-2">Histórico de Manutenção (Despesas)</h3>
-                    <div className="space-y-2 mb-6">
-                        {getBusMaintenanceHistory(selectedBus.plate).length > 0 ? (
-                            getBusMaintenanceHistory(selectedBus.plate).map(t => (
-                                <div key={t.id} className="flex justify-between items-center bg-red-50 p-3 rounded-lg border border-red-100">
-                                    <div>
-                                        <p className="font-semibold text-slate-800">{t.description}</p>
-                                        <p className="text-xs text-slate-500">{new Date(t.date).toLocaleDateString()}</p>
-                                    </div>
-                                    <span className="font-bold text-red-600">- R$ {t.amount.toLocaleString('pt-BR')}</span>
-                                </div>
-                            ))
-                        ) : (
-                            <p className="text-slate-500 italic text-sm">Nenhum registro de manutenção encontrado para esta placa.</p>
-                        )}
-                    </div>
-
-                    <h3 className="text-lg font-bold text-slate-800 mb-3 border-b pb-2">Próximas Viagens</h3>
-                    <div className="space-y-2">
-                        {bookings.filter(b => b.busId === selectedBus.id && b.status === 'CONFIRMED' && new Date(b.startTime) > new Date()).length > 0 ? (
-                            bookings.filter(b => b.busId === selectedBus.id && b.status === 'CONFIRMED' && new Date(b.startTime) > new Date())
-                                .sort((a,b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime())
-                                .map(b => (
-                                    <div key={b.id} className="flex justify-between items-center bg-blue-50 p-3 rounded-lg border border-blue-100">
-                                        <div>
-                                            <p className="font-semibold text-slate-800">{b.destination}</p>
-                                            <p className="text-xs text-slate-500">{new Date(b.startTime).toLocaleDateString()} • {b.clientName}</p>
-                                        </div>
-                                    </div>
-                                ))
-                        ) : (
-                            <p className="text-slate-500 italic text-sm">Nenhuma viagem futura agendada.</p>
-                        )}
-                    </div>
-                </div>
-            </div>
-        )}
-
-        {/* List of Bookings */}
-      <div className="lg:col-span-2 space-y-6">
-        <h2 className="text-2xl font-bold text-slate-800">Escala de Locações</h2>
-        <div className="grid gap-4">
-          {bookings.map(booking => {
-            const bus = buses.find(b => b.id === booking.busId);
-            const driver = users.find(u => u.id === booking.driverId);
-            
-            return (
-              <div key={booking.id} className={`bg-white p-5 rounded-lg shadow-sm border border-slate-200 flex flex-col md:flex-row justify-between items-start gap-4 ${editingBookingId === booking.id ? 'ring-2 ring-blue-500' : ''}`}>
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className={`px-2 py-1 rounded text-xs font-bold ${booking.status === 'CONFIRMED' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'}`}>
-                      {booking.status}
-                    </span>
-                    <h3 className="font-semibold text-lg text-slate-900">{booking.destination}</h3>
-                  </div>
-                  <p className="text-slate-600 text-sm">Cliente: <span className="font-medium text-slate-800">{booking.clientName}</span> {booking.clientPhone && <span className="text-xs text-slate-400">({booking.clientPhone})</span>}</p>
-                  
-                  <div className="mt-3 flex flex-wrap gap-4 text-sm text-slate-500">
-                    <div className="flex items-center gap-1 bg-slate-50 px-2 py-1 rounded">
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-                        {new Date(booking.startTime).toLocaleDateString()}
-                    </div>
-                    <div className="flex items-center gap-1 bg-slate-50 px-2 py-1 rounded">
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                        {new Date(booking.startTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} - {new Date(booking.endTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                    </div>
-                  </div>
-                  
-                  {/* Logistics Info */}
-                  <div className="mt-3 bg-blue-50 p-3 rounded-lg border border-blue-100 text-sm">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                        <div className="flex gap-2 items-start">
-                             <span className="text-blue-500">📍</span>
-                             <div>
-                                 <span className="font-bold text-blue-900 block text-xs uppercase">Local de Saída</span>
-                                 <span className="text-blue-800">{booking.departureLocation || 'Não informado'}</span>
-                             </div>
-                        </div>
-                        <div className="flex gap-2 items-start">
-                             <span className="text-blue-500">🕒</span>
-                             <div>
-                                 <span className="font-bold text-blue-900 block text-xs uppercase">Apresentação (Garagem)</span>
-                                 <span className="text-blue-800">
-                                     {booking.presentationTime ? new Date(booking.presentationTime).toLocaleString([], {weekday:'short', hour:'2-digit', minute:'2-digit'}) : 'Não informado'}
-                                 </span>
-                             </div>
-                        </div>
-                      </div>
-                  </div>
-
-                  <div className="mt-3 text-sm grid grid-cols-2 gap-2">
-                    <div>
-                        <span className="font-medium text-slate-700 block">Veículo</span> 
-                        {bus ? (
-                            <button 
-                                onClick={() => setSelectedBus(bus)}
-                                className="text-blue-600 hover:text-blue-800 font-semibold hover:underline text-left"
-                                title="Ver detalhes do veículo"
-                            >
-                                {bus.model} ({bus.plate})
-                            </button>
-                        ) : (
-                            <span className="text-slate-600">Não atribuído</span>
-                        )}
-                    </div>
-                    <div>
-                        <span className="font-medium text-slate-700 block">Motorista</span> 
-                        <span className="text-slate-600">{driver ? driver.name : <span className="text-red-500">Não atribuído</span>}</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="text-right border-t md:border-t-0 md:border-l border-slate-100 pt-4 md:pt-0 md:pl-4 min-w-[150px]">
-                  <p className="text-lg font-bold text-blue-600">R$ {booking.value.toLocaleString('pt-BR')}</p>
-                  
-                  <div className="mt-2 text-xs">
-                     {booking.paymentStatus === 'PAID' && (
-                         <span className="inline-block px-2 py-1 bg-green-50 text-green-700 rounded border border-green-200 w-full text-center">
-                             Pago em {new Date(booking.paymentDate!).toLocaleDateString()}
-                         </span>
-                     )}
-                     {booking.paymentStatus === 'SCHEDULED' && (
-                         <span className="inline-block px-2 py-1 bg-blue-50 text-blue-700 rounded border border-blue-200 w-full text-center">
-                             Vence em {new Date(booking.paymentDate!).toLocaleDateString()}
-                         </span>
-                     )}
-                     {booking.paymentStatus === 'PENDING' && (
-                         <span className="inline-block px-2 py-1 bg-yellow-50 text-yellow-700 rounded border border-yellow-200 w-full text-center">
-                             Pagamento Pendente
-                         </span>
-                     )}
-                  </div>
-                  
-                  {/* GENERATE OS BUTTON */}
-                  <div className="space-y-2 mt-3">
-                      <button 
-                        onClick={() => handlePrintOS(booking)}
-                        className="w-full bg-slate-800 text-white text-xs py-2 rounded hover:bg-slate-700 flex items-center justify-center gap-1 font-bold"
-                      >
-                          🖨️ Imprimir OS
-                      </button>
-
-                      <button 
-                        onClick={() => handleEdit(booking)}
-                        className="w-full bg-blue-100 text-blue-700 text-xs py-2 rounded hover:bg-blue-200 flex items-center justify-center gap-1 font-bold"
-                      >
-                          ✏️ Editar
-                      </button>
-                  </div>
-
-                  {booking.status === 'CONFIRMED' && (
-                    <button 
-                        onClick={() => updateBookingStatus(booking.id, 'CANCELLED')}
-                        className="text-xs text-red-500 hover:text-red-700 mt-2 underline block w-full text-right"
-                    >
-                        Cancelar Viagem
-                    </button>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-          {bookings.length === 0 && <p className="text-slate-500 text-center py-10">Nenhuma locação agendada.</p>}
-        </div>
-      </div>
-
-      {/* New Booking Form */}
-      <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 h-fit sticky top-6">
-        <div className="flex justify-between items-center mb-4">
-            <h3 className="text-xl font-bold text-slate-800">
-                {editingBookingId ? 'Editar Locação' : 'Nova Locação'}
-            </h3>
-            {editingBookingId && (
-                <button onClick={handleCancelEdit} className="text-xs text-red-500 hover:underline">Cancelar Edição</button>
-            )}
-        </div>
-
-        {msg && (
-            <div className={`p-3 rounded-lg text-sm mb-4 ${msg.type === 'success' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                {msg.text}
-            </div>
-        )}
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Cliente</label>
-            <input 
-              type="text" name="clientName" value={formData.clientName} onChange={handleChange}
-              className="w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
-              placeholder="Nome da empresa ou pessoa"
-              required
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Telefone do Cliente</label>
-            <input 
-              type="text" name="clientPhone" value={formData.clientPhone} onChange={handleChange}
-              className="w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
-              placeholder="(00) 00000-0000"
-              required
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Destino</label>
-            <input 
-              type="text" name="destination" value={formData.destination} onChange={handleChange}
-              className="w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
-              required
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Início da Viagem</label>
-                <input 
-                type="datetime-local" name="startTime" value={formData.startTime} onChange={handleChange}
-                className="w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                required
-                />
-            </div>
-            <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Fim da Viagem</label>
-                <input 
-                type="datetime-local" name="endTime" value={formData.endTime} onChange={handleChange}
-                className="w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                required
-                />
-            </div>
-          </div>
-          
-          <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
-              <p className="text-xs font-bold text-slate-500 uppercase mb-2">Logística</p>
-              <div className="space-y-3">
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Local de Saída</label>
-                    <input 
-                      type="text" name="departureLocation" value={formData.departureLocation} onChange={handleChange}
-                      className="w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                      placeholder="Ex: Rodoviária, Praça da Matriz..."
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Apresentação na Garagem</label>
-                    <input 
-                      type="datetime-local" name="presentationTime" value={formData.presentationTime} onChange={handleChange}
-                      className="w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                      required
-                    />
-                    <p className="text-xs text-slate-500 mt-1">Horário que o motorista deve chegar.</p>
-                  </div>
-              </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Ônibus</label>
-            <select 
-              name="busId" value={formData.busId} onChange={handleChange}
-              className="w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
-              required
-            >
-              <option value="">Selecione um veículo</option>
-              {buses.map(bus => (
-                <option key={bus.id} value={bus.id} disabled={bus.status === 'MAINTENANCE' && bus.id !== formData.busId}>
-                  {bus.plate} - {bus.model} {bus.status === 'MAINTENANCE' ? '(Manutenção)' : ''}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Motorista (Opcional)</label>
-            <select 
-              name="driverId" value={formData.driverId} onChange={handleChange}
-              className="w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
-            >
-              <option value="">Selecione um motorista</option>
-              {drivers.map(driver => (
-                <option key={driver.id} value={driver.id}>{driver.name}</option>
-              ))}
-            </select>
-          </div>
-          
-          <div className="border-t border-slate-200 pt-4 mt-2">
-              <label className="block text-sm font-bold text-slate-800 mb-2">Informações de Pagamento</label>
-              <div className="mb-3">
-                <label className="block text-sm font-medium text-slate-700 mb-1">Valor do Contrato (R$)</label>
-                <input 
-                  type="number" name="value" value={formData.value} onChange={handleChange}
-                  className="w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                  min="0"
-                  step="0.01"
-                />
-              </div>
-              
-              <div className="mb-3">
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Status do Pagamento</label>
-                  <select
-                    name="paymentStatus" 
-                    value={formData.paymentStatus} 
-                    onChange={handleChange}
-                    className="w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none bg-slate-50"
-                  >
-                      <option value="PENDING">Pendente (Não lançado no caixa)</option>
-                      <option value="PAID">Já Pago (Entra no caixa hoje/data informada)</option>
-                      <option value="SCHEDULED">Para Frente (Agendar recebimento)</option>
-                  </select>
-              </div>
-
-              {formData.paymentStatus !== 'PENDING' && (
-                  <div className="mb-3 animate-fade-in">
-                      <label className="block text-sm font-medium text-slate-700 mb-1">
-                          {formData.paymentStatus === 'PAID' ? 'Data do Pagamento' : 'Data do Vencimento'}
-                      </label>
-                      <input 
-                        type="date" name="paymentDate" value={formData.paymentDate} onChange={handleChange}
-                        className="w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                        required
-                      />
-                  </div>
-              )}
-          </div>
-
-          <button 
-            type="submit" 
-            className={`w-full text-white font-semibold py-2 rounded-lg transition-colors shadow-md ${editingBookingId ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-blue-600 hover:bg-blue-700'}`}
-          >
-            {editingBookingId ? 'Salvar Alterações' : 'Agendar Locação'}
-          </button>
-        </form>
-      </div>
-    </div>
-  );
-};
-
-export default BookingsView;
+                            <p className={`text-xl font-bold ${selectedBus.status === 'AVAILABLE' ? 'text-green-600' : selectedBus.status === 'MAINTENANCE' ? 'text-red-60
