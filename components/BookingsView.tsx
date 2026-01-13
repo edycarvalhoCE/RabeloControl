@@ -70,10 +70,19 @@ const BookingsView: React.FC = () => {
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: name === 'value' ? parseFloat(value) : value
-    }));
+    
+    if (name === 'paymentStatus' && value === 'PENDING') {
+         setFormData(prev => ({
+             ...prev,
+             [name]: value as any,
+             paymentDate: '' // Reset date if pending
+         }));
+    } else {
+        setFormData(prev => ({
+            ...prev,
+            [name]: name === 'value' ? parseFloat(value) : value
+        }));
+    }
   };
 
   // Helper to find related maintenance

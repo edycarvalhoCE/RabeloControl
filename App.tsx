@@ -13,30 +13,44 @@ import UsersView from './components/UsersView';
 import VehiclesView from './components/VehiclesView';
 import CharterView from './components/CharterView';
 import TravelPackagesView from './components/TravelPackagesView';
+import LoginView from './components/LoginView';
 import { useStore } from './services/store';
 
 const MainContent = () => {
-  const { currentUser } = useStore();
-  // Default view based on role
+  const { currentUser, isAuthenticated } = useStore();
+  
+  // Default view logic
   const getDefaultView = () => {
+    if (!currentUser) return 'dashboard';
     if (currentUser.role === 'MOTORISTA') return 'driver-portal';
     if (currentUser.role === 'MECANICO') return 'maintenance';
     return 'dashboard';
   };
 
-  const [currentView, setCurrentView] = useState(getDefaultView());
+  const [currentView, setCurrentView] = useState('dashboard');
 
-  // Update view if user role changes and they lose access to current view
+  // React to auth changes and role changes
   React.useEffect(() => {
-    const role = currentUser.role;
-    if (role === 'MOTORISTA' && currentView !== 'driver-portal') {
-      setCurrentView('driver-portal');
-    } else if (role === 'MECANICO' && currentView !== 'maintenance' && currentView !== 'inventory') {
-        setCurrentView('maintenance');
-    } else if (role !== 'MOTORISTA' && role !== 'MECANICO' && currentView === 'driver-portal') {
-        setCurrentView('dashboard');
+    if (isAuthenticated && currentUser) {
+        setCurrentView(getDefaultView());
     }
-  }, [currentUser.role]);
+  }, [isAuthenticated, currentUser?.role]);
+
+  if (!isAuthenticated) {
+      return <LoginView />;
+  }
+
+  // Prevent crash if authenticated but user profile not yet loaded from Firestore
+  if (!currentUser) {
+      return (
+          <div className="min-h-screen flex items-center justify-center bg-slate-900">
+              <div className="text-center">
+                  <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                  <p className="text-slate-400 font-medium">Carregando perfil...</p>
+              </div>
+          </div>
+      );
+  }
 
   const renderView = () => {
     switch (currentView) {

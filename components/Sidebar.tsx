@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useStore } from '../services/store';
 import { UserRole } from '../types';
 
@@ -8,7 +8,8 @@ interface SidebarProps {
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ currentView, setView }) => {
-  const { currentUser, switchUser, users } = useStore();
+  const { currentUser, logout } = useStore();
+  const [copyMsg, setCopyMsg] = useState('');
 
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: '📊', roles: [UserRole.MANAGER, UserRole.FINANCE] },
@@ -35,6 +36,14 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setView }) => {
       case UserRole.MECHANIC: return 'Mecânico';
       default: return 'Usuário';
     }
+  };
+
+  const handleShareLink = () => {
+      const url = window.location.origin;
+      navigator.clipboard.writeText(url).then(() => {
+          setCopyMsg('Link copiado!');
+          setTimeout(() => setCopyMsg(''), 2000);
+      });
   };
 
   return (
@@ -75,18 +84,25 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setView }) => {
           </div>
         </div>
 
-        {/* Development Tool: Quick Role Switcher */}
-        <div className="mt-4 pt-4 border-t border-slate-600">
-          <label className="text-xs text-slate-400 block mb-2">Simular Acesso:</label>
-          <select 
-            className="w-full bg-slate-700 text-xs p-2 rounded border border-slate-600 focus:outline-none"
-            value={currentUser.id}
-            onChange={(e) => switchUser(e.target.value)}
-          >
-            {users.map(u => (
-              <option key={u.id} value={u.id}>{u.name} ({u.role})</option>
-            ))}
-          </select>
+        {/* Action Buttons */}
+        <div className="mt-2 space-y-2 border-t border-slate-600 pt-4">
+            {/* Share Button */}
+            <button 
+                onClick={handleShareLink}
+                className="w-full flex items-center justify-center space-x-2 bg-slate-700 hover:bg-slate-600 text-blue-300 hover:text-white py-2 rounded transition-colors text-xs font-medium border border-slate-600"
+            >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" /></svg>
+                <span>{copyMsg || 'Compartilhar App'}</span>
+            </button>
+
+            {/* Logout Button */}
+            <button 
+                onClick={logout}
+                className="w-full flex items-center justify-center space-x-2 bg-slate-700 hover:bg-red-600 text-slate-200 hover:text-white py-2 rounded transition-colors text-xs font-medium"
+            >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
+                <span>Sair</span>
+            </button>
         </div>
       </div>
     </div>
