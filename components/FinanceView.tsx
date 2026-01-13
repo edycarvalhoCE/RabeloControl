@@ -28,6 +28,18 @@ const FinanceView: React.FC = () => {
     setNewTrans({ description: '', amount: 0, type: 'INCOME', category: '', status: 'COMPLETED' });
   };
 
+  // Special handler for Currency Input (ATM Style)
+  const handleCurrencyChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let inputValue = e.target.value;
+    // Remove all non-digits
+    inputValue = inputValue.replace(/\D/g, "");
+    
+    // Convert to float (cents)
+    const numericValue = inputValue ? parseInt(inputValue, 10) / 100 : 0;
+
+    setNewTrans(prev => ({ ...prev, amount: numericValue }));
+  };
+
   const currentBalance = realizedTransactions
     .reduce((acc, t) => t.type === 'INCOME' ? acc + t.amount : acc - t.amount, 0);
 
@@ -195,9 +207,12 @@ const FinanceView: React.FC = () => {
                 <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">Valor (R$)</label>
                     <input 
-                        type="number" step="0.01" required value={newTrans.amount || ''} 
-                        onChange={e => setNewTrans({...newTrans, amount: parseFloat(e.target.value)})}
-                        className="w-full border p-2 rounded focus:ring-2 focus:ring-blue-500 outline-none"
+                        type="text" 
+                        required 
+                        value={newTrans.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} 
+                        onChange={handleCurrencyChange}
+                        className="w-full border p-2 rounded focus:ring-2 focus:ring-blue-500 outline-none font-bold text-slate-800"
+                        placeholder="R$ 0,00"
                     />
                 </div>
                 <button type="submit" className="w-full bg-slate-800 text-white font-bold py-3 rounded hover:bg-slate-700 transition-colors">

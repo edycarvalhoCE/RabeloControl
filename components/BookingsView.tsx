@@ -103,8 +103,20 @@ const BookingsView: React.FC = () => {
          const isChecked = (e.target as HTMLInputElement).checked;
          setEditForm((prev: any) => ({ ...prev, isFreelance: isChecked, driverId: '', freelanceDriverName: '' }));
     } else {
-        setEditForm((prev: any) => ({ ...prev, [name]: name === 'value' ? parseFloat(value) : value }));
+        setEditForm((prev: any) => ({ ...prev, [name]: value }));
     }
+  };
+
+  // Special handler for Currency Input (ATM Style) for Edit Modal
+  const handleEditCurrencyChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let inputValue = e.target.value;
+    // Remove all non-digits
+    inputValue = inputValue.replace(/\D/g, "");
+    
+    // Convert to float (cents)
+    const numericValue = inputValue ? parseInt(inputValue, 10) / 100 : 0;
+
+    setEditForm((prev: any) => ({ ...prev, value: numericValue }));
   };
 
   const handleEditSubmit = async (e: React.FormEvent) => {
@@ -464,7 +476,14 @@ const BookingsView: React.FC = () => {
                       <textarea name="observations" value={editForm.observations} onChange={handleEditChange} placeholder="Observações..." className="w-full border p-2 rounded h-20" />
 
                       <div className="border-t pt-4 grid grid-cols-2 gap-4">
-                          <input type="number" name="value" value={editForm.value} onChange={handleEditChange} className="w-full border p-2 rounded" placeholder="Valor R$" />
+                          <input 
+                              type="text" 
+                              name="value" 
+                              value={editForm.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} 
+                              onChange={handleEditCurrencyChange}
+                              className="w-full border p-2 rounded font-bold text-slate-800" 
+                              placeholder="R$ 0,00" 
+                          />
                           <select name="paymentStatus" value={editForm.paymentStatus} onChange={handleEditChange} className="w-full border p-2 rounded">
                               <option value="PENDING">Pendente</option>
                               <option value="PAID">Pago</option>

@@ -35,10 +35,20 @@ const NewBookingView: React.FC = () => {
          const isChecked = (e.target as HTMLInputElement).checked;
          setFormData(prev => ({ ...prev, isFreelance: isChecked, driverId: '', freelanceDriverName: '' }));
     } else {
-        // Prevent NaN for value field
-        const val = name === 'value' ? (parseFloat(value) || 0) : value;
-        setFormData(prev => ({ ...prev, [name]: val }));
+        setFormData(prev => ({ ...prev, [name]: value }));
     }
+  };
+
+  // Special handler for Currency Input (ATM Style)
+  const handleCurrencyChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let inputValue = e.target.value;
+    // Remove all non-digits
+    inputValue = inputValue.replace(/\D/g, "");
+    
+    // Convert to float (cents)
+    const numericValue = inputValue ? parseInt(inputValue, 10) / 100 : 0;
+
+    setFormData(prev => ({ ...prev, value: numericValue }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -218,8 +228,15 @@ const NewBookingView: React.FC = () => {
                 <h3 className="font-bold text-slate-700 mb-3">Financeiro</h3>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">Valor Total (R$)</label>
-                        <input type="number" name="value" value={formData.value || ''} onChange={handleChange} className="w-full border p-2 rounded" placeholder="0.00" />
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Valor Total</label>
+                        <input 
+                            type="text" 
+                            name="value" 
+                            value={formData.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} 
+                            onChange={handleCurrencyChange} 
+                            className="w-full border p-2 rounded font-bold text-slate-800" 
+                            placeholder="R$ 0,00" 
+                        />
                     </div>
                     <div>
                         <label className="block text-sm font-medium text-slate-700 mb-1">Status Pagamento</label>
