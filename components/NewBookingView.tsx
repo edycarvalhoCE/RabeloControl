@@ -35,7 +35,9 @@ const NewBookingView: React.FC = () => {
          const isChecked = (e.target as HTMLInputElement).checked;
          setFormData(prev => ({ ...prev, isFreelance: isChecked, driverId: '', freelanceDriverName: '' }));
     } else {
-        setFormData(prev => ({ ...prev, [name]: name === 'value' ? parseFloat(value) : value }));
+        // Prevent NaN for value field
+        const val = name === 'value' ? (parseFloat(value) || 0) : value;
+        setFormData(prev => ({ ...prev, [name]: val }));
     }
   };
 
@@ -62,7 +64,7 @@ const NewBookingView: React.FC = () => {
     const payload = {
         busId: formData.busId,
         driverId: formData.isFreelance ? null : formData.driverId,
-        freelanceDriverName: formData.isFreelance ? formData.freelanceDriverName : undefined,
+        freelanceDriverName: formData.isFreelance ? formData.freelanceDriverName : null, // Use null to be safe
         clientName: formData.clientName,
         clientPhone: formData.clientPhone,
         destination: formData.destination,
@@ -217,7 +219,7 @@ const NewBookingView: React.FC = () => {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
                         <label className="block text-sm font-medium text-slate-700 mb-1">Valor Total (R$)</label>
-                        <input type="number" name="value" value={formData.value} onChange={handleChange} className="w-full border p-2 rounded" placeholder="0.00" />
+                        <input type="number" name="value" value={formData.value || ''} onChange={handleChange} className="w-full border p-2 rounded" placeholder="0.00" />
                     </div>
                     <div>
                         <label className="block text-sm font-medium text-slate-700 mb-1">Status Pagamento</label>

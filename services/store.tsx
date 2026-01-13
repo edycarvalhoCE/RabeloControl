@@ -224,54 +224,68 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         if (driverConflict) return { success: false, message: `Motorista Indisponível! Ele está de ${driverConflict.type}.` };
     }
 
-    const newBooking = { ...bookingData, status: 'CONFIRMED' };
-    const docRef = await addDoc(collection(db, 'bookings'), newBooking);
-    
-    if (newBooking.value > 0 && newBooking.paymentStatus !== 'PENDING') {
-        let transStatus = newBooking.paymentStatus === 'PAID' ? 'COMPLETED' : 'PENDING';
-        let transDesc = `Locação: ${newBooking.clientName} - ${newBooking.destination}`;
-        if (newBooking.paymentStatus === 'SCHEDULED') transDesc += " (Agendado)";
-        await addDoc(collection(db, 'transactions'), {
-            type: 'INCOME', status: transStatus, category: 'Locação', amount: newBooking.value,
-            date: newBooking.paymentDate || new Date().toISOString(), description: transDesc, relatedBookingId: docRef.id
-        });
+    try {
+        const newBooking = { ...bookingData, status: 'CONFIRMED' };
+        // Ensure values are clean (no undefined)
+        if (newBooking.freelanceDriverName === undefined) delete newBooking.freelanceDriverName;
+
+        const docRef = await addDoc(collection(db, 'bookings'), newBooking);
+        
+        if (newBooking.value > 0 && newBooking.paymentStatus !== 'PENDING') {
+            let transStatus = newBooking.paymentStatus === 'PAID' ? 'COMPLETED' : 'PENDING';
+            let transDesc = `Locação: ${newBooking.clientName} - ${newBooking.destination}`;
+            if (newBooking.paymentStatus === 'SCHEDULED') transDesc += " (Agendado)";
+            
+            await addDoc(collection(db, 'transactions'), {
+                type: 'INCOME', status: transStatus, category: 'Locação', amount: newBooking.value,
+                date: newBooking.paymentDate || new Date().toISOString(), description: transDesc, relatedBookingId: docRef.id
+            });
+        }
+        return { success: true, message: 'Agendamento salvo com sucesso!' };
+    } catch (e: any) {
+        console.error("Erro ao salvar locação:", e);
+        return { success: false, message: 'Erro ao salvar no banco: ' + (e.message || 'Erro desconhecido') };
     }
-    return { success: true, message: 'Agendamento salvo!' };
   };
 
   const updateBooking = async (id: string, data: Partial<Booking>) => {
     if (!isConfigured) return { success: false, message: "Banco de dados desconectado." };
-    const currentBooking = bookings.find(b => b.id === id);
-    if (!currentBooking) return { success: false, message: "Viagem não encontrada." };
+    try {
+        const currentBooking = bookings.find(b => b.id === id);
+        if (!currentBooking) return { success: false, message: "Viagem não encontrada." };
 
-    const busIdToCheck = data.busId || currentBooking.busId;
-    const startToCheck = data.startTime || currentBooking.startTime;
-    const endToCheck = data.endTime || currentBooking.endTime;
+        const busIdToCheck = data.busId || currentBooking.busId;
+        const startToCheck = data.startTime || currentBooking.startTime;
+        const endToCheck = data.endTime || currentBooking.endTime;
 
-    if (!checkAvailability(busIdToCheck, startToCheck, endToCheck, id)) {
-         return { success: false, message: 'Conflito: Este ônibus já está alugado no novo horário!' };
-    }
-
-    await updateDoc(doc(db, 'bookings', id), data);
-
-    if (data.value !== undefined || data.clientName || data.destination || data.paymentStatus || data.paymentDate) {
-        const q = query(collection(db, 'transactions'), where('relatedBookingId', '==', id));
-        const querySnapshot = await getDocs(q);
-        if (!querySnapshot.empty) {
-            const transDoc = querySnapshot.docs[0];
-            const newValue = data.value !== undefined ? data.value : transDoc.data().amount;
-            const newClient = data.clientName || currentBooking.clientName;
-            const newDest = data.destination || currentBooking.destination;
-            const newStatus = data.paymentStatus || currentBooking.paymentStatus;
-            let transStatus = newStatus === 'PAID' ? 'COMPLETED' : 'PENDING';
-            let transDesc = `Locação: ${newClient} - ${newDest}`;
-            if (newStatus === 'SCHEDULED') transDesc += " (Agendado)";
-            await updateDoc(doc(db, 'transactions', transDoc.id), {
-                amount: newValue, description: transDesc, status: transStatus, date: data.paymentDate || transDoc.data().date
-            });
+        if (!checkAvailability(busIdToCheck, startToCheck, endToCheck, id)) {
+            return { success: false, message: 'Conflito: Este ônibus já está alugado no novo horário!' };
         }
+
+        await updateDoc(doc(db, 'bookings', id), data);
+
+        if (data.value !== undefined || data.clientName || data.destination || data.paymentStatus || data.paymentDate) {
+            const q = query(collection(db, 'transactions'), where('relatedBookingId', '==', id));
+            const querySnapshot = await getDocs(q);
+            if (!querySnapshot.empty) {
+                const transDoc = querySnapshot.docs[0];
+                const newValue = data.value !== undefined ? data.value : transDoc.data().amount;
+                const newClient = data.clientName || currentBooking.clientName;
+                const newDest = data.destination || currentBooking.destination;
+                const newStatus = data.paymentStatus || currentBooking.paymentStatus;
+                let transStatus = newStatus === 'PAID' ? 'COMPLETED' : 'PENDING';
+                let transDesc = `Locação: ${newClient} - ${newDest}`;
+                if (newStatus === 'SCHEDULED') transDesc += " (Agendado)";
+                await updateDoc(doc(db, 'transactions', transDoc.id), {
+                    amount: newValue, description: transDesc, status: transStatus, date: data.paymentDate || transDoc.data().date
+                });
+            }
+        }
+        return { success: true, message: 'Viagem atualizada com sucesso!' };
+    } catch (e: any) {
+         console.error("Erro ao atualizar locação:", e);
+         return { success: false, message: 'Erro ao atualizar: ' + (e.message || 'Erro desconhecido') };
     }
-    return { success: true, message: 'Viagem atualizada com sucesso!' };
   };
 
   const updateBookingStatus = async (id: string, status: Booking['status']) => { if (isConfigured) await updateDoc(doc(db, 'bookings', id), { status }); };

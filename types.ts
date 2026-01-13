@@ -46,7 +46,7 @@ export interface Booking {
   id: string;
   busId: string;
   driverId: string | null;
-  freelanceDriverName?: string; // Option for non-registered drivers
+  freelanceDriverName?: string | null; // Option for non-registered drivers
   clientName: string;
   clientPhone?: string; // Contact phone for Service Order
   destination: string;
