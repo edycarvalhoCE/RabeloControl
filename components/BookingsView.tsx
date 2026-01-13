@@ -19,25 +19,42 @@ const BookingsView: React.FC = () => {
     presentationTime: ''
   });
   
-  // State for Editing
   const [editingBookingId, setEditingBookingId] = useState<string | null>(null);
-
   const [msg, setMsg] = useState<{ type: 'success' | 'error', text: string } | null>(null);
-  
-  // Conflict Popup State
   const [showConflictModal, setShowConflictModal] = useState(false);
   const [conflictDetails, setConflictDetails] = useState('');
-
-  // Bus Details Modal State
   const [selectedBus, setSelectedBus] = useState<Bus | null>(null);
 
   const drivers = users.filter(u => u.role === UserRole.DRIVER);
 
+  // Helper function to safely format dates and avoid crashes
+  const safeDate = (dateStr: string | null | undefined, options?: Intl.DateTimeFormatOptions) => {
+      if (!dateStr) return 'N/A';
+      try {
+          const date = new Date(dateStr);
+          if (isNaN(date.getTime())) return 'Data Inválida';
+          return date.toLocaleDateString('pt-BR', options);
+      } catch (e) {
+          return 'Erro Data';
+      }
+  };
+
+  const safeTime = (dateStr: string | null | undefined) => {
+      if (!dateStr) return '';
+      try {
+          const date = new Date(dateStr);
+          if (isNaN(date.getTime())) return '';
+          return date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+      } catch (e) {
+          return '';
+      }
+  };
+
   const handleEdit = (booking: Booking) => {
-    // Safety check for date fields to prevent crash on old records
-    const safeStart = booking.startTime ? booking.startTime.slice(0, 16) : '';
-    const safeEnd = booking.endTime ? booking.endTime.slice(0, 16) : '';
-    const safePresentation = booking.presentationTime ? booking.presentationTime.slice(0, 16) : '';
+    // Safe slicing for form inputs
+    const safeStart = booking.startTime && booking.startTime.length >= 16 ? booking.startTime.slice(0, 16) : '';
+    const safeEnd = booking.endTime && booking.endTime.length >= 16 ? booking.endTime.slice(0, 16) : '';
+    const safePresentation = booking.presentationTime && booking.presentationTime.length >= 16 ? booking.presentationTime.slice(0, 16) : '';
     const safePaymentDate = booking.paymentDate ? booking.paymentDate.split('T')[0] : '';
 
     setFormData({
@@ -55,8 +72,6 @@ const BookingsView: React.FC = () => {
       presentationTime: safePresentation
     });
     setEditingBookingId(booking.id);
-    
-    // Scroll to top
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -71,40 +86,37 @@ const BookingsView: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.busId || !formData.startTime || !formData.endTime || !formData.departureLocation || !formData.presentationTime) {
-        setMsg({ type: 'error', text: 'Preencha todos os campos obrigatórios.' });
+    if (!formData.busId || !formData.startTime || !formData.endTime) {
+        setMsg({ type: 'error', text: 'Preencha os campos obrigatórios (Destino, Datas, Ônibus).' });
         return;
     }
 
     if (formData.paymentStatus !== 'PENDING' && !formData.paymentDate) {
-        setMsg({ type: 'error', text: 'Informe a data do pagamento.' });
+        setMsg({ type: 'error', text: 'Informe a data do pagamento/vencimento.' });
         return;
     }
 
+    const payload = {
+        ...formData,
+        driverId: formData.driverId || null,
+        paymentDate: formData.paymentDate || null,
+        departureLocation: formData.departureLocation || 'Garagem',
+        presentationTime: formData.presentationTime || formData.startTime // Fallback if user left empty
+    };
+
     let result;
     if (editingBookingId) {
-        // UPDATE MODE
-        result = await updateBooking(editingBookingId, {
-            ...formData,
-            driverId: formData.driverId || null,
-            paymentDate: formData.paymentDate || null
-        });
+        result = await updateBooking(editingBookingId, payload);
     } else {
-        // CREATE MODE
-        result = await addBooking({
-            ...formData,
-            driverId: formData.driverId || null,
-            paymentDate: formData.paymentDate || null
-        });
+        result = await addBooking(payload);
     }
 
     if (result.success) {
       setMsg({ type: 'success', text: result.message });
-      handleCancelEdit(); // Reset form
+      handleCancelEdit();
       setTimeout(() => setMsg(null), 3000);
     } else {
       if (result.message.includes('Conflito')) {
-        // Show Popup for conflict
         setConflictDetails(result.message);
         setShowConflictModal(true);
       } else {
@@ -116,146 +128,52 @@ const BookingsView: React.FC = () => {
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    
     if (name === 'paymentStatus' && value === 'PENDING') {
-         setFormData(prev => ({
-             ...prev,
-             [name]: value as any,
-             paymentDate: '' // Reset date if pending
-         }));
+         setFormData(prev => ({ ...prev, [name]: value, paymentDate: '' }));
     } else {
-        setFormData(prev => ({
-            ...prev,
-            [name]: name === 'value' ? parseFloat(value) : value
-        }));
+        setFormData(prev => ({ ...prev, [name]: name === 'value' ? parseFloat(value) : value }));
     }
   };
 
-  // Helper to find related maintenance
-  const getBusMaintenanceHistory = (plate: string) => {
-      if (!plate) return [];
-      // Simple heuristic: check if transaction description contains the plate
-      return transactions.filter(t => 
-          t.type === 'EXPENSE' && 
-          t.description.toLowerCase().includes(plate.toLowerCase())
-      );
-  };
-
-  // PRINT SERVICE ORDER FUNCTION
   const handlePrintOS = (booking: Booking) => {
       const bus = buses.find(b => b.id === booking.busId);
       const driver = users.find(u => u.id === booking.driverId);
-      
-      const safeStart = booking.startTime ? new Date(booking.startTime).toLocaleString() : 'N/A';
-      const safeEnd = booking.endTime ? new Date(booking.endTime).toLocaleString() : 'N/A';
-      const safePresentation = booking.presentationTime ? new Date(booking.presentationTime).toLocaleString() : 'N/A';
+      const sStart = safeDate(booking.startTime) + ' ' + safeTime(booking.startTime);
+      const sEnd = safeDate(booking.endTime) + ' ' + safeTime(booking.endTime);
+      const sPres = safeDate(booking.presentationTime) + ' ' + safeTime(booking.presentationTime);
 
       const printContent = `
-        <html>
-        <head>
-            <title>Ordem de Serviço - ${booking.destination}</title>
-            <style>
-                body { font-family: Arial, sans-serif; padding: 20px; color: #000; }
-                .header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 20px; }
-                .header h1 { margin: 0; font-size: 24px; }
-                .header p { margin: 5px 0 0; }
-                .section { margin-bottom: 20px; }
-                .section h3 { background: #eee; padding: 5px; border-bottom: 1px solid #ccc; margin-bottom: 10px; font-size: 16px; text-transform: uppercase; }
-                .row { display: flex; margin-bottom: 8px; }
-                .label { font-weight: bold; width: 150px; }
-                .value { flex: 1; border-bottom: 1px dotted #ccc; }
-                .box { border: 2px solid #000; padding: 15px; margin-top: 30px; }
-                .km-row { display: flex; justify-content: space-between; margin-top: 20px; }
-                .km-field { width: 45%; border-bottom: 1px solid #000; padding-bottom: 5px; }
-                .footer { margin-top: 50px; text-align: center; font-size: 12px; }
-                @media print {
-                    body { -webkit-print-color-adjust: exact; }
-                }
-            </style>
-        </head>
-        <body>
-            <div class="header">
-                <h1>RabeloTour - ORDEM DE SERVIÇO</h1>
-                <p>Transporte e Turismo</p>
-            </div>
-
-            <div class="section">
-                <h3>Dados da Viagem</h3>
-                <div class="row"><span class="label">Destino:</span><span class="value">${booking.destination}</span></div>
-                <div class="row"><span class="label">Local de Saída:</span><span class="value">${booking.departureLocation || 'Não informado'}</span></div>
-                <div class="row"><span class="label">Horário de Saída:</span><span class="value">${safeStart}</span></div>
-                <div class="row"><span class="label">Apresentação:</span><span class="value">${safePresentation} (Garagem)</span></div>
-                <div class="row"><span class="label">Retorno Previsto:</span><span class="value">${safeEnd}</span></div>
-            </div>
-
-            <div class="section">
-                <h3>Cliente</h3>
-                <div class="row"><span class="label">Nome:</span><span class="value">${booking.clientName}</span></div>
-                <div class="row"><span class="label">Telefone:</span><span class="value">${booking.clientPhone || 'Não informado'}</span></div>
-            </div>
-
-            <div class="section">
-                <h3>Equipe e Veículo</h3>
-                <div class="row"><span class="label">Motorista:</span><span class="value">${driver?.name || '___________________________'}</span></div>
-                <div class="row"><span class="label">Veículo:</span><span class="value">${bus?.model} - Placa: ${bus?.plate}</span></div>
-            </div>
-
-            <div class="box">
-                <h3 style="border:none; background:none; padding:0; margin:0 10px 0;">CONTROLE DE QUILOMETRAGEM</h3>
-                <div class="km-row">
-                    <div class="km-field">KM INICIAL: </div>
-                    <div class="km-field">KM FINAL: </div>
-                </div>
-                <div style="margin-top: 30px;">
-                    <p>Observações do Motorista:</p>
-                    <div style="height: 50px; border-bottom: 1px solid #ccc; margin-top: 10px;"></div>
-                    <div style="height: 50px; border-bottom: 1px solid #ccc; margin-top: 10px;"></div>
-                </div>
-            </div>
-
-            <div class="footer">
-                <p>_____________________________________________</p>
-                <p>Assinatura do Motorista</p>
-            </div>
-            
+        <html><head><title>OS - ${booking.destination}</title>
+        <style>body{font-family:Arial,sans-serif;padding:20px;color:#000}.header{text-align:center;border-bottom:2px solid #000;margin-bottom:20px}.row{display:flex;margin-bottom:8px}.label{font-weight:bold;width:150px}.value{flex:1;border-bottom:1px dotted #ccc}.box{border:2px solid #000;padding:15px;margin-top:30px}</style>
+        </head><body>
+            <div class="header"><h1>RabeloTour - ORDEM DE SERVIÇO</h1></div>
+            <h3>Dados da Viagem</h3>
+            <div class="row"><span class="label">Destino:</span><span class="value">${booking.destination}</span></div>
+            <div class="row"><span class="label">Saída:</span><span class="value">${sStart} - ${booking.departureLocation}</span></div>
+            <div class="row"><span class="label">Apresentação:</span><span class="value">${sPres}</span></div>
+            <div class="row"><span class="label">Retorno:</span><span class="value">${sEnd}</span></div>
+            <h3>Cliente</h3>
+            <div class="row"><span class="label">Nome:</span><span class="value">${booking.clientName}</span></div>
+            <div class="row"><span class="label">Telefone:</span><span class="value">${booking.clientPhone || '-'}</span></div>
+            <h3>Veículo e Motorista</h3>
+            <div class="row"><span class="label">Veículo:</span><span class="value">${bus?.plate} - ${bus?.model}</span></div>
+            <div class="row"><span class="label">Motorista:</span><span class="value">${driver?.name || '__________________'}</span></div>
+            <div class="box"><h3>KM Inicial: _______ KM Final: _______</h3><br/><br/>Assinatura: ________________________</div>
             <script>window.print();</script>
-        </body>
-        </html>
-      `;
-
+        </body></html>`;
       const win = window.open('', '', 'width=800,height=600');
-      if (win) {
-          win.document.write(printContent);
-          win.document.close();
-      }
+      if (win) { win.document.write(printContent); win.document.close(); }
   };
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-fade-in relative">
-      
-      {/* CONFLICT POPUP MODAL */}
+      {/* CONFLICT MODAL */}
       {showConflictModal && (
           <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-              <div className="bg-white rounded-xl shadow-2xl max-w-md w-full overflow-hidden animate-bounce-in">
-                  <div className="bg-red-600 p-4 flex items-center gap-3">
-                      <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
-                      <h3 className="text-xl font-bold text-white">Veículo Indisponível!</h3>
-                  </div>
-                  <div className="p-6">
-                      <p className="text-slate-700 font-medium text-lg mb-2">Atenção, Gerente:</p>
-                      <p className="text-slate-600 mb-6 border-l-4 border-red-200 pl-4 py-2 bg-red-50 rounded-r">
-                        {conflictDetails}
-                      </p>
-                      <p className="text-sm text-slate-500 mb-6">
-                        Já existe uma locação confirmada para este ônibus no mesmo dia e horário. Por favor, selecione outro veículo ou altere o horário.
-                      </p>
-                      <button 
-                        onClick={() => setShowConflictModal(false)}
-                        className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 rounded-lg transition-colors"
-                      >
-                        Entendido, vou corrigir
-                      </button>
-                  </div>
+              <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6">
+                  <h3 className="text-xl font-bold text-red-600 mb-2">Conflito de Horário!</h3>
+                  <p className="text-slate-600 mb-4">{conflictDetails}</p>
+                  <button onClick={() => setShowConflictModal(false)} className="w-full bg-slate-800 text-white py-2 rounded">Fechar</button>
               </div>
           </div>
       )}
@@ -263,25 +181,149 @@ const BookingsView: React.FC = () => {
       {/* BUS DETAILS MODAL */}
       {selectedBus && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 backdrop-blur-sm" onClick={() => setSelectedBus(null)}>
-            <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full overflow-hidden animate-bounce-in" onClick={e => e.stopPropagation()}>
-                <div className="bg-slate-800 p-6 flex justify-between items-start">
-                    <div>
-                        <h2 className="text-2xl font-bold text-white flex items-center gap-2">
-                            🚌 {selectedBus.model}
-                        </h2>
-                        <span className="text-blue-200 font-mono text-lg">{selectedBus.plate}</span>
-                    </div>
-                    <button onClick={() => setSelectedBus(null)} className="text-slate-400 hover:text-white">
-                        <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                    </button>
+            <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full p-6" onClick={e => e.stopPropagation()}>
+                <h2 className="text-2xl font-bold text-slate-800 mb-2">{selectedBus.plate}</h2>
+                <p className="text-slate-600 mb-4">{selectedBus.model} - {selectedBus.capacity} Lugares</p>
+                <div className="bg-slate-50 p-3 rounded mb-4 max-h-40 overflow-y-auto">
+                    <h4 className="font-bold text-xs uppercase mb-2">Próximas Viagens</h4>
+                    {bookings.filter(b => b.busId === selectedBus.id && b.status === 'CONFIRMED').map(b => (
+                        <div key={b.id} className="text-sm border-b py-1">{safeDate(b.startTime)} - {b.destination}</div>
+                    ))}
                 </div>
-                
-                <div className="p-6 max-h-[80vh] overflow-y-auto">
-                    <div className="grid grid-cols-2 gap-4 mb-6">
-                        <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
-                            <span className="text-xs font-bold text-slate-500 uppercase">Capacidade</span>
-                            <p className="text-xl font-bold text-slate-800">{selectedBus.capacity} Passageiros</p>
-                        </div>
-                        <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
-                            <span className="text-xs font-bold text-slate-500 uppercase">Status Atual</span>
-                            <p className={`text-xl font-bold ${selectedBus.status === 'AVAILABLE' ? 'text-green-600' : selectedBus.status === 'MAINTENANCE' ? 'text-red-60
+                <button onClick={() => setSelectedBus(null)} className="w-full bg-slate-200 text-slate-800 py-2 rounded">Fechar</button>
+            </div>
+        </div>
+      )}
+
+      {/* LIST */}
+      <div className="lg:col-span-2 space-y-6">
+        <h2 className="text-2xl font-bold text-slate-800">Escala de Locações</h2>
+        <div className="grid gap-4">
+          {bookings.map(booking => {
+            const bus = buses.find(b => b.id === booking.busId);
+            const driver = users.find(u => u.id === booking.driverId);
+            const isEditing = editingBookingId === booking.id;
+            
+            return (
+              <div key={booking.id} className={`bg-white p-5 rounded-lg shadow-sm border border-slate-200 flex flex-col md:flex-row justify-between items-start gap-4 ${isEditing ? 'ring-2 ring-blue-500' : ''}`}>
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className={`px-2 py-1 rounded text-xs font-bold ${booking.status === 'CONFIRMED' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'}`}>
+                      {booking.status}
+                    </span>
+                    <h3 className="font-semibold text-lg text-slate-900">{booking.destination}</h3>
+                  </div>
+                  <p className="text-slate-600 text-sm">Cliente: <strong>{booking.clientName}</strong></p>
+                  
+                  <div className="mt-3 flex flex-wrap gap-4 text-sm text-slate-500">
+                    <div className="bg-slate-50 px-2 py-1 rounded border border-slate-100">
+                        📅 {safeDate(booking.startTime)}
+                    </div>
+                    <div className="bg-slate-50 px-2 py-1 rounded border border-slate-100">
+                        ⏰ {safeTime(booking.startTime)} - {safeTime(booking.endTime)}
+                    </div>
+                  </div>
+                  
+                  <div className="mt-2 text-sm text-slate-500">
+                      📍 Saída: {booking.departureLocation || 'N/A'}
+                  </div>
+
+                  <div className="mt-3 text-sm grid grid-cols-2 gap-2">
+                    <div>
+                        <span className="font-medium text-slate-700 block">Veículo</span> 
+                        {bus ? (
+                            <button onClick={() => setSelectedBus(bus)} className="text-blue-600 hover:underline font-semibold">{bus.model} ({bus.plate})</button>
+                        ) : <span className="text-slate-400">Não atribuído</span>}
+                    </div>
+                    <div>
+                        <span className="font-medium text-slate-700 block">Motorista</span> 
+                        <span className="text-slate-600">{driver ? driver.name : <span className="text-red-500 font-bold">Sem Motorista</span>}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="text-right border-t md:border-t-0 md:border-l border-slate-100 pt-4 md:pt-0 md:pl-4 min-w-[150px]">
+                  <p className="text-lg font-bold text-blue-600">R$ {booking.value.toLocaleString('pt-BR')}</p>
+                  
+                  <div className="mt-2 text-xs mb-3">
+                     {booking.paymentStatus === 'PAID' ? (
+                         <span className="bg-green-100 text-green-700 px-2 py-1 rounded">Pago: {safeDate(booking.paymentDate)}</span>
+                     ) : booking.paymentStatus === 'SCHEDULED' ? (
+                         <span className="bg-blue-100 text-blue-700 px-2 py-1 rounded">Vence: {safeDate(booking.paymentDate)}</span>
+                     ) : (
+                         <span className="bg-yellow-100 text-yellow-700 px-2 py-1 rounded">Pendente</span>
+                     )}
+                  </div>
+                  
+                  <div className="flex flex-col gap-2">
+                      <button onClick={() => handlePrintOS(booking)} className="bg-slate-800 text-white text-xs py-2 rounded font-bold hover:bg-slate-700">🖨️ Imprimir OS</button>
+                      <button onClick={() => handleEdit(booking)} className="bg-blue-100 text-blue-700 text-xs py-2 rounded font-bold hover:bg-blue-200">✏️ Editar</button>
+                      {booking.status === 'CONFIRMED' && (
+                          <button onClick={() => updateBookingStatus(booking.id, 'CANCELLED')} className="text-red-500 text-xs hover:underline">Cancelar Viagem</button>
+                      )}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+          {bookings.length === 0 && <p className="text-center text-slate-500 py-10">Nenhuma locação encontrada.</p>}
+        </div>
+      </div>
+
+      {/* FORM */}
+      <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 h-fit sticky top-6">
+        <div className="flex justify-between items-center mb-4">
+            <h3 className="text-xl font-bold text-slate-800">{editingBookingId ? 'Editar Locação' : 'Nova Locação'}</h3>
+            {editingBookingId && <button onClick={handleCancelEdit} className="text-xs text-red-500 underline">Cancelar</button>}
+        </div>
+        
+        {msg && <div className={`p-3 rounded mb-4 text-sm ${msg.type === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>{msg.text}</div>}
+        
+        <form onSubmit={handleSubmit} className="space-y-4">
+            <input name="clientName" value={formData.clientName} onChange={handleChange} placeholder="Cliente" className="w-full border p-2 rounded" required />
+            <input name="clientPhone" value={formData.clientPhone} onChange={handleChange} placeholder="Telefone" className="w-full border p-2 rounded" />
+            <input name="destination" value={formData.destination} onChange={handleChange} placeholder="Destino" className="w-full border p-2 rounded" required />
+            
+            <div className="grid grid-cols-2 gap-2">
+                <div><label className="text-xs font-bold">Início</label><input type="datetime-local" name="startTime" value={formData.startTime} onChange={handleChange} className="w-full border p-2 rounded" required /></div>
+                <div><label className="text-xs font-bold">Fim</label><input type="datetime-local" name="endTime" value={formData.endTime} onChange={handleChange} className="w-full border p-2 rounded" required /></div>
+            </div>
+
+            <input name="departureLocation" value={formData.departureLocation} onChange={handleChange} placeholder="Local de Saída" className="w-full border p-2 rounded" required />
+            <div><label className="text-xs font-bold">Apresentação (Garagem)</label><input type="datetime-local" name="presentationTime" value={formData.presentationTime} onChange={handleChange} className="w-full border p-2 rounded" /></div>
+
+            <select name="busId" value={formData.busId} onChange={handleChange} className="w-full border p-2 rounded" required>
+                <option value="">Selecione o Ônibus</option>
+                {buses.map(b => (
+                    <option key={b.id} value={b.id} disabled={b.status === 'MAINTENANCE' && b.id !== formData.busId}>{b.plate} - {b.model}</option>
+                ))}
+            </select>
+            
+            <select name="driverId" value={formData.driverId} onChange={handleChange} className="w-full border p-2 rounded">
+                <option value="">Selecione o Motorista</option>
+                {drivers.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+            </select>
+
+            <div className="border-t pt-4">
+                <label className="block text-sm font-bold mb-2">Financeiro</label>
+                <input type="number" name="value" value={formData.value} onChange={handleChange} className="w-full border p-2 rounded mb-2" placeholder="Valor R$" />
+                <select name="paymentStatus" value={formData.paymentStatus} onChange={handleChange} className="w-full border p-2 rounded mb-2">
+                    <option value="PENDING">Pendente</option>
+                    <option value="PAID">Pago</option>
+                    <option value="SCHEDULED">Agendado</option>
+                </select>
+                {formData.paymentStatus !== 'PENDING' && (
+                    <input type="date" name="paymentDate" value={formData.paymentDate} onChange={handleChange} className="w-full border p-2 rounded" required />
+                )}
+            </div>
+
+            <button type="submit" className={`w-full py-2 rounded text-white font-bold ${editingBookingId ? 'bg-indigo-600' : 'bg-blue-600'}`}>
+                {editingBookingId ? 'Salvar Alterações' : 'Agendar'}
+            </button>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+export default BookingsView;

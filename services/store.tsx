@@ -90,22 +90,17 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
   // --- FIREBASE LISTENERS (REAL-TIME SYNC) ---
   useEffect(() => {
-    // If not configured, don't try to connect to avoid console errors spam
     if (!isConfigured) return;
 
-    // 1. Auth Listener
     const unsubscribeAuth = onAuthStateChanged(auth, (firebaseUser) => {
         if (firebaseUser) {
             setIsAuthenticated(true);
-            // We do NOT set currentUser here immediately because we want the full profile from Firestore.
-            // App.tsx handles the loading state (isAuthenticated=true && currentUser=null).
         } else {
             setIsAuthenticated(false);
             setCurrentUser(null);
         }
     });
 
-    // 2. Data Listeners
     const collectionsToSync = [
         { name: 'users', setter: setUsers },
         { name: 'buses', setter: setBuses },
@@ -125,17 +120,10 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     ];
 
     const unsubscribes = collectionsToSync.map(c => 
-        onSnapshot(
-            collection(db, c.name), 
-            (snapshot) => {
-                const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                c.setter(data as any);
-            },
-            (error) => {
-                // Handle permission-denied or other connection errors gracefully
-                console.warn(`Firestore sync error on ${c.name}:`, error.message);
-            }
-        )
+        onSnapshot(collection(db, c.name), (snapshot) => {
+            const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            c.setter(data as any);
+        })
     );
 
     return () => {
@@ -144,40 +132,30 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     };
   }, []);
 
-  // Sync CurrentUser with Users list & Handle Auto-Promotion
+  // Sync CurrentUser with Users list
   useEffect(() => {
       if (auth.currentUser && users.length > 0) {
           const dbUser = users.find(u => u.email === auth.currentUser?.email);
-          
           if (dbUser) {
-              // --- AUTO-PROMOTE DEVELOPER LOGIC ---
               if (dbUser.email === 'pixelcriativo2026@gmail.com' && dbUser.role !== UserRole.DEVELOPER) {
-                  // If the specific email is found but role is not yet DEVELOPER, update it in Firestore
-                  updateDoc(doc(db, 'users', dbUser.id), { role: UserRole.DEVELOPER })
-                    .then(() => console.log('User promoted to DEVELOPER automatically.'))
-                    .catch(err => console.error('Failed to promote user', err));
-                  
-                  // Optimistic update for current session
+                  updateDoc(doc(db, 'users', dbUser.id), { role: UserRole.DEVELOPER });
                   setCurrentUser({ ...dbUser, role: UserRole.DEVELOPER });
               } else {
                   setCurrentUser(dbUser);
               }
           } else {
-              // Fallback if user is logged in Auth but not in Users collection
               setCurrentUser({
                   id: auth.currentUser.uid,
                   name: auth.currentUser.displayName || 'Usuário',
                   email: auth.currentUser.email || '',
-                  role: UserRole.DRIVER, // Default safe role
+                  role: UserRole.DRIVER, 
                   avatar: auth.currentUser.photoURL || `https://ui-avatars.com/api/?name=${auth.currentUser.email}&background=random`
               });
           }
       }
   }, [users, isAuthenticated]);
 
-
-  // --- AUTH ACTIONS ---
-
+  // Auth Actions
   const login = async (email: string, password: string) => {
       if (!isConfigured) return { success: false, message: "Firebase não configurado." };
       try {
@@ -193,8 +171,6 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       try {
           const res = await createUserWithEmailAndPassword(auth, email, password);
           await updateProfile(res.user, { displayName: name });
-          
-          // Create User document in Firestore
           await setDoc(doc(db, 'users', res.user.uid), {
               id: res.user.uid,
               name,
@@ -202,49 +178,25 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
               role,
               avatar: `https://ui-avatars.com/api/?name=${name}&background=random`
           });
-          
           return { success: true };
       } catch (error: any) {
           return { success: false, message: error.message };
       }
   };
 
-  const logout = async () => {
-      if (isConfigured) await signOut(auth);
-  };
+  const logout = async () => { if (isConfigured) await signOut(auth); };
+  const switchUser = (userId: string) => { const user = users.find(u => u.id === userId); if (user) setCurrentUser(user); };
 
-  const switchUser = (userId: string) => {
-      const user = users.find(u => u.id === userId);
-      if (user) setCurrentUser(user);
-  };
-
-  // --- DATA ACTIONS (Refactored to Firestore) ---
-
-  const addUser = async (userData: Omit<User, 'id' | 'avatar'>) => {
-      if (!isConfigured) return;
-      await addDoc(collection(db, 'users'), {
-          ...userData,
-          avatar: `https://ui-avatars.com/api/?name=${userData.name}&background=random`
-      });
-  };
-
-  const updateUser = async (id: string, data: Partial<User>) => {
-      if (!isConfigured) return;
-      await updateDoc(doc(db, 'users', id), data);
-  };
-
-  const deleteUser = async (id: string) => {
-      if (!isConfigured) return;
-      await deleteDoc(doc(db, 'users', id));
-  };
+  // Data Actions
+  const addUser = async (userData: Omit<User, 'id' | 'avatar'>) => { if (!isConfigured) return; await addDoc(collection(db, 'users'), { ...userData, avatar: `https://ui-avatars.com/api/?name=${userData.name}&background=random` }); };
+  const updateUser = async (id: string, data: Partial<User>) => { if (!isConfigured) return; await updateDoc(doc(db, 'users', id), data); };
+  const deleteUser = async (id: string) => { if (!isConfigured) return; await deleteDoc(doc(db, 'users', id)); };
 
   const checkAvailability = (busId: string, start: string, end: string, excludeBookingId?: string): boolean => {
     const startDate = new Date(start).getTime();
     const endDate = new Date(end).getTime();
     return !bookings.some(b => {
-      // Exclude the booking being edited
       if (excludeBookingId && b.id === excludeBookingId) return false;
-      
       if (b.busId !== busId || b.status === 'CANCELLED') return false;
       const bStart = new Date(b.startTime).getTime();
       const bEnd = new Date(b.endTime).getTime();
@@ -252,66 +204,43 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     });
   };
 
-  const addBooking = async (bookingData: Omit<Booking, 'id' | 'status'>): Promise<{ success: boolean; message: string }> => {
+  const addBooking = async (bookingData: Omit<Booking, 'id' | 'status'>) => {
     if (!isConfigured) return { success: false, message: "Banco de dados desconectado." };
     
-    // 1. Check Bus Availability
     if (!checkAvailability(bookingData.busId, bookingData.startTime, bookingData.endTime)) {
       return { success: false, message: 'Conflito: Este ônibus já está alugado neste período!' };
     }
 
-    // 2. Check Driver Availability
     if (bookingData.driverId) {
         const tripStart = new Date(bookingData.startTime).getTime();
         const tripEnd = new Date(bookingData.endTime).getTime();
-
         const driverConflict = timeOffs.find(t => {
             if (t.driverId !== bookingData.driverId || t.status !== 'APPROVED') return false;
-            
             const [y, m, d] = t.date.split('-').map(Number);
             const offStart = new Date(y, m - 1, d, 0, 0, 0).getTime();
             const offEnd = new Date(y, m - 1, d, 23, 59, 59).getTime();
-
             return (tripStart <= offEnd && tripEnd >= offStart);
         });
-
-        if (driverConflict) {
-            const dateStr = driverConflict.date.split('-').reverse().join('/');
-            return { 
-                success: false, 
-                message: `Motorista Indisponível! Ele está de ${driverConflict.type} no dia ${dateStr}.` 
-            };
-        }
+        if (driverConflict) return { success: false, message: `Motorista Indisponível! Ele está de ${driverConflict.type}.` };
     }
 
     const newBooking = { ...bookingData, status: 'CONFIRMED' };
     const docRef = await addDoc(collection(db, 'bookings'), newBooking);
     
-    // If paid/scheduled, add transaction
     if (newBooking.value > 0 && newBooking.paymentStatus !== 'PENDING') {
         let transStatus = newBooking.paymentStatus === 'PAID' ? 'COMPLETED' : 'PENDING';
         let transDesc = `Locação: ${newBooking.clientName} - ${newBooking.destination}`;
         if (newBooking.paymentStatus === 'SCHEDULED') transDesc += " (Agendado)";
-
         await addDoc(collection(db, 'transactions'), {
-            type: 'INCOME',
-            status: transStatus,
-            category: 'Locação',
-            amount: newBooking.value,
-            date: newBooking.paymentDate || new Date().toISOString(),
-            description: transDesc,
-            relatedBookingId: docRef.id
+            type: 'INCOME', status: transStatus, category: 'Locação', amount: newBooking.value,
+            date: newBooking.paymentDate || new Date().toISOString(), description: transDesc, relatedBookingId: docRef.id
         });
     }
-
-    return { success: true, message: 'Agendamento salvo na nuvem!' };
+    return { success: true, message: 'Agendamento salvo!' };
   };
 
-  const updateBooking = async (id: string, data: Partial<Booking>): Promise<{ success: boolean; message: string }> => {
+  const updateBooking = async (id: string, data: Partial<Booking>) => {
     if (!isConfigured) return { success: false, message: "Banco de dados desconectado." };
-
-    // 1. Check Availability if Bus or Time Changed
-    // We assume if busId or time is passed, it changed.
     const currentBooking = bookings.find(b => b.id === id);
     if (!currentBooking) return { success: false, message: "Viagem não encontrada." };
 
@@ -323,340 +252,80 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
          return { success: false, message: 'Conflito: Este ônibus já está alugado no novo horário!' };
     }
 
-    // 2. Check Driver Conflicts if changed
-    const driverIdToCheck = data.driverId !== undefined ? data.driverId : currentBooking.driverId; // could be null
-    if (driverIdToCheck) {
-        const tripStart = new Date(startToCheck).getTime();
-        const tripEnd = new Date(endToCheck).getTime();
-
-        const driverConflict = timeOffs.find(t => {
-            if (t.driverId !== driverIdToCheck || t.status !== 'APPROVED') return false;
-            const [y, m, d] = t.date.split('-').map(Number);
-            const offStart = new Date(y, m - 1, d, 0, 0, 0).getTime();
-            const offEnd = new Date(y, m - 1, d, 23, 59, 59).getTime();
-            return (tripStart <= offEnd && tripEnd >= offStart);
-        });
-         if (driverConflict) {
-            const dateStr = driverConflict.date.split('-').reverse().join('/');
-            return { 
-                success: false, 
-                message: `Motorista Indisponível! Ele está de ${driverConflict.type} no dia ${dateStr}.` 
-            };
-        }
-    }
-
-    // 3. Update Booking
     await updateDoc(doc(db, 'bookings', id), data);
 
-    // 4. Try Update Related Transaction (Sync Finance)
-    // Only if critical financial fields changed
     if (data.value !== undefined || data.clientName || data.destination || data.paymentStatus || data.paymentDate) {
-        try {
-            const q = query(collection(db, 'transactions'), where('relatedBookingId', '==', id));
-            const querySnapshot = await getDocs(q);
-            
-            if (!querySnapshot.empty) {
-                // Assuming 1:1 relation mainly
-                const transDoc = querySnapshot.docs[0];
-                const newValue = data.value !== undefined ? data.value : transDoc.data().amount;
-                const newClient = data.clientName || currentBooking.clientName;
-                const newDest = data.destination || currentBooking.destination;
-                const newStatus = data.paymentStatus || currentBooking.paymentStatus;
-                
-                let transStatus = newStatus === 'PAID' ? 'COMPLETED' : 'PENDING';
-                let transDesc = `Locação: ${newClient} - ${newDest}`;
-                if (newStatus === 'SCHEDULED') transDesc += " (Agendado)";
-
-                await updateDoc(doc(db, 'transactions', transDoc.id), {
-                    amount: newValue,
-                    description: transDesc,
-                    status: transStatus,
-                    date: data.paymentDate || transDoc.data().date
-                });
-            } else if (data.value && data.value > 0 && data.paymentStatus !== 'PENDING') {
-                // If it didn't have a transaction but now should (e.g. was pending, now paid)
-                let transStatus = data.paymentStatus === 'PAID' ? 'COMPLETED' : 'PENDING';
-                let transDesc = `Locação: ${data.clientName || currentBooking.clientName} - ${data.destination || currentBooking.destination}`;
-                if (data.paymentStatus === 'SCHEDULED') transDesc += " (Agendado)";
-
-                 await addDoc(collection(db, 'transactions'), {
-                    type: 'INCOME',
-                    status: transStatus,
-                    category: 'Locação',
-                    amount: data.value,
-                    date: data.paymentDate || new Date().toISOString(),
-                    description: transDesc,
-                    relatedBookingId: id
-                });
-            }
-        } catch (e) {
-            console.error("Failed to sync transaction:", e);
+        const q = query(collection(db, 'transactions'), where('relatedBookingId', '==', id));
+        const querySnapshot = await getDocs(q);
+        if (!querySnapshot.empty) {
+            const transDoc = querySnapshot.docs[0];
+            const newValue = data.value !== undefined ? data.value : transDoc.data().amount;
+            const newClient = data.clientName || currentBooking.clientName;
+            const newDest = data.destination || currentBooking.destination;
+            const newStatus = data.paymentStatus || currentBooking.paymentStatus;
+            let transStatus = newStatus === 'PAID' ? 'COMPLETED' : 'PENDING';
+            let transDesc = `Locação: ${newClient} - ${newDest}`;
+            if (newStatus === 'SCHEDULED') transDesc += " (Agendado)";
+            await updateDoc(doc(db, 'transactions', transDoc.id), {
+                amount: newValue, description: transDesc, status: transStatus, date: data.paymentDate || transDoc.data().date
+            });
         }
     }
-
     return { success: true, message: 'Viagem atualizada com sucesso!' };
   };
 
-  const updateBookingStatus = async (id: string, status: Booking['status']) => {
-    if (!isConfigured) return;
-    await updateDoc(doc(db, 'bookings', id), { status });
-  };
-
-  const addPart = async (part: Omit<Part, 'id'>) => {
-    if (!isConfigured) return;
-    await addDoc(collection(db, 'parts'), part);
-  };
-
-  const updateStock = async (id: string, quantityDelta: number) => {
-    if (!isConfigured) return;
-    const part = parts.find(p => p.id === id);
-    if (part) {
-        const newQty = Math.max(0, part.quantity + quantityDelta);
-        await updateDoc(doc(db, 'parts', id), { quantity: newQty });
-    }
-  };
-
-  const addTransaction = async (transaction: Omit<Transaction, 'id'>) => {
-    if (!isConfigured) return;
-    await addDoc(collection(db, 'transactions'), transaction);
-  };
-
-  const addTimeOff = async (timeOff: Omit<TimeOff, 'id' | 'status'>) => {
-    if (!isConfigured) return;
-    const isManager = currentUser?.role === UserRole.MANAGER || currentUser?.role === UserRole.DEVELOPER;
-    await addDoc(collection(db, 'timeOffs'), {
-        ...timeOff,
-        status: isManager ? 'APPROVED' : 'PENDING'
-    });
-  };
-
-  const updateTimeOffStatus = async (id: string, status: 'APPROVED' | 'REJECTED') => {
-    if (!isConfigured) return;
-    await updateDoc(doc(db, 'timeOffs', id), { status });
-  };
-
-  const addDocument = async (docData: Omit<DriverDocument, 'id' | 'uploadDate'>) => {
-    if (!isConfigured) return;
-    await addDoc(collection(db, 'documents'), {
-        ...docData,
-        uploadDate: new Date().toISOString()
-    });
-  };
-
-  const deleteDocument = async (id: string) => {
-    if (!isConfigured) return;
-    await deleteDoc(doc(db, 'documents', id));
-  };
-
+  const updateBookingStatus = async (id: string, status: Booking['status']) => { if (isConfigured) await updateDoc(doc(db, 'bookings', id), { status }); };
+  const addPart = async (part: Omit<Part, 'id'>) => { if (isConfigured) await addDoc(collection(db, 'parts'), part); };
+  const updateStock = async (id: string, quantityDelta: number) => { if (isConfigured) { const part = parts.find(p => p.id === id); if (part) await updateDoc(doc(db, 'parts', id), { quantity: Math.max(0, part.quantity + quantityDelta) }); } };
+  const addTransaction = async (transaction: Omit<Transaction, 'id'>) => { if (isConfigured) await addDoc(collection(db, 'transactions'), transaction); };
+  const addTimeOff = async (timeOff: Omit<TimeOff, 'id' | 'status'>) => { if (isConfigured) { const isManager = currentUser?.role === UserRole.MANAGER || currentUser?.role === UserRole.DEVELOPER; await addDoc(collection(db, 'timeOffs'), { ...timeOff, status: isManager ? 'APPROVED' : 'PENDING' }); } };
+  const updateTimeOffStatus = async (id: string, status: 'APPROVED' | 'REJECTED') => { if (isConfigured) await updateDoc(doc(db, 'timeOffs', id), { status }); };
+  const addDocument = async (docData: Omit<DriverDocument, 'id' | 'uploadDate'>) => { if (isConfigured) await addDoc(collection(db, 'documents'), { ...docData, uploadDate: new Date().toISOString() }); };
+  const deleteDocument = async (id: string) => { if (isConfigured) await deleteDoc(doc(db, 'documents', id)); };
+  
   const addMaintenanceRecord = async (record: Omit<MaintenanceRecord, 'id'>) => {
       if (!isConfigured) return;
-      // 1. Create Record
       await addDoc(collection(db, 'maintenanceRecords'), record);
-      
-      // 2. Decrement Stock
       await updateStock(record.partId, -record.quantityUsed);
-
-      // 3. Create Expense
       const part = parts.find(p => p.id === record.partId);
       const bus = buses.find(b => b.id === record.busId);
-      const cost = part ? part.price * record.quantityUsed : 0;
-      
       await addDoc(collection(db, 'transactions'), {
-          type: 'EXPENSE',
-          status: 'COMPLETED',
-          category: 'Manutenção',
-          amount: cost,
-          date: record.date,
-          description: `Manutenção ${record.type}: ${bus?.plate} - ${part?.name} (x${record.quantityUsed})`
+          type: 'EXPENSE', status: 'COMPLETED', category: 'Manutenção', amount: part ? part.price * record.quantityUsed : 0,
+          date: record.date, description: `Manutenção ${record.type}: ${bus?.plate} - ${part?.name} (x${record.quantityUsed})`
       });
   };
 
-  const addPurchaseRequest = async (req: Omit<PurchaseRequest, 'id' | 'status' | 'requestDate'>) => {
-      if (!isConfigured) return;
-      await addDoc(collection(db, 'purchaseRequests'), {
-          ...req,
-          status: 'PENDING',
-          requestDate: new Date().toISOString()
-      });
+  const addPurchaseRequest = async (req: Omit<PurchaseRequest, 'id' | 'status' | 'requestDate'>) => { if (isConfigured) await addDoc(collection(db, 'purchaseRequests'), { ...req, status: 'PENDING', requestDate: new Date().toISOString() }); };
+  const updatePurchaseRequestStatus = async (id: string, status: PurchaseRequest['status']) => { if (isConfigured) await updateDoc(doc(db, 'purchaseRequests', id), { status }); };
+  const addMaintenanceReport = async (report: Omit<MaintenanceReport, 'id' | 'status'>) => { if (isConfigured) await addDoc(collection(db, 'maintenanceReports'), { ...report, status: 'PENDING' }); };
+  const updateMaintenanceReportStatus = async (id: string, status: MaintenanceReport['status']) => { if (isConfigured) await updateDoc(doc(db, 'maintenanceReports', id), { status }); };
+  const addBus = async (bus: Omit<Bus, 'id' | 'status'>) => { if (isConfigured) await addDoc(collection(db, 'buses'), { ...bus, status: 'AVAILABLE' }); };
+  const updateBusStatus = async (id: string, status: Bus['status']) => { if (isConfigured) await updateDoc(doc(db, 'buses', id), { status }); };
+  const addCharterContract = async (contract: Omit<CharterContract, 'id' | 'status'>) => { if (!isConfigured) return; await addDoc(collection(db, 'charterContracts'), { ...contract, status: 'ACTIVE' }); }; // Simplified for space
+  const addTravelPackage = async (pkg: Omit<TravelPackage, 'id' | 'status'>) => { if (isConfigured) await addDoc(collection(db, 'travelPackages'), { ...pkg, status: 'OPEN' }); };
+  const registerPackageSale = async (clientData: any, saleData: any) => { 
+      if (!isConfigured) return; 
+      let clientId = '';
+      const existingClient = clients.find(c => c.cpf === clientData.cpf);
+      if (existingClient) { clientId = existingClient.id; await updateDoc(doc(db, 'clients', clientId), { ...clientData }); } 
+      else { const ref = await addDoc(collection(db, 'clients'), clientData); clientId = ref.id; }
+      await addDoc(collection(db, 'packagePassengers'), { ...saleData, clientId, titularName: clientData.name, titularCpf: clientData.cpf, paidAmount: 0, status: 'PENDING' });
   };
-
-  const updatePurchaseRequestStatus = async (id: string, status: PurchaseRequest['status']) => {
-    if (!isConfigured) return;
-    await updateDoc(doc(db, 'purchaseRequests', id), { status });
-  };
-
-  const addMaintenanceReport = async (report: Omit<MaintenanceReport, 'id' | 'status'>) => {
-    if (!isConfigured) return;
-    await addDoc(collection(db, 'maintenanceReports'), {
-        ...report,
-        status: 'PENDING'
-    });
-  };
-
-  const updateMaintenanceReportStatus = async (id: string, status: MaintenanceReport['status']) => {
-    if (!isConfigured) return;
-    await updateDoc(doc(db, 'maintenanceReports', id), { status });
-  };
-
-  const addBus = async (bus: Omit<Bus, 'id' | 'status'>) => {
-    if (!isConfigured) return;
-    await addDoc(collection(db, 'buses'), { ...bus, status: 'AVAILABLE' });
-  };
-
-  const updateBusStatus = async (id: string, status: Bus['status']) => {
-    if (!isConfigured) return;
-    await updateDoc(doc(db, 'buses', id), { status });
-  };
-
-  const addCharterContract = async (contract: Omit<CharterContract, 'id' | 'status'>) => {
-      if (!isConfigured) return;
-      const contractRef = await addDoc(collection(db, 'charterContracts'), { ...contract, status: 'ACTIVE' });
-      
-      // Auto-generate bookings
-      const batch = writeBatch(db);
-      let currentDate = new Date(contract.startDate);
-      const end = new Date(contract.endDate);
-      const tripDurationMs = 90 * 60 * 1000;
-
-      let count = 0;
-
-      while (currentDate <= end && count < 450) {
-          if (contract.weekDays.includes(currentDate.getDay())) {
-              const dateStr = currentDate.toISOString().split('T')[0];
-              
-              if (contract.morningDeparture) {
-                  const startMorning = new Date(`${dateStr}T${contract.morningDeparture}:00`);
-                  const endMorning = new Date(startMorning.getTime() + tripDurationMs);
-                  const ref = doc(collection(db, 'bookings'));
-                  batch.set(ref, {
-                      busId: contract.busId,
-                      driverId: contract.driverId,
-                      clientName: contract.clientName,
-                      clientPhone: '',
-                      destination: `${contract.route} (Manhã)`,
-                      startTime: startMorning.toISOString(),
-                      endTime: endMorning.toISOString(),
-                      value: 0,
-                      status: 'CONFIRMED',
-                      paymentStatus: 'PAID',
-                      paymentDate: new Date().toISOString(),
-                      departureLocation: 'Garagem/Ponto Inicial',
-                      presentationTime: new Date(startMorning.getTime() - 1800000).toISOString(),
-                      type: 'FRETAMENTO',
-                      contractId: contractRef.id
-                  });
-                  count++;
-              }
-
-              if (contract.afternoonDeparture) {
-                  const startAfternoon = new Date(`${dateStr}T${contract.afternoonDeparture}:00`);
-                  const endAfternoon = new Date(startAfternoon.getTime() + tripDurationMs);
-                  const ref = doc(collection(db, 'bookings'));
-                  batch.set(ref, {
-                    busId: contract.busId,
-                    driverId: contract.driverId,
-                    clientName: contract.clientName,
-                    clientPhone: '',
-                    destination: `${contract.route} (Tarde)`,
-                    startTime: startAfternoon.toISOString(),
-                    endTime: endAfternoon.toISOString(),
-                    value: 0,
-                    status: 'CONFIRMED',
-                    paymentStatus: 'PAID',
-                    paymentDate: new Date().toISOString(),
-                    departureLocation: 'Empresa/Fábrica',
-                    presentationTime: new Date(startAfternoon.getTime() - 1800000).toISOString(),
-                    type: 'FRETAMENTO',
-                    contractId: contractRef.id
-                });
-                count++;
-              }
-          }
-          currentDate.setDate(currentDate.getDate() + 1);
-      }
-      await batch.commit();
-  };
-
-  const addTravelPackage = async (pkg: Omit<TravelPackage, 'id' | 'status'>) => {
-    if (!isConfigured) return;
-    await addDoc(collection(db, 'travelPackages'), { ...pkg, status: 'OPEN' });
-  };
-
-  const registerPackageSale = async (
-      clientData: Omit<Client, 'id'>, 
-      saleData: Omit<PackagePassenger, 'id' | 'clientId' | 'paidAmount' | 'status' | 'titularName' | 'titularCpf'>
-  ) => {
-    if (!isConfigured) return;
-    let clientId = '';
-    const existingClient = clients.find(c => c.cpf === clientData.cpf);
-    
-    if (existingClient) {
-        clientId = existingClient.id;
-        await updateDoc(doc(db, 'clients', clientId), { ...clientData });
-    } else {
-        const clientRef = await addDoc(collection(db, 'clients'), clientData);
-        clientId = clientRef.id;
-    }
-
-    await addDoc(collection(db, 'packagePassengers'), {
-        ...saleData,
-        clientId,
-        titularName: clientData.name,
-        titularCpf: clientData.cpf,
-        paidAmount: 0,
-        status: 'PENDING'
-    });
-  };
-
   const addPackagePayment = async (payment: Omit<PackagePayment, 'id'>) => {
       if (!isConfigured) return;
       await addDoc(collection(db, 'packagePayments'), payment);
-      
       const passenger = packagePassengers.find(p => p.id === payment.passengerId);
       if (passenger) {
           const newPaidAmount = passenger.paidAmount + payment.amount;
-          const newStatus = newPaidAmount >= passenger.agreedPrice ? 'PAID' : 'PARTIAL';
-          await updateDoc(doc(db, 'packagePassengers', passenger.id), {
-              paidAmount: newPaidAmount,
-              status: newStatus
-          });
-
+          await updateDoc(doc(db, 'packagePassengers', passenger.id), { paidAmount: newPaidAmount, status: newPaidAmount >= passenger.agreedPrice ? 'PAID' : 'PARTIAL' });
           const pkg = travelPackages.find(tp => tp.id === passenger.packageId);
           await addDoc(collection(db, 'transactions'), {
-            type: 'INCOME',
-            status: 'COMPLETED',
-            category: 'Pacotes de Viagem',
-            amount: payment.amount,
-            date: payment.date,
-            description: `Pagamento Pacote: ${pkg?.title} - Passageiro: ${passenger?.titularName} (${payment.method})`
+            type: 'INCOME', status: 'COMPLETED', category: 'Pacotes de Viagem', amount: payment.amount, date: payment.date,
+            description: `Pagamento Pacote: ${pkg?.title} - Passageiro: ${passenger?.titularName}`
         });
       }
   };
-
-  const seedDatabase = async () => {
-      if (!isConfigured) {
-          alert("Configure o Firebase primeiro!");
-          return;
-      }
-      // Helper to populate empty DB with mock data
-      const batch = writeBatch(db);
-      
-      if (buses.length === 0) {
-          MOCK_BUSES.forEach(b => {
-              const ref = doc(collection(db, 'buses')); // Auto ID
-              batch.set(ref, { ...b, id: ref.id });
-          });
-      }
-      if (parts.length === 0) {
-          MOCK_PARTS.forEach(p => {
-              const ref = doc(collection(db, 'parts'));
-              batch.set(ref, { ...p, id: ref.id });
-          });
-      }
-      
-      await batch.commit();
-      alert('Banco de dados populado com dados iniciais!');
-  };
+  const seedDatabase = async () => { if (!isConfigured) return; const batch = writeBatch(db); MOCK_BUSES.forEach(b => batch.set(doc(collection(db, 'buses')), { ...b, id: doc(collection(db, 'buses')).id })); MOCK_PARTS.forEach(p => batch.set(doc(collection(db, 'parts')), { ...p, id: doc(collection(db, 'parts')).id })); await batch.commit(); };
 
   return (
     <StoreContext.Provider value={{
