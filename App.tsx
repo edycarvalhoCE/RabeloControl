@@ -3,6 +3,7 @@ import { StoreProvider } from './services/store';
 import Sidebar from './components/Sidebar';
 import Dashboard from './components/Dashboard';
 import BookingsView from './components/BookingsView';
+import NewBookingView from './components/NewBookingView';
 import InventoryView from './components/InventoryView';
 import FinanceView from './components/FinanceView';
 import DriverPortal from './components/DriverPortal';
@@ -57,6 +58,7 @@ const MainContent = () => {
     switch (currentView) {
       case 'dashboard': return <Dashboard />;
       case 'calendar': return <CalendarView />;
+      case 'new-booking': return <NewBookingView />;
       case 'bookings': return <BookingsView />;
       case 'travel-packages': return <TravelPackagesView />;
       case 'vehicles': return <VehiclesView />;

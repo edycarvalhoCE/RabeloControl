@@ -3,24 +3,7 @@ import { useStore } from '../services/store';
 import { UserRole, Bus, Booking } from '../types';
 
 const BookingsView: React.FC = () => {
-  const { bookings, buses, users, addBooking, updateBooking, updateBookingStatus } = useStore();
-  
-  // --- FORM STATE ---
-  const [formData, setFormData] = useState({
-    busId: '',
-    driverId: '',
-    clientName: '',
-    clientPhone: '',
-    destination: '',
-    startTime: '',
-    endTime: '',
-    value: 0,
-    paymentStatus: 'PENDING' as 'PAID' | 'PENDING' | 'SCHEDULED',
-    paymentDate: '',
-    departureLocation: '',
-    presentationTime: '',
-    observations: ''
-  });
+  const { bookings, buses, users, updateBooking, updateBookingStatus } = useStore();
   
   // --- FILTER STATE ---
   const [filters, setFilters] = useState({
@@ -30,8 +13,11 @@ const BookingsView: React.FC = () => {
       status: ''
   });
 
-  const [editingBookingId, setEditingBookingId] = useState<string | null>(null);
+  // --- EDIT MODAL STATE ---
+  const [editingBooking, setEditingBooking] = useState<Booking | null>(null);
+  const [editForm, setEditForm] = useState<any>({});
   const [msg, setMsg] = useState<{ type: 'success' | 'error', text: string } | null>(null);
+
   const [showConflictModal, setShowConflictModal] = useState(false);
   const [conflictDetails, setConflictDetails] = useState('');
   const [selectedBus, setSelectedBus] = useState<Bus | null>(null);
@@ -59,15 +45,20 @@ const BookingsView: React.FC = () => {
 
   // --- ACTIONS ---
 
-  const handleEdit = (booking: Booking) => {
+  const handleEditClick = (booking: Booking) => {
     const safeStart = booking.startTime && booking.startTime.length >= 16 ? booking.startTime.slice(0, 16) : '';
     const safeEnd = booking.endTime && booking.endTime.length >= 16 ? booking.endTime.slice(0, 16) : '';
     const safePresentation = booking.presentationTime && booking.presentationTime.length >= 16 ? booking.presentationTime.slice(0, 16) : '';
     const safePaymentDate = booking.paymentDate ? booking.paymentDate.split('T')[0] : '';
+    
+    // Determine if freelance
+    const isFreelance = !booking.driverId && !!booking.freelanceDriverName;
 
-    setFormData({
+    setEditForm({
       busId: booking.busId,
       driverId: booking.driverId || '',
+      freelanceDriverName: booking.freelanceDriverName || '',
+      isFreelance: isFreelance,
       clientName: booking.clientName,
       clientPhone: booking.clientPhone || '',
       destination: booking.destination,
@@ -80,68 +71,67 @@ const BookingsView: React.FC = () => {
       presentationTime: safePresentation,
       observations: booking.observations || ''
     });
-    setEditingBookingId(booking.id);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    setEditingBooking(booking);
   };
 
-  const handleCancelEdit = () => {
-    setEditingBookingId(null);
-    setFormData({ 
-      busId: '', driverId: '', clientName: '', clientPhone: '', destination: '', startTime: '', endTime: '', value: 0,
-      paymentStatus: 'PENDING', paymentDate: '',
-      departureLocation: '', presentationTime: '', observations: ''
-    });
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formData.busId || !formData.startTime || !formData.endTime) {
-        setMsg({ type: 'error', text: 'Preencha os campos obrigatórios.' });
-        return;
+  const handleEditChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    if (name === 'paymentStatus' && value === 'PENDING') {
+         setEditForm((prev: any) => ({ ...prev, [name]: value, paymentDate: '' }));
+    } else if (name === 'isFreelance') {
+         const isChecked = (e.target as HTMLInputElement).checked;
+         setEditForm((prev: any) => ({ ...prev, isFreelance: isChecked, driverId: '', freelanceDriverName: '' }));
+    } else {
+        setEditForm((prev: any) => ({ ...prev, [name]: name === 'value' ? parseFloat(value) : value }));
     }
+  };
+
+  const handleEditSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingBooking) return;
 
     const payload = {
-        ...formData,
-        driverId: formData.driverId || null,
-        paymentDate: formData.paymentDate || null,
-        departureLocation: formData.departureLocation || 'Garagem',
-        presentationTime: formData.presentationTime || formData.startTime
+        ...editForm,
+        driverId: editForm.isFreelance ? null : editForm.driverId,
+        freelanceDriverName: editForm.isFreelance ? editForm.freelanceDriverName : null,
+        paymentDate: editForm.paymentDate || null,
+        presentationTime: editForm.presentationTime || editForm.startTime
     };
+    // remove temp field
+    delete payload.isFreelance;
 
-    let result;
-    if (editingBookingId) {
-        result = await updateBooking(editingBookingId, payload);
-    } else {
-        result = await addBooking(payload);
-    }
+    const result = await updateBooking(editingBooking.id, payload);
 
     if (result.success) {
       setMsg({ type: 'success', text: result.message });
-      handleCancelEdit();
-      setTimeout(() => setMsg(null), 3000);
+      setTimeout(() => {
+          setMsg(null);
+          setEditingBooking(null);
+      }, 1500);
     } else {
       if (result.message.includes('Conflito')) {
         setConflictDetails(result.message);
         setShowConflictModal(true);
       } else {
         setMsg({ type: 'error', text: result.message });
-        setTimeout(() => setMsg(null), 3000);
       }
     }
   };
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
-    if (name === 'paymentStatus' && value === 'PENDING') {
-         setFormData(prev => ({ ...prev, [name]: value, paymentDate: '' }));
-    } else {
-        setFormData(prev => ({ ...prev, [name]: name === 'value' ? parseFloat(value) : value }));
-    }
+  const getDriverName = (booking: Booking) => {
+      if (booking.driverId) {
+          const d = users.find(u => u.id === booking.driverId);
+          return d ? d.name : 'Motorista Excluído';
+      }
+      if (booking.freelanceDriverName) {
+          return `${booking.freelanceDriverName} (Freelance)`;
+      }
+      return 'Sem Motorista';
   };
 
   const handlePrintOS = (booking: Booking) => {
       const bus = buses.find(b => b.id === booking.busId);
-      const driver = users.find(u => u.id === booking.driverId);
+      const driverName = getDriverName(booking);
       const sStart = safeDate(booking.startTime) + ' ' + safeTime(booking.startTime);
       const sEnd = safeDate(booking.endTime) + ' ' + safeTime(booking.endTime);
       const sPres = safeDate(booking.presentationTime) + ' ' + safeTime(booking.presentationTime);
@@ -173,7 +163,7 @@ const BookingsView: React.FC = () => {
             
             <h3>Veículo e Motorista</h3>
             <div class="row"><span class="label">Veículo:</span><span class="value">${bus?.plate} - ${bus?.model}</span></div>
-            <div class="row"><span class="label">Motorista:</span><span class="value">${driver?.name || '__________________'}</span></div>
+            <div class="row"><span class="label">Motorista:</span><span class="value">${driverName}</span></div>
             
             <h3>Observações / Instruções</h3>
             <div class="obs-box">
@@ -378,7 +368,6 @@ const BookingsView: React.FC = () => {
       
       let matchDate = true;
       if (filters.date) {
-          // Compare simple string YYYY-MM-DD
           const bookingDate = b.startTime.split('T')[0];
           matchDate = bookingDate === filters.date;
       }
@@ -387,7 +376,7 @@ const BookingsView: React.FC = () => {
   }).sort((a,b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime());
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-fade-in relative">
+    <div className="animate-fade-in relative">
       {/* CONFLICT MODAL */}
       {showConflictModal && (
           <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
@@ -395,6 +384,77 @@ const BookingsView: React.FC = () => {
                   <h3 className="text-xl font-bold text-red-600 mb-2">Conflito de Horário!</h3>
                   <p className="text-slate-600 mb-4">{conflictDetails}</p>
                   <button onClick={() => setShowConflictModal(false)} className="w-full bg-slate-800 text-white py-2 rounded">Fechar</button>
+              </div>
+          </div>
+      )}
+
+      {/* EDIT MODAL */}
+      {editingBooking && (
+          <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-40 p-4 overflow-y-auto">
+              <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full p-6 my-8">
+                  <div className="flex justify-between items-center mb-4">
+                      <h3 className="text-xl font-bold text-slate-800">Editar Locação</h3>
+                      <button onClick={() => setEditingBooking(null)} className="text-slate-400 hover:text-slate-800 text-xl font-bold">&times;</button>
+                  </div>
+                  
+                  {msg && <div className={`p-3 rounded mb-4 text-sm ${msg.type === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>{msg.text}</div>}
+                  
+                  <form onSubmit={handleEditSubmit} className="space-y-4">
+                      <div className="grid grid-cols-2 gap-4">
+                          <input name="clientName" value={editForm.clientName} onChange={handleEditChange} placeholder="Cliente" className="w-full border p-2 rounded" required />
+                          <input name="clientPhone" value={editForm.clientPhone} onChange={handleEditChange} placeholder="Telefone" className="w-full border p-2 rounded" />
+                      </div>
+                      <input name="destination" value={editForm.destination} onChange={handleEditChange} placeholder="Destino" className="w-full border p-2 rounded" required />
+                      <div className="grid grid-cols-2 gap-4">
+                        <div><label className="text-xs font-bold">Início</label><input type="datetime-local" name="startTime" value={editForm.startTime} onChange={handleEditChange} className="w-full border p-2 rounded" required /></div>
+                        <div><label className="text-xs font-bold">Fim</label><input type="datetime-local" name="endTime" value={editForm.endTime} onChange={handleEditChange} className="w-full border p-2 rounded" required /></div>
+                      </div>
+                      <input name="departureLocation" value={editForm.departureLocation} onChange={handleEditChange} placeholder="Local de Saída" className="w-full border p-2 rounded" required />
+                      <div><label className="text-xs font-bold">Apresentação</label><input type="datetime-local" name="presentationTime" value={editForm.presentationTime} onChange={handleEditChange} className="w-full border p-2 rounded" /></div>
+
+                      <select name="busId" value={editForm.busId} onChange={handleEditChange} className="w-full border p-2 rounded" required>
+                          <option value="">Selecione o Ônibus</option>
+                          {buses.map(b => (
+                              <option key={b.id} value={b.id}>{b.plate} - {b.model}</option>
+                          ))}
+                      </select>
+
+                      <div className="bg-slate-50 p-3 rounded border border-slate-200">
+                        <label className="flex items-center space-x-2 text-sm cursor-pointer mb-2">
+                            <input 
+                                type="checkbox" 
+                                name="isFreelance" 
+                                checked={editForm.isFreelance} 
+                                onChange={handleEditChange} 
+                                className="rounded text-blue-600 focus:ring-blue-500"
+                            />
+                            <span className="font-bold text-blue-700">Motorista Freelance?</span>
+                        </label>
+                        {editForm.isFreelance ? (
+                            <input name="freelanceDriverName" value={editForm.freelanceDriverName} onChange={handleEditChange} placeholder="Nome do Freelance" className="w-full border p-2 rounded" />
+                        ) : (
+                            <select name="driverId" value={editForm.driverId} onChange={handleEditChange} className="w-full border p-2 rounded">
+                                <option value="">Selecione o Motorista</option>
+                                {drivers.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                            </select>
+                        )}
+                      </div>
+
+                      <textarea name="observations" value={editForm.observations} onChange={handleEditChange} placeholder="Observações..." className="w-full border p-2 rounded h-20" />
+
+                      <div className="border-t pt-4 grid grid-cols-2 gap-4">
+                          <input type="number" name="value" value={editForm.value} onChange={handleEditChange} className="w-full border p-2 rounded" placeholder="Valor R$" />
+                          <select name="paymentStatus" value={editForm.paymentStatus} onChange={handleEditChange} className="w-full border p-2 rounded">
+                              <option value="PENDING">Pendente</option>
+                              <option value="PAID">Pago</option>
+                              <option value="SCHEDULED">Agendado</option>
+                          </select>
+                          {editForm.paymentStatus !== 'PENDING' && (
+                              <input type="date" name="paymentDate" value={editForm.paymentDate} onChange={handleEditChange} className="w-full border p-2 rounded col-span-2" />
+                          )}
+                      </div>
+                      <button type="submit" className="w-full bg-blue-600 text-white py-3 rounded font-bold hover:bg-blue-700">Salvar Alterações</button>
+                  </form>
               </div>
           </div>
       )}
@@ -416,9 +476,7 @@ const BookingsView: React.FC = () => {
         </div>
       )}
 
-      {/* LIST SECTION (LEFT) */}
-      <div className="lg:col-span-2 space-y-6">
-        
+      <div className="space-y-6">
         {/* FILTERS BAR */}
         <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
             <h3 className="text-sm font-bold text-slate-700 uppercase mb-3 flex items-center gap-2">
@@ -457,17 +515,16 @@ const BookingsView: React.FC = () => {
         </div>
 
         <h2 className="text-xl font-bold text-slate-800">
-            Locações Encontradas ({filteredBookings.length})
+            Listagem de Locações ({filteredBookings.length})
         </h2>
         
         <div className="grid gap-4">
           {filteredBookings.map(booking => {
             const bus = buses.find(b => b.id === booking.busId);
-            const driver = users.find(u => u.id === booking.driverId);
-            const isEditing = editingBookingId === booking.id;
+            const driverName = getDriverName(booking);
             
             return (
-              <div key={booking.id} className={`bg-white p-5 rounded-lg shadow-sm border border-slate-200 flex flex-col md:flex-row justify-between items-start gap-4 ${isEditing ? 'ring-2 ring-blue-500' : ''}`}>
+              <div key={booking.id} className="bg-white p-5 rounded-lg shadow-sm border border-slate-200 flex flex-col md:flex-row justify-between items-start gap-4">
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-1">
                     <span className={`px-2 py-1 rounded text-xs font-bold ${booking.status === 'CONFIRMED' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'}`}>
@@ -499,7 +556,9 @@ const BookingsView: React.FC = () => {
                     </div>
                     <div>
                         <span className="font-medium text-slate-700 block">Motorista</span> 
-                        <span className="text-slate-600">{driver ? driver.name : <span className="text-red-500 font-bold">Sem Motorista</span>}</span>
+                        <span className={`font-medium ${booking.driverId ? 'text-slate-600' : booking.freelanceDriverName ? 'text-purple-600' : 'text-red-500'}`}>
+                            {driverName}
+                        </span>
                     </div>
                   </div>
                 </div>
@@ -520,7 +579,7 @@ const BookingsView: React.FC = () => {
                   <div className="flex flex-col gap-2">
                       <button onClick={() => handlePrintOS(booking)} className="bg-slate-800 text-white text-xs py-2 rounded font-bold hover:bg-slate-700">🖨️ Imprimir OS</button>
                       <button onClick={() => handlePrintContract(booking)} className="bg-purple-600 text-white text-xs py-2 rounded font-bold hover:bg-purple-700">🖨️ Imprimir Contrato</button>
-                      <button onClick={() => handleEdit(booking)} className="bg-blue-100 text-blue-700 text-xs py-2 rounded font-bold hover:bg-blue-200">✏️ Editar</button>
+                      <button onClick={() => handleEditClick(booking)} className="bg-blue-100 text-blue-700 text-xs py-2 rounded font-bold hover:bg-blue-200">✏️ Editar</button>
                       {booking.status === 'CONFIRMED' && (
                           <button onClick={() => updateBookingStatus(booking.id, 'CANCELLED')} className="text-red-500 text-xs hover:underline">Cancelar Viagem</button>
                       )}
@@ -535,77 +594,6 @@ const BookingsView: React.FC = () => {
             </div>
           )}
         </div>
-      </div>
-
-      {/* FORM SECTION (RIGHT) */}
-      <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 h-fit sticky top-6">
-        <div className="flex justify-between items-center mb-4">
-            <h3 className="text-xl font-bold text-slate-800">{editingBookingId ? 'Editar Locação' : 'Nova Locação'}</h3>
-            {editingBookingId && <button onClick={handleCancelEdit} className="text-xs text-red-500 underline">Cancelar</button>}
-        </div>
-        
-        {msg && <div className={`p-3 rounded mb-4 text-sm ${msg.type === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>{msg.text}</div>}
-        
-        <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-                <label className="text-xs font-bold text-slate-500 uppercase">Dados do Cliente</label>
-                <input name="clientName" value={formData.clientName} onChange={handleChange} placeholder="Nome do Cliente" className="w-full border p-2 rounded mt-1" required />
-                <input name="clientPhone" value={formData.clientPhone} onChange={handleChange} placeholder="Telefone" className="w-full border p-2 rounded mt-2" />
-            </div>
-
-            <div>
-                <label className="text-xs font-bold text-slate-500 uppercase">Detalhes da Viagem</label>
-                <input name="destination" value={formData.destination} onChange={handleChange} placeholder="Destino" className="w-full border p-2 rounded mt-1" required />
-            </div>
-            
-            <div className="grid grid-cols-2 gap-2">
-                <div><label className="text-xs font-bold">Início</label><input type="datetime-local" name="startTime" value={formData.startTime} onChange={handleChange} className="w-full border p-2 rounded" required /></div>
-                <div><label className="text-xs font-bold">Fim</label><input type="datetime-local" name="endTime" value={formData.endTime} onChange={handleChange} className="w-full border p-2 rounded" required /></div>
-            </div>
-
-            <input name="departureLocation" value={formData.departureLocation} onChange={handleChange} placeholder="Local de Saída" className="w-full border p-2 rounded" required />
-            <div><label className="text-xs font-bold">Apresentação (Garagem)</label><input type="datetime-local" name="presentationTime" value={formData.presentationTime} onChange={handleChange} className="w-full border p-2 rounded" /></div>
-
-            <select name="busId" value={formData.busId} onChange={handleChange} className="w-full border p-2 rounded" required>
-                <option value="">Selecione o Ônibus</option>
-                {buses.map(b => (
-                    <option key={b.id} value={b.id} disabled={b.status === 'MAINTENANCE' && b.id !== formData.busId}>{b.plate} - {b.model}</option>
-                ))}
-            </select>
-            
-            <select name="driverId" value={formData.driverId} onChange={handleChange} className="w-full border p-2 rounded">
-                <option value="">Selecione o Motorista</option>
-                {drivers.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-            </select>
-
-            <div>
-                <label className="text-xs font-bold text-slate-500 uppercase">Observações (Para a OS)</label>
-                <textarea 
-                    name="observations" 
-                    value={formData.observations} 
-                    onChange={handleChange} 
-                    placeholder="Ex: Pegar passageiros extra na praça; Levar água; Cliente VIP..." 
-                    className="w-full border p-2 rounded mt-1 h-20 resize-none text-sm" 
-                />
-            </div>
-
-            <div className="border-t pt-4">
-                <label className="block text-sm font-bold mb-2">Financeiro</label>
-                <input type="number" name="value" value={formData.value} onChange={handleChange} className="w-full border p-2 rounded mb-2" placeholder="Valor R$" />
-                <select name="paymentStatus" value={formData.paymentStatus} onChange={handleChange} className="w-full border p-2 rounded mb-2">
-                    <option value="PENDING">Pendente</option>
-                    <option value="PAID">Pago</option>
-                    <option value="SCHEDULED">Agendado</option>
-                </select>
-                {formData.paymentStatus !== 'PENDING' && (
-                    <input type="date" name="paymentDate" value={formData.paymentDate} onChange={handleChange} className="w-full border p-2 rounded" required />
-                )}
-            </div>
-
-            <button type="submit" className={`w-full py-2 rounded text-white font-bold ${editingBookingId ? 'bg-indigo-600' : 'bg-blue-600'}`}>
-                {editingBookingId ? 'Salvar Alterações' : 'Agendar'}
-            </button>
-        </form>
       </div>
     </div>
   );
