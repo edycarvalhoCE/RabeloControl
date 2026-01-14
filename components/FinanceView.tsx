@@ -34,7 +34,13 @@ const FinanceView: React.FC = () => {
   // --- RECEIVE PAYMENT MODAL STATE ---
   const [paymentModal, setPaymentModal] = useState<{ open: boolean, liability: DriverLiability | null, amount: number }>({ open: false, liability: null, amount: 0 });
 
-  const drivers = users.filter(u => u.role === UserRole.DRIVER);
+  // ROBUST DRIVER FILTER: Checks for Enum value OR string 'MOTORISTA' OR string 'DRIVER'
+  const drivers = users.filter(u => 
+      u.role === UserRole.DRIVER || 
+      u.role === 'MOTORISTA' || 
+      u.role === 'DRIVER' ||
+      u.role === 'Motorista'
+  );
 
   // --- FILTERS ---
   const realizedTransactions = transactions
@@ -466,7 +472,7 @@ const FinanceView: React.FC = () => {
                                     <tr><td colSpan={6} className="p-8 text-center text-slate-500">Nenhuma avaria ou multa registrada.</td></tr>
                                 ) : (
                                     driverLiabilities.map(l => {
-                                        const drv = drivers.find(d => d.id === l.driverId);
+                                        const drv = users.find(u => u.id === l.driverId);
                                         const pendingAmount = l.totalAmount - l.paidAmount;
                                         return (
                                             <tr key={l.id} className="hover:bg-slate-50">
@@ -474,7 +480,7 @@ const FinanceView: React.FC = () => {
                                                     {new Date(l.date).toLocaleDateString()}
                                                     <span className="block text-[10px] text-slate-400">{l.description}</span>
                                                 </td>
-                                                <td className="p-3 font-bold text-slate-800">{drv?.name}</td>
+                                                <td className="p-3 font-bold text-slate-800">{drv?.name || 'Motorista Removido'}</td>
                                                 <td className="p-3">
                                                     <span className={`text-xs px-2 py-1 rounded font-bold ${l.type === 'AVARIA' ? 'bg-orange-100 text-orange-700' : 'bg-red-100 text-red-700'}`}>
                                                         {l.type}

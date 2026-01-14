@@ -1,16 +1,17 @@
+
 export enum UserRole {
   DEVELOPER = 'DEVELOPER',
-  MANAGER = 'MANAGER',
-  FINANCE = 'FINANCE',
-  DRIVER = 'DRIVER',
-  MECHANIC = 'MECHANIC'
+  MANAGER = 'GERENTE',
+  FINANCE = 'FINANCEIRO',
+  DRIVER = 'MOTORISTA',
+  MECHANIC = 'MECANICO'
 }
 
 export interface User {
   id: string;
   name: string;
   email: string;
-  role: UserRole;
+  role: UserRole | string; // Allow string for legacy data compatibility
   avatar: string;
 }
 
