@@ -60,6 +60,13 @@ export interface Transaction {
   date: string;
   description: string;
   relatedBookingId?: string;
+  // New fields for Expenses/Installments
+  nfe?: string;
+  paymentMethod?: 'BOLETO' | 'CARTAO_CREDITO' | 'PIX' | 'DINHEIRO' | 'OUTROS';
+  installment?: {
+    current: number;
+    total: number;
+  };
 }
 
 export interface TimeOff {

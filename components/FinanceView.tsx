@@ -15,26 +15,29 @@ const FinanceView: React.FC = () => {
       type: 'INCOME', 
       category: '', 
       status: 'COMPLETED',
-      date: new Date().toISOString().split('T')[0] // Allow manual date
+      date: new Date().toISOString().split('T')[0],
+      nfe: '',
+      paymentMethod: 'PIX' as 'PIX' | 'BOLETO' | 'CARTAO_CREDITO' | 'DINHEIRO' | 'OUTROS'
   });
-  const [isRecurring, setIsRecurring] = useState(false);
-  const [recurrenceCount, setRecurrenceCount] = useState(1);
+  
+  // Installment State
+  const [isInstallment, setIsInstallment] = useState(false);
+  const [installmentsCount, setInstallmentsCount] = useState(2);
 
   // --- LIABILITY STATE ---
   const [liabilityForm, setLiabilityForm] = useState({
       driverId: '',
       type: 'AVARIA' as 'AVARIA' | 'MULTA',
       date: new Date().toISOString().split('T')[0],
-      description: '', // Infraction type or Damage Desc
+      description: '', 
       amount: 0,
       installments: 1,
-      createExpense: true // Default to paying the cost immediately
+      createExpense: true 
   });
 
   // --- RECEIVE PAYMENT MODAL STATE ---
   const [paymentModal, setPaymentModal] = useState<{ open: boolean, liability: DriverLiability | null, amount: number }>({ open: false, liability: null, amount: 0 });
 
-  // ROBUST DRIVER FILTER: Checks for Enum value OR string 'MOTORISTA' OR string 'DRIVER'
   const drivers = users.filter(u => 
       u.role === UserRole.DRIVER || 
       u.role === 'MOTORISTA' || 
@@ -58,28 +61,49 @@ const FinanceView: React.FC = () => {
   const handleAddTransaction = (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Logic for recurrence
-    const count = isRecurring ? recurrenceCount : 1;
-    
-    for (let i = 0; i < count; i++) {
-        const transDate = new Date(newTrans.date);
-        transDate.setMonth(transDate.getMonth() + i); // Add months
-        
-        // Let's clone the transaction
+    // Logic for Installments (Parcelado) vs Single (À Vista)
+    if (isInstallment && installmentsCount > 1) {
+        // Calculate amount per installment
+        const totalAmount = newTrans.amount;
+        const installmentValue = totalAmount / installmentsCount;
+
+        for (let i = 0; i < installmentsCount; i++) {
+            const transDate = new Date(newTrans.date);
+            transDate.setMonth(transDate.getMonth() + i); // Add months for subsequent installments
+            
+            const payload = {
+                ...newTrans,
+                amount: installmentValue,
+                type: newTrans.type as 'INCOME' | 'EXPENSE',
+                date: transDate.toISOString().split('T')[0],
+                // For future installments, set as PENDING. First one keeps selected status (usually COMPLETED if paid now)
+                status: (i > 0) ? 'PENDING' : newTrans.status as 'COMPLETED' | 'PENDING',
+                description: `${newTrans.description}`,
+                installment: {
+                    current: i + 1,
+                    total: installmentsCount
+                }
+            };
+            addTransaction(payload);
+        }
+        alert(`${installmentsCount} parcelas lançadas com sucesso!`);
+    } else {
+        // Single Transaction
         const payload = {
             ...newTrans,
             type: newTrans.type as 'INCOME' | 'EXPENSE',
-            date: transDate.toISOString().split('T')[0], // format YYYY-MM-DD for consistency
-            description: count > 1 ? `${newTrans.description} (${i + 1}/${count})` : newTrans.description,
-            status: (isRecurring && i > 0) ? 'PENDING' : newTrans.status as 'COMPLETED' | 'PENDING'
+            status: newTrans.status as 'COMPLETED' | 'PENDING'
         };
         addTransaction(payload);
+        alert('Lançamento realizado!');
     }
 
-    setNewTrans({ description: '', amount: 0, type: 'INCOME', category: '', status: 'COMPLETED', date: new Date().toISOString().split('T')[0] });
-    setIsRecurring(false);
-    setRecurrenceCount(1);
-    alert(`${count} lançamento(s) realizado(s)!`);
+    // Reset Form
+    setNewTrans({ 
+        description: '', amount: 0, type: 'INCOME', category: '', status: 'COMPLETED', date: new Date().toISOString().split('T')[0], nfe: '', paymentMethod: 'PIX' 
+    });
+    setIsInstallment(false);
+    setInstallmentsCount(2);
   };
 
   const handleLiabilitySubmit = (e: React.FormEvent) => {
@@ -120,6 +144,16 @@ const FinanceView: React.FC = () => {
 
   const currentBalance = realizedTransactions.reduce((acc, t) => t.type === 'INCOME' ? acc + t.amount : acc - t.amount, 0);
   const projectedIncome = pendingTransactions.filter(t => t.type === 'INCOME').reduce((acc, t) => acc + t.amount, 0);
+
+  const getMethodLabel = (method?: string) => {
+      switch(method) {
+          case 'BOLETO': return 'Boleto';
+          case 'CARTAO_CREDITO': return 'C. Crédito';
+          case 'PIX': return 'Pix';
+          case 'DINHEIRO': return 'Dinheiro';
+          default: return method || '-';
+      }
+  };
 
   return (
     <div className="space-y-6 animate-fade-in relative">
@@ -223,7 +257,7 @@ const FinanceView: React.FC = () => {
                                 <tr>
                                     <th className="p-4">Data</th>
                                     <th className="p-4">Descrição</th>
-                                    <th className="p-4">Categoria</th>
+                                    <th className="p-4">Categoria/NFe</th>
                                     <th className="p-4 text-right">Valor</th>
                                 </tr>
                             </thead>
@@ -235,9 +269,19 @@ const FinanceView: React.FC = () => {
                                         <td className="p-4 text-slate-500 text-sm whitespace-nowrap">
                                             {new Date(t.date).toLocaleDateString()}
                                         </td>
-                                        <td className="p-4 font-medium text-slate-700">{t.description}</td>
+                                        <td className="p-4 font-medium text-slate-700">
+                                            {t.description}
+                                            {t.installment && (
+                                                <span className="ml-2 text-xs bg-indigo-100 text-indigo-700 px-1.5 rounded">
+                                                    {t.installment.current}/{t.installment.total}
+                                                </span>
+                                            )}
+                                        </td>
                                         <td className="p-4 text-slate-500 text-sm">
-                                            <span className="bg-slate-100 px-2 py-1 rounded text-xs border border-slate-200">{t.category}</span>
+                                            <div className="flex flex-col">
+                                                <span>{t.category}</span>
+                                                {t.nfe && <span className="text-xs text-slate-400">NFe: {t.nfe}</span>}
+                                            </div>
                                         </td>
                                         <td className={`p-4 text-right font-bold ${t.type === 'INCOME' ? 'text-green-600' : 'text-red-600'}`}>
                                             {t.type === 'INCOME' ? '+' : '-'} R$ {t.amount.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
@@ -263,7 +307,7 @@ const FinanceView: React.FC = () => {
                                 <tr>
                                     <th className="p-4">Vencimento</th>
                                     <th className="p-4">Descrição</th>
-                                    <th className="p-4">Categoria</th>
+                                    <th className="p-4">Categoria/NFe</th>
                                     <th className="p-4 text-right">Valor Previsto</th>
                                 </tr>
                             </thead>
@@ -275,9 +319,19 @@ const FinanceView: React.FC = () => {
                                         <td className="p-4 text-slate-500 text-sm whitespace-nowrap font-medium text-yellow-700">
                                             {new Date(t.date).toLocaleDateString()}
                                         </td>
-                                        <td className="p-4 font-medium text-slate-700">{t.description}</td>
+                                        <td className="p-4 font-medium text-slate-700">
+                                            {t.description}
+                                            {t.installment && (
+                                                <span className="ml-2 text-xs bg-indigo-100 text-indigo-700 px-1.5 rounded">
+                                                    {t.installment.current}/{t.installment.total}
+                                                </span>
+                                            )}
+                                        </td>
                                         <td className="p-4 text-slate-500 text-sm">
-                                            <span className="bg-slate-100 px-2 py-1 rounded text-xs border border-slate-200">{t.category}</span>
+                                            <div className="flex flex-col">
+                                                <span>{t.category}</span>
+                                                {t.nfe && <span className="text-xs text-slate-400">NFe: {t.nfe}</span>}
+                                            </div>
                                         </td>
                                         <td className={`p-4 text-right font-bold text-slate-400`}>
                                             R$ {t.amount.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
@@ -294,7 +348,7 @@ const FinanceView: React.FC = () => {
             <div className="space-y-6">
                 <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 sticky top-6">
                     <h3 className="font-bold text-lg mb-4 text-slate-800">Novo Lançamento Manual</h3>
-                    <p className="text-xs text-slate-500 mb-4">Lançamentos gerais do dia-a-dia.</p>
+                    <p className="text-xs text-slate-500 mb-4">Use para lançar despesas de fornecedores, peças, etc.</p>
                     <form onSubmit={handleAddTransaction} className="space-y-4">
                         <div>
                             <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Tipo</label>
@@ -329,18 +383,29 @@ const FinanceView: React.FC = () => {
                                 required value={newTrans.description} 
                                 onChange={e => setNewTrans({...newTrans, description: e.target.value})}
                                 className="w-full border p-2 rounded focus:ring-2 focus:ring-blue-500 outline-none"
+                                placeholder="Ex: Peças do Motor"
                             />
                         </div>
-                        <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-1">Categoria</label>
-                            <input 
-                                required value={newTrans.category} placeholder="Ex: Material Escritório, Café..."
-                                onChange={e => setNewTrans({...newTrans, category: e.target.value})}
-                                className="w-full border p-2 rounded focus:ring-2 focus:ring-blue-500 outline-none"
-                            />
+                        <div className="grid grid-cols-2 gap-2">
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-1">Categoria</label>
+                                <input 
+                                    required value={newTrans.category} placeholder="Ex: Manutenção"
+                                    onChange={e => setNewTrans({...newTrans, category: e.target.value})}
+                                    className="w-full border p-2 rounded focus:ring-2 focus:ring-blue-500 outline-none"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-1">NFe (Opcional)</label>
+                                <input 
+                                    value={newTrans.nfe} placeholder="Núm. Nota"
+                                    onChange={e => setNewTrans({...newTrans, nfe: e.target.value})}
+                                    className="w-full border p-2 rounded focus:ring-2 focus:ring-blue-500 outline-none"
+                                />
+                            </div>
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-1">Valor (R$)</label>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Valor Total (R$)</label>
                             <div className="flex items-center border border-slate-300 rounded-lg overflow-hidden bg-white focus-within:ring-2 focus-within:ring-blue-500">
                                 <span className="bg-slate-100 text-slate-600 px-3 py-2 font-bold border-r border-slate-300">R$</span>
                                 <input 
@@ -355,32 +420,61 @@ const FinanceView: React.FC = () => {
                             </div>
                         </div>
 
-                        {/* Recurring Option */}
-                        <div className="bg-slate-50 p-3 rounded border border-slate-200">
-                            <label className="flex items-center space-x-2 cursor-pointer">
-                                <input 
-                                    type="checkbox" 
-                                    checked={isRecurring} 
-                                    onChange={e => setIsRecurring(e.target.checked)}
-                                    className="rounded text-blue-600" 
-                                />
-                                <span className="text-sm font-bold text-slate-700">Recorrente?</span>
-                            </label>
-                            {isRecurring && (
-                                <div className="mt-2 flex items-center gap-2 animate-fade-in">
-                                    <label className="text-xs text-slate-500">Repetir por:</label>
-                                    <input 
-                                        type="number" min="2" max="60"
-                                        value={recurrenceCount} onChange={e => setRecurrenceCount(parseInt(e.target.value))}
-                                        className="w-16 border p-1 rounded text-center text-sm"
-                                    />
-                                    <span className="text-xs text-slate-500">meses</span>
+                        {/* Payment Configuration */}
+                        <div className="bg-slate-50 p-3 rounded border border-slate-200 space-y-3">
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Forma de Pagamento</label>
+                                <div className="flex gap-2">
+                                    <button 
+                                        type="button" 
+                                        onClick={() => setIsInstallment(false)}
+                                        className={`flex-1 py-1.5 text-xs rounded border ${!isInstallment ? 'bg-white shadow text-slate-800 font-bold border-slate-300' : 'text-slate-500 border-transparent'}`}
+                                    >
+                                        À Vista
+                                    </button>
+                                    <button 
+                                        type="button" 
+                                        onClick={() => setIsInstallment(true)}
+                                        className={`flex-1 py-1.5 text-xs rounded border ${isInstallment ? 'bg-white shadow text-slate-800 font-bold border-slate-300' : 'text-slate-500 border-transparent'}`}
+                                    >
+                                        Parcelado
+                                    </button>
+                                </div>
+                            </div>
+
+                            {isInstallment && (
+                                <div className="grid grid-cols-2 gap-2 animate-fade-in">
+                                    <div>
+                                        <label className="block text-xs font-medium text-slate-700 mb-1">Qtd. Parcelas</label>
+                                        <input 
+                                            type="number" min="2" max="60" required
+                                            value={installmentsCount} 
+                                            onChange={e => setInstallmentsCount(parseInt(e.target.value))}
+                                            className="w-full border p-2 rounded text-sm"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-medium text-slate-700 mb-1">Meio Pagto</label>
+                                        <select 
+                                            className="w-full border p-2 rounded text-sm bg-white"
+                                            value={newTrans.paymentMethod}
+                                            onChange={e => setNewTrans({...newTrans, paymentMethod: e.target.value as any})}
+                                        >
+                                            <option value="BOLETO">Boleto</option>
+                                            <option value="CARTAO_CREDITO">Cartão Crédito</option>
+                                            <option value="PIX">Pix Parcelado</option>
+                                            <option value="OUTROS">Outros</option>
+                                        </select>
+                                    </div>
+                                    <div className="col-span-2 text-xs text-slate-500 text-center bg-white p-2 rounded border border-slate-100">
+                                        Valor por Parcela: <strong>R$ {(newTrans.amount / installmentsCount).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</strong>
+                                    </div>
                                 </div>
                             )}
                         </div>
 
                         <button type="submit" className="w-full bg-slate-800 text-white font-bold py-3 rounded hover:bg-slate-700 transition-colors">
-                            Registrar Agora
+                            Registrar {newTrans.type === 'EXPENSE' ? 'Despesa' : 'Receita'}
                         </button>
                     </form>
                 </div>
