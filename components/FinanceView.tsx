@@ -1,12 +1,39 @@
+
 import React, { useState } from 'react';
 import { useStore } from '../services/store';
+import { UserRole } from '../types';
 
 const FinanceView: React.FC = () => {
-  const { transactions, addTransaction } = useStore();
+  const { transactions, addTransaction, users, addDriverLiability, driverLiabilities } = useStore();
   const [filter, setFilter] = useState<'ALL' | 'INCOME' | 'EXPENSE'>('ALL');
-  const [newTrans, setNewTrans] = useState({ description: '', amount: 0, type: 'INCOME', category: '', status: 'COMPLETED' });
+  const [activeTab, setActiveTab] = useState<'CASHBOOK' | 'LIABILITIES'>('CASHBOOK');
 
-  // Separate transactions into Realized (Completed) and Forecast (Pending)
+  // --- MANUAL TRANSACTION STATE ---
+  const [newTrans, setNewTrans] = useState({ 
+      description: '', 
+      amount: 0, 
+      type: 'INCOME', 
+      category: '', 
+      status: 'COMPLETED',
+      date: new Date().toISOString().split('T')[0] // Allow manual date
+  });
+  const [isRecurring, setIsRecurring] = useState(false);
+  const [recurrenceCount, setRecurrenceCount] = useState(1);
+
+  // --- LIABILITY STATE ---
+  const [liabilityForm, setLiabilityForm] = useState({
+      driverId: '',
+      type: 'AVARIA' as 'AVARIA' | 'MULTA',
+      date: new Date().toISOString().split('T')[0],
+      description: '', // Infraction type or Damage Desc
+      amount: 0,
+      installments: 1,
+      createExpense: true // Default to paying the cost immediately
+  });
+
+  const drivers = users.filter(u => u.role === UserRole.DRIVER);
+
+  // --- FILTERS ---
   const realizedTransactions = transactions
     .filter(t => t.status === 'COMPLETED')
     .filter(t => filter === 'ALL' ? true : t.type === filter)
@@ -15,212 +42,414 @@ const FinanceView: React.FC = () => {
   const pendingTransactions = transactions
     .filter(t => t.status === 'PENDING')
     .filter(t => filter === 'ALL' ? true : t.type === filter)
-    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()); // Sort ascending for future dates
+    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-  const handleAdd = (e: React.FormEvent) => {
+  // --- HANDLERS ---
+
+  const handleAddTransaction = (e: React.FormEvent) => {
     e.preventDefault();
-    addTransaction({
-      ...newTrans,
-      type: newTrans.type as 'INCOME' | 'EXPENSE',
-      status: 'COMPLETED', // Manual entry usually means it happened
-      date: new Date().toISOString()
-    });
-    setNewTrans({ description: '', amount: 0, type: 'INCOME', category: '', status: 'COMPLETED' });
+    
+    // Logic for recurrence
+    const count = isRecurring ? recurrenceCount : 1;
+    
+    for (let i = 0; i < count; i++) {
+        const transDate = new Date(newTrans.date);
+        transDate.setMonth(transDate.getMonth() + i); // Add months
+        
+        // If recurring, future ones are typically PENDING (Scheduled) unless marked otherwise,
+        // but for simplicity, let's keep the user's status choice or force pending for future?
+        // Let's adhere to user choice but if it's recurrence, usually it's "Scheduled".
+        // However, user might be back-filling past recurring expenses.
+        
+        // Let's clone the transaction
+        const payload = {
+            ...newTrans,
+            type: newTrans.type as 'INCOME' | 'EXPENSE',
+            date: transDate.toISOString().split('T')[0], // format YYYY-MM-DD for consistency
+            description: count > 1 ? `${newTrans.description} (${i + 1}/${count})` : newTrans.description,
+            // If it's a future recurring transaction, maybe mark as PENDING? 
+            // For now, trust the user status or default to PENDING for future iterations if desired.
+            status: (isRecurring && i > 0) ? 'PENDING' : newTrans.status as 'COMPLETED' | 'PENDING'
+        };
+        addTransaction(payload);
+    }
+
+    setNewTrans({ description: '', amount: 0, type: 'INCOME', category: '', status: 'COMPLETED', date: new Date().toISOString().split('T')[0] });
+    setIsRecurring(false);
+    setRecurrenceCount(1);
+    alert(`${count} lançamento(s) realizado(s)!`);
   };
 
-  // Special handler for Currency Input (ATM Style)
-  const handleCurrencyChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleLiabilitySubmit = (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!liabilityForm.driverId || liabilityForm.amount <= 0) return;
+
+      addDriverLiability({
+          driverId: liabilityForm.driverId,
+          type: liabilityForm.type,
+          date: liabilityForm.date,
+          description: liabilityForm.description,
+          totalAmount: liabilityForm.amount,
+          installments: liabilityForm.installments
+      }, liabilityForm.createExpense);
+
+      alert('Avaria/Multa lançada com sucesso!');
+      setLiabilityForm({
+          driverId: '', type: 'AVARIA', date: new Date().toISOString().split('T')[0], description: '', amount: 0, installments: 1, createExpense: true
+      });
+  };
+
+  // Currency Helpers
+  const handleCurrencyChange = (e: React.ChangeEvent<HTMLInputElement>, setter: any) => {
     const value = e.target.value;
     const digits = value.replace(/\D/g, "");
     const realValue = Number(digits) / 100;
-    setNewTrans(prev => ({ ...prev, amount: realValue }));
+    setter((prev: any) => ({ ...prev, amount: realValue }));
   };
 
-  const currentBalance = realizedTransactions
-    .reduce((acc, t) => t.type === 'INCOME' ? acc + t.amount : acc - t.amount, 0);
-
-  const projectedIncome = pendingTransactions
-    .filter(t => t.type === 'INCOME')
-    .reduce((acc, t) => acc + t.amount, 0);
+  const currentBalance = realizedTransactions.reduce((acc, t) => t.type === 'INCOME' ? acc + t.amount : acc - t.amount, 0);
+  const projectedIncome = pendingTransactions.filter(t => t.type === 'INCOME').reduce((acc, t) => acc + t.amount, 0);
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-fade-in">
-      {/* Transaction List */}
-      <div className="lg:col-span-2 space-y-6">
-        <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-            <div>
-                <h2 className="text-2xl font-bold text-slate-800">Livro Caixa</h2>
-                <p className="text-slate-500 text-sm">Controle de receitas e despesas</p>
-            </div>
-            <div className="bg-white rounded-lg p-1 border border-slate-200 flex text-sm">
-                {['ALL', 'INCOME', 'EXPENSE'].map((f) => (
-                    <button
-                        key={f}
-                        onClick={() => setFilter(f as any)}
-                        className={`px-3 py-1 rounded ${filter === f ? 'bg-slate-800 text-white' : 'text-slate-600 hover:bg-slate-100'}`}
-                    >
-                        {f === 'ALL' ? 'Todos' : f === 'INCOME' ? 'Receitas' : 'Despesas'}
-                    </button>
-                ))}
-            </div>
+    <div className="space-y-6 animate-fade-in">
+        
+        {/* TABS */}
+        <div className="flex border-b border-slate-300">
+            <button 
+                onClick={() => setActiveTab('CASHBOOK')}
+                className={`px-6 py-3 font-bold text-sm ${activeTab === 'CASHBOOK' ? 'border-b-2 border-slate-800 text-slate-800' : 'text-slate-500 hover:text-slate-700'}`}
+            >
+                📚 Livro Caixa
+            </button>
+            <button 
+                onClick={() => setActiveTab('LIABILITIES')}
+                className={`px-6 py-3 font-bold text-sm ${activeTab === 'LIABILITIES' ? 'border-b-2 border-red-600 text-red-600' : 'text-slate-500 hover:text-slate-700'}`}
+            >
+                💥 Avarias e Multas (Motoristas)
+            </button>
         </div>
 
-        {/* Balance Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
-                <p className="text-slate-500 text-xs font-bold uppercase">Saldo Atual (Realizado)</p>
-                <p className={`text-2xl font-bold mt-1 ${currentBalance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                    R$ {currentBalance.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
-                </p>
-            </div>
-            <div className="bg-blue-50 p-4 rounded-xl shadow-sm border border-blue-100">
-                <p className="text-blue-600 text-xs font-bold uppercase">Previsão de Entradas (Futuro)</p>
-                <p className="text-2xl font-bold text-blue-700 mt-1">
-                    + R$ {projectedIncome.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
-                </p>
-            </div>
-        </div>
-
-        {/* REALIZED TABLE */}
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-            <div className="bg-slate-50 px-4 py-2 border-b border-slate-200">
-                <h3 className="text-sm font-bold text-slate-700 uppercase">Transações Realizadas</h3>
-            </div>
-            <div className="overflow-x-auto">
-                <table className="w-full text-left">
-                    <thead className="text-slate-500 text-xs uppercase border-b border-slate-100">
-                        <tr>
-                            <th className="p-4">Data</th>
-                            <th className="p-4">Descrição</th>
-                            <th className="p-4">Categoria</th>
-                            <th className="p-4 text-right">Valor</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                        {realizedTransactions.length === 0 ? (
-                            <tr><td colSpan={4} className="p-4 text-center text-slate-500 text-sm">Nenhuma transação realizada.</td></tr>
-                        ) : realizedTransactions.map(t => (
-                            <tr key={t.id} className="hover:bg-slate-50">
-                                <td className="p-4 text-slate-500 text-sm whitespace-nowrap">
-                                    {new Date(t.date).toLocaleDateString()}
-                                </td>
-                                <td className="p-4 font-medium text-slate-700">{t.description}</td>
-                                <td className="p-4 text-slate-500 text-sm">
-                                    <span className="bg-slate-100 px-2 py-1 rounded text-xs border border-slate-200">{t.category}</span>
-                                </td>
-                                <td className={`p-4 text-right font-bold ${t.type === 'INCOME' ? 'text-green-600' : 'text-red-600'}`}>
-                                    {t.type === 'INCOME' ? '+' : '-'} R$ {t.amount.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
-                                </td>
-                            </tr>
+        {activeTab === 'CASHBOOK' && (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Transaction List */}
+            <div className="lg:col-span-2 space-y-6">
+                <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+                    <div>
+                        <h2 className="text-2xl font-bold text-slate-800">Fluxo Financeiro</h2>
+                        <p className="text-slate-500 text-sm">Controle de receitas e despesas</p>
+                    </div>
+                    <div className="bg-white rounded-lg p-1 border border-slate-200 flex text-sm">
+                        {['ALL', 'INCOME', 'EXPENSE'].map((f) => (
+                            <button
+                                key={f}
+                                onClick={() => setFilter(f as any)}
+                                className={`px-3 py-1 rounded ${filter === f ? 'bg-slate-800 text-white' : 'text-slate-600 hover:bg-slate-100'}`}
+                            >
+                                {f === 'ALL' ? 'Todos' : f === 'INCOME' ? 'Receitas' : 'Despesas'}
+                            </button>
                         ))}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-
-        {/* PENDING TABLE */}
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-            <div className="bg-yellow-50 px-4 py-2 border-b border-yellow-100">
-                <h3 className="text-sm font-bold text-yellow-800 uppercase flex items-center gap-2">
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                    Lançamentos Futuros (Agendados)
-                </h3>
-            </div>
-            <div className="overflow-x-auto">
-                <table className="w-full text-left">
-                    <thead className="text-slate-500 text-xs uppercase border-b border-slate-100">
-                        <tr>
-                            <th className="p-4">Vencimento</th>
-                            <th className="p-4">Descrição</th>
-                            <th className="p-4">Categoria</th>
-                            <th className="p-4 text-right">Valor Previsto</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                        {pendingTransactions.length === 0 ? (
-                            <tr><td colSpan={4} className="p-4 text-center text-slate-500 text-sm">Nenhum lançamento futuro.</td></tr>
-                        ) : pendingTransactions.map(t => (
-                            <tr key={t.id} className="hover:bg-slate-50">
-                                <td className="p-4 text-slate-500 text-sm whitespace-nowrap font-medium text-yellow-700">
-                                    {new Date(t.date).toLocaleDateString()}
-                                </td>
-                                <td className="p-4 font-medium text-slate-700">{t.description}</td>
-                                <td className="p-4 text-slate-500 text-sm">
-                                    <span className="bg-slate-100 px-2 py-1 rounded text-xs border border-slate-200">{t.category}</span>
-                                </td>
-                                <td className={`p-4 text-right font-bold text-slate-400`}>
-                                    R$ {t.amount.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-      </div>
-
-      {/* Add Transaction */}
-      <div className="space-y-6">
-          <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 sticky top-6">
-            <h3 className="font-bold text-lg mb-4 text-slate-800">Novo Lançamento Manual</h3>
-            <p className="text-xs text-slate-500 mb-4">Para lançamentos vinculados a locações, utilize a tela de Locações.</p>
-            <form onSubmit={handleAdd} className="space-y-4">
-                <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Tipo</label>
-                    <div className="flex gap-2">
-                        <button 
-                            type="button"
-                            onClick={() => setNewTrans({...newTrans, type: 'INCOME'})}
-                            className={`flex-1 py-2 rounded border ${newTrans.type === 'INCOME' ? 'bg-green-100 border-green-500 text-green-700 font-bold' : 'border-slate-200 text-slate-500'}`}
-                        >
-                            Receita
-                        </button>
-                        <button 
-                            type="button"
-                            onClick={() => setNewTrans({...newTrans, type: 'EXPENSE'})}
-                            className={`flex-1 py-2 rounded border ${newTrans.type === 'EXPENSE' ? 'bg-red-100 border-red-500 text-red-700 font-bold' : 'border-slate-200 text-slate-500'}`}
-                        >
-                            Despesa
-                        </button>
                     </div>
                 </div>
-                <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Descrição</label>
-                    <input 
-                        required value={newTrans.description} 
-                        onChange={e => setNewTrans({...newTrans, description: e.target.value})}
-                        className="w-full border p-2 rounded focus:ring-2 focus:ring-blue-500 outline-none"
-                    />
-                </div>
-                <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Categoria</label>
-                    <input 
-                        required value={newTrans.category} placeholder="Ex: Combustível, Aluguel..."
-                        onChange={e => setNewTrans({...newTrans, category: e.target.value})}
-                        className="w-full border p-2 rounded focus:ring-2 focus:ring-blue-500 outline-none"
-                    />
-                </div>
-                <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Valor (R$)</label>
-                    <div className="flex items-center border border-slate-300 rounded-lg overflow-hidden bg-white focus-within:ring-2 focus-within:ring-blue-500">
-                        <span className="bg-slate-100 text-slate-600 px-3 py-2 font-bold border-r border-slate-300">R$</span>
-                        <input 
-                            type="text" 
-                            inputMode="numeric"
-                            required 
-                            value={newTrans.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} 
-                            onChange={handleCurrencyChange}
-                            className="w-full p-2 outline-none text-right font-bold text-slate-800"
-                            placeholder="0,00"
-                        />
+
+                {/* Balance Cards */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+                        <p className="text-slate-500 text-xs font-bold uppercase">Saldo Atual (Realizado)</p>
+                        <p className={`text-2xl font-bold mt-1 ${currentBalance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                            R$ {currentBalance.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
+                        </p>
+                    </div>
+                    <div className="bg-blue-50 p-4 rounded-xl shadow-sm border border-blue-100">
+                        <p className="text-blue-600 text-xs font-bold uppercase">Previsão de Entradas (Futuro)</p>
+                        <p className="text-2xl font-bold text-blue-700 mt-1">
+                            + R$ {projectedIncome.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
+                        </p>
                     </div>
                 </div>
-                <button type="submit" className="w-full bg-slate-800 text-white font-bold py-3 rounded hover:bg-slate-700 transition-colors">
-                    Registrar Agora
-                </button>
-            </form>
-          </div>
-      </div>
+
+                {/* REALIZED TABLE */}
+                <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                    <div className="bg-slate-50 px-4 py-2 border-b border-slate-200">
+                        <h3 className="text-sm font-bold text-slate-700 uppercase">Transações Realizadas</h3>
+                    </div>
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-left">
+                            <thead className="text-slate-500 text-xs uppercase border-b border-slate-100">
+                                <tr>
+                                    <th className="p-4">Data</th>
+                                    <th className="p-4">Descrição</th>
+                                    <th className="p-4">Categoria</th>
+                                    <th className="p-4 text-right">Valor</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                                {realizedTransactions.length === 0 ? (
+                                    <tr><td colSpan={4} className="p-4 text-center text-slate-500 text-sm">Nenhuma transação realizada.</td></tr>
+                                ) : realizedTransactions.map(t => (
+                                    <tr key={t.id} className="hover:bg-slate-50">
+                                        <td className="p-4 text-slate-500 text-sm whitespace-nowrap">
+                                            {new Date(t.date).toLocaleDateString()}
+                                        </td>
+                                        <td className="p-4 font-medium text-slate-700">{t.description}</td>
+                                        <td className="p-4 text-slate-500 text-sm">
+                                            <span className="bg-slate-100 px-2 py-1 rounded text-xs border border-slate-200">{t.category}</span>
+                                        </td>
+                                        <td className={`p-4 text-right font-bold ${t.type === 'INCOME' ? 'text-green-600' : 'text-red-600'}`}>
+                                            {t.type === 'INCOME' ? '+' : '-'} R$ {t.amount.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                {/* PENDING TABLE */}
+                <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                    <div className="bg-yellow-50 px-4 py-2 border-b border-yellow-100">
+                        <h3 className="text-sm font-bold text-yellow-800 uppercase flex items-center gap-2">
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                            Lançamentos Futuros (Agendados)
+                        </h3>
+                    </div>
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-left">
+                            <thead className="text-slate-500 text-xs uppercase border-b border-slate-100">
+                                <tr>
+                                    <th className="p-4">Vencimento</th>
+                                    <th className="p-4">Descrição</th>
+                                    <th className="p-4">Categoria</th>
+                                    <th className="p-4 text-right">Valor Previsto</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                                {pendingTransactions.length === 0 ? (
+                                    <tr><td colSpan={4} className="p-4 text-center text-slate-500 text-sm">Nenhum lançamento futuro.</td></tr>
+                                ) : pendingTransactions.map(t => (
+                                    <tr key={t.id} className="hover:bg-slate-50">
+                                        <td className="p-4 text-slate-500 text-sm whitespace-nowrap font-medium text-yellow-700">
+                                            {new Date(t.date).toLocaleDateString()}
+                                        </td>
+                                        <td className="p-4 font-medium text-slate-700">{t.description}</td>
+                                        <td className="p-4 text-slate-500 text-sm">
+                                            <span className="bg-slate-100 px-2 py-1 rounded text-xs border border-slate-200">{t.category}</span>
+                                        </td>
+                                        <td className={`p-4 text-right font-bold text-slate-400`}>
+                                            R$ {t.amount.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            {/* Add Transaction */}
+            <div className="space-y-6">
+                <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 sticky top-6">
+                    <h3 className="font-bold text-lg mb-4 text-slate-800">Novo Lançamento Manual</h3>
+                    <p className="text-xs text-slate-500 mb-4">Lançamentos gerais do dia-a-dia.</p>
+                    <form onSubmit={handleAddTransaction} className="space-y-4">
+                        <div>
+                            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Tipo</label>
+                            <div className="flex gap-2">
+                                <button 
+                                    type="button"
+                                    onClick={() => setNewTrans({...newTrans, type: 'INCOME'})}
+                                    className={`flex-1 py-2 rounded border ${newTrans.type === 'INCOME' ? 'bg-green-100 border-green-500 text-green-700 font-bold' : 'border-slate-200 text-slate-500'}`}
+                                >
+                                    Receita
+                                </button>
+                                <button 
+                                    type="button"
+                                    onClick={() => setNewTrans({...newTrans, type: 'EXPENSE'})}
+                                    className={`flex-1 py-2 rounded border ${newTrans.type === 'EXPENSE' ? 'bg-red-100 border-red-500 text-red-700 font-bold' : 'border-slate-200 text-slate-500'}`}
+                                >
+                                    Despesa
+                                </button>
+                            </div>
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Data</label>
+                            <input 
+                                type="date" required 
+                                value={newTrans.date} onChange={e => setNewTrans({...newTrans, date: e.target.value})}
+                                className="w-full border p-2 rounded focus:ring-2 focus:ring-blue-500 outline-none"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Descrição</label>
+                            <input 
+                                required value={newTrans.description} 
+                                onChange={e => setNewTrans({...newTrans, description: e.target.value})}
+                                className="w-full border p-2 rounded focus:ring-2 focus:ring-blue-500 outline-none"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Categoria</label>
+                            <input 
+                                required value={newTrans.category} placeholder="Ex: Material Escritório, Café..."
+                                onChange={e => setNewTrans({...newTrans, category: e.target.value})}
+                                className="w-full border p-2 rounded focus:ring-2 focus:ring-blue-500 outline-none"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Valor (R$)</label>
+                            <div className="flex items-center border border-slate-300 rounded-lg overflow-hidden bg-white focus-within:ring-2 focus-within:ring-blue-500">
+                                <span className="bg-slate-100 text-slate-600 px-3 py-2 font-bold border-r border-slate-300">R$</span>
+                                <input 
+                                    type="text" 
+                                    inputMode="numeric"
+                                    required 
+                                    value={newTrans.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} 
+                                    onChange={e => handleCurrencyChange(e, setNewTrans)}
+                                    className="w-full p-2 outline-none text-right font-bold text-slate-800"
+                                    placeholder="0,00"
+                                />
+                            </div>
+                        </div>
+
+                        {/* Recurring Option */}
+                        <div className="bg-slate-50 p-3 rounded border border-slate-200">
+                            <label className="flex items-center space-x-2 cursor-pointer">
+                                <input 
+                                    type="checkbox" 
+                                    checked={isRecurring} 
+                                    onChange={e => setIsRecurring(e.target.checked)}
+                                    className="rounded text-blue-600" 
+                                />
+                                <span className="text-sm font-bold text-slate-700">Despesa Recorrente?</span>
+                            </label>
+                            {isRecurring && (
+                                <div className="mt-2 flex items-center gap-2 animate-fade-in">
+                                    <label className="text-xs text-slate-500">Repetir por:</label>
+                                    <input 
+                                        type="number" min="2" max="60"
+                                        value={recurrenceCount} onChange={e => setRecurrenceCount(parseInt(e.target.value))}
+                                        className="w-16 border p-1 rounded text-center text-sm"
+                                    />
+                                    <span className="text-xs text-slate-500">meses</span>
+                                </div>
+                            )}
+                        </div>
+
+                        <button type="submit" className="w-full bg-slate-800 text-white font-bold py-3 rounded hover:bg-slate-700 transition-colors">
+                            Registrar Agora
+                        </button>
+                    </form>
+                </div>
+            </div>
+            </div>
+        )}
+
+        {activeTab === 'LIABILITIES' && (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="bg-white p-6 rounded-xl shadow-sm border border-red-200 h-fit">
+                    <h3 className="font-bold text-lg mb-4 text-red-800 flex items-center gap-2">
+                        <span className="bg-red-100 p-1.5 rounded">⚠️</span>
+                        Lançar Avaria ou Multa
+                    </h3>
+                    <form onSubmit={handleLiabilitySubmit} className="space-y-4">
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Motorista</label>
+                            <select 
+                                required value={liabilityForm.driverId} 
+                                onChange={e => setLiabilityForm({...liabilityForm, driverId: e.target.value})}
+                                className="w-full border p-2 rounded bg-slate-50"
+                            >
+                                <option value="">Selecione...</option>
+                                {drivers.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                            </select>
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Tipo</label>
+                            <div className="flex gap-2">
+                                <button type="button" onClick={() => setLiabilityForm({...liabilityForm, type: 'AVARIA'})} className={`flex-1 py-2 rounded text-sm font-bold border ${liabilityForm.type === 'AVARIA' ? 'bg-orange-100 text-orange-700 border-orange-300' : 'border-slate-200 text-slate-500'}`}>Avaria (Dano)</button>
+                                <button type="button" onClick={() => setLiabilityForm({...liabilityForm, type: 'MULTA'})} className={`flex-1 py-2 rounded text-sm font-bold border ${liabilityForm.type === 'MULTA' ? 'bg-red-100 text-red-700 border-red-300' : 'border-slate-200 text-slate-500'}`}>Multa Trânsito</button>
+                            </div>
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Data do Ocorrido</label>
+                            <input type="date" required value={liabilityForm.date} onChange={e => setLiabilityForm({...liabilityForm, date: e.target.value})} className="w-full border p-2 rounded" />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">{liabilityForm.type === 'AVARIA' ? 'Descrição do Dano' : 'Tipo da Infração'}</label>
+                            <input required value={liabilityForm.description} onChange={e => setLiabilityForm({...liabilityForm, description: e.target.value})} className="w-full border p-2 rounded" placeholder={liabilityForm.type === 'AVARIA' ? 'Ex: Farol quebrado' : 'Ex: Excesso Velocidade'} />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Valor Total (R$)</label>
+                            <div className="flex items-center border border-slate-300 rounded-lg overflow-hidden bg-white">
+                                <span className="bg-slate-100 text-slate-600 px-3 py-2 font-bold border-r border-slate-300">R$</span>
+                                <input type="text" inputMode="numeric" required value={liabilityForm.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} onChange={e => handleCurrencyChange(e, setLiabilityForm)} className="w-full p-2 outline-none text-right font-bold text-red-700" />
+                            </div>
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Parcelar Cobrança em:</label>
+                            <input type="number" min="1" max="24" value={liabilityForm.installments} onChange={e => setLiabilityForm({...liabilityForm, installments: parseInt(e.target.value)})} className="w-full border p-2 rounded" />
+                        </div>
+                        
+                        <div className="bg-slate-50 p-3 rounded border border-slate-200">
+                            <label className="flex items-center space-x-2 cursor-pointer">
+                                <input 
+                                    type="checkbox" 
+                                    checked={liabilityForm.createExpense} 
+                                    onChange={e => setLiabilityForm({...liabilityForm, createExpense: e.target.checked})}
+                                    className="rounded text-red-600" 
+                                />
+                                <span className="text-xs font-bold text-slate-700">Lançar saída no Caixa da Empresa agora?</span>
+                            </label>
+                            <p className="text-[10px] text-slate-500 mt-1 pl-5">Marque se a empresa já pagou pelo conserto/multa.</p>
+                        </div>
+
+                        <button type="submit" className="w-full bg-red-700 text-white font-bold py-3 rounded hover:bg-red-800">
+                            Registrar Cobrança
+                        </button>
+                    </form>
+                </div>
+
+                <div className="lg:col-span-2">
+                    <h3 className="font-bold text-slate-700 mb-4">Histórico de Cobranças aos Motoristas</h3>
+                    <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                        <table className="w-full text-left">
+                            <thead className="bg-slate-50 text-slate-600 text-xs uppercase font-bold border-b border-slate-200">
+                                <tr>
+                                    <th className="p-3">Data</th>
+                                    <th className="p-3">Motorista</th>
+                                    <th className="p-3">Descrição</th>
+                                    <th className="p-3">Tipo</th>
+                                    <th className="p-3 text-right">Valor</th>
+                                    <th className="p-3 text-center">Parc.</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                                {driverLiabilities.length === 0 ? (
+                                    <tr><td colSpan={6} className="p-8 text-center text-slate-500">Nenhuma avaria ou multa registrada.</td></tr>
+                                ) : (
+                                    driverLiabilities.map(l => {
+                                        const drv = drivers.find(d => d.id === l.driverId);
+                                        return (
+                                            <tr key={l.id} className="hover:bg-slate-50">
+                                                <td className="p-3 text-sm text-slate-600">{new Date(l.date).toLocaleDateString()}</td>
+                                                <td className="p-3 font-bold text-slate-800">{drv?.name}</td>
+                                                <td className="p-3 text-sm text-slate-700">{l.description}</td>
+                                                <td className="p-3">
+                                                    <span className={`text-xs px-2 py-1 rounded font-bold ${l.type === 'AVARIA' ? 'bg-orange-100 text-orange-700' : 'bg-red-100 text-red-700'}`}>
+                                                        {l.type}
+                                                    </span>
+                                                </td>
+                                                <td className="p-3 text-right font-bold text-red-600">R$ {l.totalAmount.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
+                                                <td className="p-3 text-center text-sm">{l.installments}x</td>
+                                            </tr>
+                                        );
+                                    })
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        )}
     </div>
   );
 };

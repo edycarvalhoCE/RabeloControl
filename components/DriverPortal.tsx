@@ -5,10 +5,10 @@ import CalendarView from './CalendarView';
 import { Booking } from '../types';
 
 const DriverPortal: React.FC = () => {
-  const { currentUser, bookings, timeOffs, addTimeOff, documents, buses, addMaintenanceReport, maintenanceReports, addFuelRecord } = useStore();
+  const { currentUser, bookings, timeOffs, addTimeOff, documents, buses, addMaintenanceReport, maintenanceReports, addFuelRecord, driverLiabilities } = useStore();
   const [requestDate, setRequestDate] = useState('');
   const [requestType, setRequestType] = useState<'FOLGA' | 'FERIAS'>('FOLGA');
-  const [activeTab, setActiveTab] = useState<'schedule' | 'documents' | 'requests' | 'report' | 'fuel'>('schedule');
+  const [activeTab, setActiveTab] = useState<'schedule' | 'documents' | 'requests' | 'report' | 'fuel' | 'finance'>('schedule');
 
   // Trip Details Modal State
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
@@ -35,6 +35,7 @@ const DriverPortal: React.FC = () => {
   const myTimeOffs = timeOffs.filter(t => t.driverId === currentUser.id);
   const myDocuments = documents.filter(d => d.driverId === currentUser.id);
   const myReports = maintenanceReports.filter(r => r.driverId === currentUser.id).sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  const myLiabilities = driverLiabilities.filter(l => l.driverId === currentUser.id).sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
   const handleRequest = (e: React.FormEvent) => {
     e.preventDefault();
@@ -148,6 +149,12 @@ const DriverPortal: React.FC = () => {
             className={`pb-2 px-1 font-medium text-sm transition-colors whitespace-nowrap ${activeTab === 'fuel' ? 'border-b-2 border-green-600 text-green-600' : 'text-slate-500 hover:text-slate-700'}`}
         >
             ⛽ Abastecer
+        </button>
+        <button 
+            onClick={() => setActiveTab('finance')}
+            className={`pb-2 px-1 font-medium text-sm transition-colors whitespace-nowrap ${activeTab === 'finance' ? 'border-b-2 border-red-600 text-red-600' : 'text-slate-500 hover:text-slate-700'}`}
+        >
+            💸 Descontos / Avarias
         </button>
         <button 
             onClick={() => setActiveTab('documents')}
@@ -318,6 +325,48 @@ const DriverPortal: React.FC = () => {
                         Confirmar Abastecimento
                     </button>
                 </form>
+            </div>
+        )}
+
+        {/* FINANCE / LIABILITIES TAB */}
+        {activeTab === 'finance' && (
+            <div className="space-y-4">
+                <h2 className="text-2xl font-bold text-slate-800">Meus Débitos (Avarias e Multas)</h2>
+                {myLiabilities.length === 0 ? (
+                    <div className="p-10 bg-white rounded-xl border-2 border-dashed border-slate-200 text-center text-slate-500">
+                        <p>Nenhuma pendência registrada em seu nome. Parabéns!</p>
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {myLiabilities.map(liability => (
+                            <div key={liability.id} className="bg-white p-5 rounded-xl shadow-sm border border-red-100 flex flex-col justify-between">
+                                <div>
+                                    <div className="flex justify-between items-start mb-2">
+                                        <span className={`text-xs font-bold px-2 py-1 rounded ${liability.type === 'AVARIA' ? 'bg-orange-100 text-orange-700' : 'bg-red-100 text-red-700'}`}>
+                                            {liability.type}
+                                        </span>
+                                        <span className="text-sm text-slate-500">{new Date(liability.date).toLocaleDateString()}</span>
+                                    </div>
+                                    <h4 className="font-bold text-slate-800 mb-1">{liability.description}</h4>
+                                    <p className="text-2xl font-bold text-red-600 mb-2">
+                                        R$ {liability.totalAmount.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
+                                    </p>
+                                </div>
+                                <div className="bg-slate-50 p-3 rounded border border-slate-200 mt-2">
+                                    <p className="text-xs text-slate-500 font-bold uppercase mb-1">Plano de Pagamento</p>
+                                    <div className="flex justify-between items-center text-sm">
+                                        <span>Desconto em Folha:</span>
+                                        <span className="font-bold">{liability.installments}x</span>
+                                    </div>
+                                    <div className="flex justify-between items-center text-sm mt-1">
+                                        <span>Valor Parcela:</span>
+                                        <span className="font-bold">R$ {(liability.totalAmount / liability.installments).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
             </div>
         )}
 

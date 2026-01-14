@@ -203,3 +203,14 @@ export interface FuelSupply {
   registeredInFinance: boolean;
   type: 'DIESEL'; 
 }
+
+export interface DriverLiability {
+  id: string;
+  driverId: string;
+  type: 'AVARIA' | 'MULTA';
+  date: string; // Date of incident
+  description: string; // Or infraction type
+  totalAmount: number;
+  installments: number; // How many times to pay
+  status: 'OPEN' | 'PAID';
+}
