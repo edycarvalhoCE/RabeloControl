@@ -188,10 +188,10 @@ export interface FuelRecord {
   dieselLiters: number;
   arlaLiters: number;
   hasArla: boolean;
-  location: 'GARAGE' | 'STREET';
+  location: 'GARAGE' | 'STREET'; // New field
+  cost?: number; // New field (Street only)
+  stationName?: string; // New field (Street only)
   loggedBy: string; // User ID
-  cost?: number; // If street
-  stationName?: string; // If street
 }
 
 export interface FuelSupply {
@@ -200,6 +200,6 @@ export interface FuelSupply {
   liters: number;
   cost: number;
   receiverName: string;
-  supplier?: string;
-  registeredInFinance: boolean; // If true, created a Transaction
+  registeredInFinance: boolean;
+  type: 'DIESEL'; 
 }

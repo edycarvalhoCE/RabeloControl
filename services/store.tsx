@@ -32,7 +32,7 @@ interface StoreContextType {
   clients: Client[];
   fuelRecords: FuelRecord[];
   fuelSupplies: FuelSupply[];
-  fuelStockLevel: number; // Calculated on fly
+  fuelStockLevel: number;
   
   // Actions
   login: (email: string, password: string) => Promise<{success: boolean, message?: string}>;
