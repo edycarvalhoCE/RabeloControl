@@ -13,6 +13,7 @@ export interface User {
   email: string;
   role: UserRole | string; // Allow string for legacy data compatibility
   avatar: string;
+  status?: 'APPROVED' | 'PENDING' | 'REJECTED'; // New field for access control
 }
 
 export interface Bus {

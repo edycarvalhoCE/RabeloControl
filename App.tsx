@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { StoreProvider } from './services/store';
 import Sidebar from './components/Sidebar';
@@ -18,7 +19,7 @@ import LoginView from './components/LoginView';
 import { useStore } from './services/store';
 
 const MainContent = () => {
-  const { currentUser, isAuthenticated } = useStore();
+  const { currentUser, isAuthenticated, logout } = useStore();
   
   // Default view logic
   const getDefaultView = () => {
@@ -49,6 +50,34 @@ const MainContent = () => {
               <div className="text-center">
                   <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
                   <p className="text-slate-400 font-medium">Carregando perfil...</p>
+              </div>
+          </div>
+      );
+  }
+
+  // PENDING APPROVAL SCREEN
+  if (currentUser.status === 'PENDING') {
+      return (
+          <div className="min-h-screen flex items-center justify-center bg-slate-900 p-4">
+              <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-8 text-center">
+                  <div className="bg-yellow-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 text-yellow-600">
+                      <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                  </div>
+                  <h2 className="text-2xl font-bold text-slate-800 mb-2">Acesso Pendente</h2>
+                  <p className="text-slate-600 mb-6">
+                      Seu cadastro foi realizado com sucesso, mas o acesso ao sistema precisa ser aprovado por um <strong>Gerente</strong> ou <strong>Administrador</strong>.
+                  </p>
+                  <div className="bg-slate-50 p-4 rounded-lg text-sm text-slate-500 mb-6">
+                      <p>Nome: {currentUser.name}</p>
+                      <p>Email: {currentUser.email}</p>
+                      <p>Função Solicitada: {currentUser.role}</p>
+                  </div>
+                  <button 
+                    onClick={logout}
+                    className="bg-slate-800 text-white px-6 py-2 rounded-lg font-bold hover:bg-slate-700 transition-colors w-full"
+                  >
+                      Sair e Tentar Mais Tarde
+                  </button>
               </div>
           </div>
       );

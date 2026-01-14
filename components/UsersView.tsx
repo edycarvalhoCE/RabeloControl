@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useStore } from '../services/store';
 import { UserRole, User } from '../types';
@@ -10,9 +11,15 @@ const UsersView: React.FC = () => {
   // Form State
   const [formData, setFormData] = useState({ name: '', email: '', role: UserRole.DRIVER as UserRole });
 
+  const isManager = currentUser.role === UserRole.DEVELOPER || currentUser.role === UserRole.MANAGER;
+
+  // Filter pending users (only visible to managers)
+  const pendingUsers = users.filter(u => u.status === 'PENDING');
+  const activeUsers = users.filter(u => u.status !== 'PENDING');
+
   const handleEdit = (user: User) => {
       setEditingUser(user);
-      setFormData({ name: user.name, email: user.email, role: user.role });
+      setFormData({ name: user.name, email: user.email, role: user.role as UserRole });
       setShowForm(true);
   };
 
@@ -22,6 +29,18 @@ const UsersView: React.FC = () => {
           return;
       }
       if (window.confirm(`Tem certeza que deseja excluir o usuário ${user.name}?`)) {
+          await deleteUser(user.id);
+      }
+  };
+
+  const handleApprove = async (user: User) => {
+      if (window.confirm(`Confirma a aprovação do acesso para ${user.name}?`)) {
+          await updateUser(user.id, { status: 'APPROVED' });
+      }
+  };
+
+  const handleReject = async (user: User) => {
+      if (window.confirm(`Deseja recusar e excluir o cadastro de ${user.name}?`)) {
           await deleteUser(user.id);
       }
   };
@@ -61,6 +80,46 @@ const UsersView: React.FC = () => {
           {showForm ? 'Cancelar' : '+ Novo Usuário'}
         </button>
       </div>
+
+      {/* PENDING APPROVAL SECTION */}
+      {isManager && pendingUsers.length > 0 && (
+          <div className="bg-orange-50 border border-orange-200 rounded-xl p-6 shadow-sm mb-6">
+              <h3 className="text-lg font-bold text-orange-800 mb-4 flex items-center gap-2">
+                  <span className="bg-orange-200 text-orange-800 p-1 rounded text-xs">⚠️</span>
+                  Solicitações de Acesso Pendentes ({pendingUsers.length})
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {pendingUsers.map(user => (
+                      <div key={user.id} className="bg-white p-4 rounded-lg shadow-sm border border-orange-100 flex flex-col gap-3">
+                          <div className="flex items-center gap-3">
+                               <img src={user.avatar} alt={user.name} className="w-10 h-10 rounded-full bg-slate-100" />
+                               <div>
+                                   <p className="font-bold text-slate-800 text-sm">{user.name}</p>
+                                   <p className="text-xs text-slate-500">{user.email}</p>
+                                   <span className="text-[10px] bg-slate-100 px-2 py-0.5 rounded border border-slate-200 uppercase font-bold text-slate-600 mt-1 inline-block">
+                                       {user.role}
+                                   </span>
+                               </div>
+                          </div>
+                          <div className="flex gap-2 mt-1">
+                              <button 
+                                onClick={() => handleApprove(user)}
+                                className="flex-1 bg-green-600 hover:bg-green-700 text-white text-xs font-bold py-2 rounded transition-colors"
+                              >
+                                  Aprovar
+                              </button>
+                              <button 
+                                onClick={() => handleReject(user)}
+                                className="flex-1 bg-red-100 hover:bg-red-200 text-red-700 text-xs font-bold py-2 rounded transition-colors"
+                              >
+                                  Recusar
+                              </button>
+                          </div>
+                      </div>
+                  ))}
+              </div>
+          </div>
+      )}
 
       {showForm && (
           <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 max-w-2xl">
@@ -118,7 +177,7 @@ const UsersView: React.FC = () => {
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {users.map(user => (
+          {activeUsers.map(user => (
               <div key={user.id} className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex justify-between items-center group">
                   <div className="flex items-center space-x-4">
                       <img src={user.avatar} alt={user.name} className="w-12 h-12 rounded-full border border-slate-200" />

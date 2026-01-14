@@ -166,19 +166,27 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       if (auth.currentUser && users.length > 0) {
           const dbUser = users.find(u => u.email === auth.currentUser?.email);
           if (dbUser) {
-              if (dbUser.email === 'pixelcriativo2026@gmail.com' && dbUser.role !== UserRole.DEVELOPER) {
-                  updateDoc(doc(db, 'users', dbUser.id), { role: UserRole.DEVELOPER });
-                  setCurrentUser({ ...dbUser, role: UserRole.DEVELOPER });
+              // Ensure legacy users have APPROVED status by default if missing
+              const safeUser = {
+                  ...dbUser,
+                  status: dbUser.status || 'APPROVED'
+              };
+
+              if (safeUser.email === 'pixelcriativo2026@gmail.com' && safeUser.role !== UserRole.DEVELOPER) {
+                  updateDoc(doc(db, 'users', safeUser.id), { role: UserRole.DEVELOPER, status: 'APPROVED' });
+                  setCurrentUser({ ...safeUser, role: UserRole.DEVELOPER, status: 'APPROVED' });
               } else {
-                  setCurrentUser(dbUser);
+                  setCurrentUser(safeUser);
               }
           } else {
+              // Fallback for new creation latency
               setCurrentUser({
                   id: auth.currentUser.uid,
                   name: auth.currentUser.displayName || 'Usuário',
                   email: auth.currentUser.email || '',
                   role: UserRole.DRIVER, 
-                  avatar: auth.currentUser.photoURL || `https://ui-avatars.com/api/?name=${auth.currentUser.email}&background=random`
+                  avatar: auth.currentUser.photoURL || `https://ui-avatars.com/api/?name=${auth.currentUser.email}&background=random`,
+                  status: 'PENDING'
               });
           }
       }
@@ -200,12 +208,15 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       try {
           const res = await createUserWithEmailAndPassword(auth, email, password);
           await updateProfile(res.user, { displayName: name });
+          
+          // New users are PENDING by default
           await setDoc(doc(db, 'users', res.user.uid), {
               id: res.user.uid,
               name,
               email,
               role,
-              avatar: `https://ui-avatars.com/api/?name=${name}&background=random`
+              avatar: `https://ui-avatars.com/api/?name=${name}&background=random`,
+              status: 'PENDING' 
           });
           return { success: true };
       } catch (error: any) {
@@ -217,7 +228,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   const switchUser = (userId: string) => { const user = users.find(u => u.id === userId); if (user) setCurrentUser(user); };
 
   // Data Actions
-  const addUser = async (userData: Omit<User, 'id' | 'avatar'>) => { if (!isConfigured) return; await addDoc(collection(db, 'users'), { ...userData, avatar: `https://ui-avatars.com/api/?name=${userData.name}&background=random` }); };
+  const addUser = async (userData: Omit<User, 'id' | 'avatar'>) => { if (!isConfigured) return; await addDoc(collection(db, 'users'), { ...userData, status: 'APPROVED', avatar: `https://ui-avatars.com/api/?name=${userData.name}&background=random` }); };
   const updateUser = async (id: string, data: Partial<User>) => { if (!isConfigured) return; await updateDoc(doc(db, 'users', id), data); };
   const deleteUser = async (id: string) => { if (!isConfigured) return; await deleteDoc(doc(db, 'users', id)); };
 
