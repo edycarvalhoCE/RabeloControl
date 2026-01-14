@@ -357,14 +357,41 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   const updateBusStatus = async (id: string, status: Bus['status']) => { if (isConfigured) await updateDoc(doc(db, 'buses', id), { status }); };
   const addCharterContract = async (contract: Omit<CharterContract, 'id' | 'status'>) => { if (!isConfigured) return; await addDoc(collection(db, 'charterContracts'), { ...contract, status: 'ACTIVE' }); }; // Simplified for space
   const addTravelPackage = async (pkg: Omit<TravelPackage, 'id' | 'status'>) => { if (isConfigured) await addDoc(collection(db, 'travelPackages'), { ...pkg, status: 'OPEN' }); };
+  
   const registerPackageSale = async (clientData: any, saleData: any) => { 
       if (!isConfigured) return; 
       let clientId = '';
+      
+      // If agency, we might skip creating a "Client" record in future, but for now we create/find one to act as the contact
+      // Or we can treat the Agency as a client.
+      
       const existingClient = clients.find(c => c.cpf === clientData.cpf);
-      if (existingClient) { clientId = existingClient.id; await updateDoc(doc(db, 'clients', clientId), { ...clientData }); } 
-      else { const ref = await addDoc(collection(db, 'clients'), clientData); clientId = ref.id; }
-      await addDoc(collection(db, 'packagePassengers'), { ...saleData, clientId, titularName: clientData.name, titularCpf: clientData.cpf, paidAmount: 0, status: 'PENDING' });
+      if (existingClient) { 
+          clientId = existingClient.id; 
+          await updateDoc(doc(db, 'clients', clientId), { ...clientData }); 
+      } else { 
+          const ref = await addDoc(collection(db, 'clients'), clientData); 
+          clientId = ref.id; 
+      }
+
+      // Calculate Commission
+      // Default to 1% if Direct, 12% if Agency
+      let commissionRate = saleData.saleType === 'AGENCY' ? 0.12 : 0.01;
+      let commissionValue = (saleData.agreedPrice || 0) * commissionRate;
+
+      await addDoc(collection(db, 'packagePassengers'), { 
+          ...saleData, 
+          clientId, 
+          titularName: clientData.name, 
+          titularCpf: clientData.cpf, 
+          paidAmount: 0, 
+          status: 'PENDING',
+          commissionRate,
+          commissionValue,
+          sellerId: currentUser.id
+      });
   };
+
   const addPackagePayment = async (payment: Omit<PackagePayment, 'id'>) => {
       if (!isConfigured) return;
       await addDoc(collection(db, 'packagePayments'), payment);
@@ -458,7 +485,40 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       });
   };
 
-  const seedDatabase = async () => { if (!isConfigured) return; const batch = writeBatch(db); MOCK_BUSES.forEach(b => batch.set(doc(collection(db, 'buses')), { ...b, id: doc(collection(db, 'buses')).id })); MOCK_PARTS.forEach(p => batch.set(doc(collection(db, 'parts')), { ...p, id: doc(collection(db, 'parts')).id })); await batch.commit(); };
+  const seedDatabase = async () => { 
+      if (!isConfigured) return; 
+      const batch = writeBatch(db); 
+      
+      // Basic Mocks
+      MOCK_BUSES.forEach(b => batch.set(doc(collection(db, 'buses')), { ...b, id: doc(collection(db, 'buses')).id })); 
+      MOCK_PARTS.forEach(p => batch.set(doc(collection(db, 'parts')), { ...p, id: doc(collection(db, 'parts')).id })); 
+      
+      // New Travel Packages
+      const packages = [
+          { title: "Carnaval em Guarapari", date: "2026-02-13", price: 2890 },
+          { title: "Encantos de Vassouras", date: "2026-03-01", price: 399 },
+          { title: "Hotel Vilarejo Praia All Inclusive", date: "2026-03-13", price: 2990 },
+          { title: "Hotel Fazenda Estalagem", date: "2026-04-10", price: 1390 },
+          { title: "Hotel Fazenda Raposo", date: "2026-05-01", price: 1590 },
+          { title: "Caldas Novas Junho", date: "2026-06-06", price: 2690 },
+          { title: "Caldas Novas Férias de Julho", date: "2026-07-18", price: 2990 },
+          { title: "Festa Julina em Passa Quatro", date: "2026-07-20", price: 2390 },
+          { title: "Caldas Novas Agosto 2026", date: "2026-08-22", price: 2690 },
+      ];
+
+      packages.forEach(p => {
+          batch.set(doc(collection(db, 'travelPackages')), { 
+              title: p.title, 
+              date: p.date, 
+              adultPrice: p.price,
+              childPrice: p.price * 0.7, // Assume 70% for child as example
+              seniorPrice: p.price, // Same as adult usually
+              status: 'OPEN'
+          });
+      });
+
+      await batch.commit(); 
+  };
 
   return (
     <StoreContext.Provider value={{

@@ -8,12 +8,17 @@ const TravelPackagesView: React.FC = () => {
   
   const [selectedPackage, setSelectedPackage] = useState<TravelPackage | null>(null);
   const [showNewPackageForm, setShowNewPackageForm] = useState(false);
+  const [showCommissionReport, setShowCommissionReport] = useState(false);
   
   // Create Package Form
   const [newPkg, setNewPkg] = useState({ title: '', date: '', adultPrice: 0, childPrice: 0, seniorPrice: 0 });
 
   // Sale/Passenger Form State
   const [saleForm, setSaleForm] = useState({
+      saleType: 'DIRECT' as 'DIRECT' | 'AGENCY',
+      agencyName: '',
+      agencyPhone: '',
+      paxList: '', // Text area for Agency PAX names
       cpf: '',
       name: '',
       rg: '',
@@ -106,7 +111,7 @@ const TravelPackagesView: React.FC = () => {
           // 3. Register
           registerPackageSale(
               {
-                  name: saleForm.name,
+                  name: saleForm.name, // Will be Client Name OR Agency Contact Person
                   cpf: saleForm.cpf,
                   rg: saleForm.rg,
                   birthDate: saleForm.birthDate,
@@ -119,12 +124,19 @@ const TravelPackagesView: React.FC = () => {
                   qtdChild: saleForm.qtdChild,
                   qtdSenior: saleForm.qtdSenior,
                   discount: saleForm.discount,
-                  agreedPrice: finalPrice
+                  agreedPrice: finalPrice,
+                  saleType: saleForm.saleType,
+                  agencyName: saleForm.saleType === 'AGENCY' ? saleForm.agencyName : undefined,
+                  agencyPhone: saleForm.saleType === 'AGENCY' ? saleForm.agencyPhone : undefined,
+                  paxList: saleForm.saleType === 'AGENCY' ? saleForm.paxList : undefined
               }
           );
 
           // Reset
-          setSaleForm({ cpf: '', name: '', rg: '', birthDate: '', phone: '', address: '', qtdAdult: 0, qtdChild: 0, qtdSenior: 0, discount: 0 });
+          setSaleForm({ 
+              saleType: 'DIRECT', agencyName: '', agencyPhone: '', paxList: '',
+              cpf: '', name: '', rg: '', birthDate: '', phone: '', address: '', qtdAdult: 0, qtdChild: 0, qtdSenior: 0, discount: 0 
+          });
           alert("Venda registrada com sucesso!");
       }
   };
@@ -196,10 +208,10 @@ const TravelPackagesView: React.FC = () => {
 
                 <div class="row">
                     <span class="label">Cliente:</span>
-                    <span class="value">${client.name}</span>
+                    <span class="value">${client.name} ${passenger.saleType === 'AGENCY' ? `(Agência: ${passenger.agencyName})` : ''}</span>
                 </div>
                 <div class="row">
-                    <span class="label">CPF:</span>
+                    <span class="label">CPF/CNPJ:</span>
                     <span class="value">${client.cpf}</span>
                     <span class="label" style="width: auto; margin-left: 20px;">Telefone:</span>
                     <span class="value">${client.phone || '-'}</span>
@@ -282,6 +294,7 @@ const TravelPackagesView: React.FC = () => {
                 <strong>ENDEREÇO:</strong> ${client.address || '____________________________________________________'}<br/>
                 <strong>PACOTE:</strong> ${pkg.title} &nbsp;&nbsp; <strong>DATA:</strong> ${new Date(pkg.date).toLocaleDateString()}<br/>
                 <strong>VALOR TOTAL:</strong> R$ ${passenger.agreedPrice.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
+                ${passenger.saleType === 'AGENCY' ? `<br/><strong>AGÊNCIA:</strong> ${passenger.agencyName}` : ''}
             </div>
 
             <div class="clause-title">1-RESPONSABILIDADE</div>
@@ -359,12 +372,14 @@ const TravelPackagesView: React.FC = () => {
       const passengers = packagePassengers.filter(p => p.packageId === selectedPackage.id);
       const totalRevenuePotential = passengers.reduce((sum, p) => sum + p.agreedPrice, 0);
       const totalRevenueCollected = passengers.reduce((sum, p) => sum + p.paidAmount, 0);
+      const totalCommission = passengers.reduce((sum, p) => sum + (p.commissionValue || 0), 0);
 
       // Calculations for the current form state (Preview)
       const currentTotal = (saleForm.qtdAdult * selectedPackage.adultPrice) + 
                            (saleForm.qtdChild * selectedPackage.childPrice) +
                            (saleForm.qtdSenior * selectedPackage.seniorPrice);
       const currentFinal = Math.max(0, currentTotal - saleForm.discount);
+      const estimatedCommission = currentFinal * (saleForm.saleType === 'AGENCY' ? 0.12 : 0.01);
 
       return (
           <div className="space-y-6 animate-fade-in">
@@ -398,24 +413,80 @@ const TravelPackagesView: React.FC = () => {
                           <div className="bg-slate-50 p-5 rounded-xl border border-slate-200 mb-8 shadow-sm">
                               <h4 className="font-bold text-slate-700 mb-3 border-b border-slate-200 pb-2">Nova Venda / Reserva</h4>
                               <form onSubmit={handleRegisterSale}>
+                                  
+                                  {/* TYPE OF SALE SELECTION */}
+                                  <div className="mb-4 bg-white p-3 rounded border border-slate-200">
+                                      <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Tipo de Venda (Comissão)</label>
+                                      <div className="flex gap-4">
+                                          <label className="flex items-center gap-2 cursor-pointer">
+                                              <input 
+                                                type="radio" name="saleType" value="DIRECT"
+                                                checked={saleForm.saleType === 'DIRECT'}
+                                                onChange={() => setSaleForm({...saleForm, saleType: 'DIRECT'})}
+                                                className="text-emerald-600 focus:ring-emerald-500"
+                                              />
+                                              <span className="text-sm font-medium">Venda Direta (1%)</span>
+                                          </label>
+                                          <label className="flex items-center gap-2 cursor-pointer">
+                                              <input 
+                                                type="radio" name="saleType" value="AGENCY"
+                                                checked={saleForm.saleType === 'AGENCY'}
+                                                onChange={() => setSaleForm({...saleForm, saleType: 'AGENCY'})}
+                                                className="text-emerald-600 focus:ring-emerald-500"
+                                              />
+                                              <span className="text-sm font-medium">Agência (12%)</span>
+                                          </label>
+                                      </div>
+                                  </div>
+
                                   <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
                                       <div>
-                                          <label className="text-xs font-bold text-slate-500">CPF (Titular)</label>
+                                          <label className="text-xs font-bold text-slate-500">CPF / CNPJ (Contratante)</label>
                                           <input 
                                             value={saleForm.cpf} onChange={e => setSaleForm({...saleForm, cpf: e.target.value})}
                                             onBlur={handleCpfBlur}
-                                            className="w-full border p-2 rounded text-sm" placeholder="000.000.000-00" required
+                                            className="w-full border p-2 rounded text-sm" placeholder="Documento" required
                                           />
                                       </div>
                                       <div className="md:col-span-2">
-                                          <label className="text-xs font-bold text-slate-500">Nome Completo</label>
+                                          <label className="text-xs font-bold text-slate-500">{saleForm.saleType === 'AGENCY' ? 'Nome do Contato na Agência' : 'Nome Completo Cliente'}</label>
                                           <input 
                                             value={saleForm.name} onChange={e => setSaleForm({...saleForm, name: e.target.value})}
                                             className="w-full border p-2 rounded text-sm" required
                                           />
                                       </div>
+                                      
+                                      {/* AGENCY SPECIFIC FIELDS */}
+                                      {saleForm.saleType === 'AGENCY' && (
+                                          <>
+                                              <div className="md:col-span-2">
+                                                  <label className="text-xs font-bold text-slate-500">Nome da Agência</label>
+                                                  <input 
+                                                    value={saleForm.agencyName} onChange={e => setSaleForm({...saleForm, agencyName: e.target.value})}
+                                                    className="w-full border p-2 rounded text-sm" required
+                                                  />
+                                              </div>
+                                              <div>
+                                                  <label className="text-xs font-bold text-slate-500">Telefone Agência</label>
+                                                  <input 
+                                                    value={saleForm.agencyPhone} onChange={e => setSaleForm({...saleForm, agencyPhone: e.target.value})}
+                                                    className="w-full border p-2 rounded text-sm"
+                                                  />
+                                              </div>
+                                              <div className="md:col-span-3">
+                                                  <label className="text-xs font-bold text-slate-500">Lista de Passageiros (Nome e Telefone)</label>
+                                                  <textarea 
+                                                    value={saleForm.paxList} onChange={e => setSaleForm({...saleForm, paxList: e.target.value})}
+                                                    className="w-full border p-2 rounded text-sm h-20"
+                                                    placeholder="Ex: João Silva - (24) 99999-9999&#10;Maria Souza - (24) 88888-8888"
+                                                  />
+                                              </div>
+                                          </>
+                                      )}
+
+                                      {/* COMMON FIELDS */}
                                       <div>
-                                          <label className="text-xs font-bold text-slate-500">RG</label>
+                                          <label className="text-xs font-bold text-slate-500">RG (Responsável)</label>
                                           <input 
                                             value={saleForm.rg} onChange={e => setSaleForm({...saleForm, rg: e.target.value})}
                                             className="w-full border p-2 rounded text-sm"
@@ -485,6 +556,7 @@ const TravelPackagesView: React.FC = () => {
                                           <div className="text-right">
                                               <span className="text-xs text-slate-500 block">Total a Pagar</span>
                                               <span className="text-lg font-bold text-emerald-600">R$ {currentFinal.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                                              <span className="text-xs text-slate-400 block mt-1">Comissão Estimada: R$ {estimatedCommission.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
                                           </div>
                                       </div>
                                   </div>
@@ -501,7 +573,12 @@ const TravelPackagesView: React.FC = () => {
                                   const progress = getPaymentProgress(p.paidAmount, p.agreedPrice);
                                   const client = clients.find(c => c.id === p.clientId);
                                   return (
-                                      <div key={p.id} className="bg-white border border-slate-200 p-4 rounded-lg hover:shadow-md transition-shadow">
+                                      <div key={p.id} className="bg-white border border-slate-200 p-4 rounded-lg hover:shadow-md transition-shadow relative">
+                                          {p.saleType === 'AGENCY' && (
+                                              <div className="absolute top-2 right-2 text-[10px] bg-purple-100 text-purple-700 px-2 py-0.5 rounded font-bold uppercase border border-purple-200">
+                                                  Agência: {p.agencyName}
+                                              </div>
+                                          )}
                                           <div className="flex justify-between items-start mb-2">
                                               <div>
                                                   <div className="flex items-center gap-2">
@@ -520,13 +597,20 @@ const TravelPackagesView: React.FC = () => {
                                                       {p.qtdChild > 0 && <span className="bg-slate-100 px-2 py-0.5 rounded">Crianças: {p.qtdChild}</span>}
                                                       {p.qtdSenior > 0 && <span className="bg-slate-100 px-2 py-0.5 rounded">Melhor Idade: {p.qtdSenior}</span>}
                                                   </div>
+                                                  {p.paxList && (
+                                                      <div className="mt-2 p-2 bg-slate-50 rounded text-xs text-slate-600 border border-slate-100">
+                                                          <strong>PAX Agência:</strong><br/>
+                                                          {p.paxList}
+                                                      </div>
+                                                  )}
                                               </div>
-                                              <div className="text-right">
+                                              <div className="text-right mt-6">
                                                   <span className={`block text-xs font-bold mb-1 ${p.status === 'PAID' ? 'text-emerald-600' : p.status === 'PARTIAL' ? 'text-blue-600' : 'text-orange-500'}`}>
                                                       {p.status === 'PAID' ? 'QUITADO' : p.status === 'PARTIAL' ? 'PARCIAL' : 'PENDENTE'}
                                                   </span>
                                                   <p className="font-bold text-slate-800">R$ {p.agreedPrice.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</p>
                                                   {p.discount > 0 && <p className="text-xs text-red-500">- Desc: R$ {p.discount.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</p>}
+                                                  <p className="text-[10px] text-slate-400 mt-1">Comissão: R$ {p.commissionValue?.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</p>
                                               </div>
                                           </div>
                                           
@@ -582,6 +666,10 @@ const TravelPackagesView: React.FC = () => {
                               <div>
                                   <p className="text-sm text-slate-500">Valor Recebido (Caixa)</p>
                                   <p className="text-2xl font-bold text-emerald-600">R$ {totalRevenueCollected.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</p>
+                              </div>
+                              <div className="border-t border-slate-200 pt-2">
+                                  <p className="text-sm text-slate-500">Comissões a Pagar (Total)</p>
+                                  <p className="text-xl font-bold text-purple-600">R$ {totalCommission.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</p>
                               </div>
                               <div className="pt-4 border-t border-slate-200">
                                   <p className="text-sm text-slate-500 mb-1">A Receber</p>
@@ -706,16 +794,98 @@ const TravelPackagesView: React.FC = () => {
 
   // LIST VIEW
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-6 animate-fade-in relative">
         <div className="flex justify-between items-center">
             <h2 className="text-2xl font-bold text-slate-800">Pacotes de Viagem</h2>
-            <button 
-                onClick={() => setShowNewPackageForm(!showNewPackageForm)}
-                className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg font-medium shadow-sm transition-colors"
-            >
-                {showNewPackageForm ? 'Cancelar' : '+ Novo Pacote'}
-            </button>
+            <div className="flex gap-2">
+                <button 
+                    onClick={() => setShowCommissionReport(true)}
+                    className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg font-medium shadow-sm transition-colors text-sm flex items-center gap-1"
+                >
+                    💰 Relatório de Comissões
+                </button>
+                <button 
+                    onClick={() => setShowNewPackageForm(!showNewPackageForm)}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg font-medium shadow-sm transition-colors text-sm"
+                >
+                    {showNewPackageForm ? 'Cancelar' : '+ Novo Pacote'}
+                </button>
+            </div>
         </div>
+
+        {/* COMMISSION REPORT MODAL */}
+        {showCommissionReport && (
+            <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+                <div className="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col overflow-hidden animate-fade-in">
+                    <div className="bg-purple-800 p-4 text-white flex justify-between items-center">
+                        <h3 className="font-bold text-lg">Relatório de Comissões</h3>
+                        <button onClick={() => setShowCommissionReport(false)} className="text-purple-200 hover:text-white text-xl">&times;</button>
+                    </div>
+                    <div className="p-6 overflow-y-auto flex-1">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                            <div className="bg-purple-50 p-4 rounded-lg border border-purple-100">
+                                <p className="text-purple-800 text-xs font-bold uppercase">Total Comissões Geradas</p>
+                                <p className="text-2xl font-bold text-purple-900">
+                                    R$ {packagePassengers.reduce((sum, p) => sum + (p.commissionValue || 0), 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}
+                                </p>
+                            </div>
+                            <div className="bg-emerald-50 p-4 rounded-lg border border-emerald-100">
+                                <p className="text-emerald-800 text-xs font-bold uppercase">Total em Vendas</p>
+                                <p className="text-2xl font-bold text-emerald-900">
+                                    R$ {packagePassengers.reduce((sum, p) => sum + p.agreedPrice, 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}
+                                </p>
+                            </div>
+                        </div>
+
+                        <h4 className="font-bold text-slate-700 mb-2">Detalhamento por Venda</h4>
+                        <div className="border border-slate-200 rounded-lg overflow-hidden">
+                            <table className="w-full text-left text-sm">
+                                <thead className="bg-slate-50 text-slate-600 font-bold border-b border-slate-200">
+                                    <tr>
+                                        <th className="p-3">Cliente / Agência</th>
+                                        <th className="p-3">Pacote</th>
+                                        <th className="p-3">Tipo</th>
+                                        <th className="p-3 text-right">Valor Venda</th>
+                                        <th className="p-3 text-right">%</th>
+                                        <th className="p-3 text-right">Comissão</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100">
+                                    {packagePassengers.map(p => {
+                                        const pkg = travelPackages.find(tp => tp.id === p.packageId);
+                                        return (
+                                            <tr key={p.id} className="hover:bg-slate-50">
+                                                <td className="p-3">
+                                                    <span className="font-medium text-slate-800">{p.titularName}</span>
+                                                    {p.agencyName && <span className="block text-xs text-purple-600">{p.agencyName}</span>}
+                                                </td>
+                                                <td className="p-3 text-slate-600">{pkg?.title}</td>
+                                                <td className="p-3">
+                                                    {p.saleType === 'AGENCY' ? 
+                                                        <span className="bg-purple-100 text-purple-700 px-2 py-0.5 rounded text-xs font-bold">Agência</span> : 
+                                                        <span className="bg-slate-100 text-slate-600 px-2 py-0.5 rounded text-xs font-bold">Direta</span>
+                                                    }
+                                                </td>
+                                                <td className="p-3 text-right font-medium">R$ {p.agreedPrice.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
+                                                <td className="p-3 text-right text-slate-500">{(p.commissionRate || 0) * 100}%</td>
+                                                <td className="p-3 text-right font-bold text-green-600">R$ {(p.commissionValue || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
+                                            </tr>
+                                        );
+                                    })}
+                                    {packagePassengers.length === 0 && (
+                                        <tr><td colSpan={6} className="p-6 text-center text-slate-400">Nenhuma venda com comissão registrada.</td></tr>
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div className="bg-slate-50 p-4 border-t border-slate-200 text-right">
+                        <button onClick={() => window.print()} className="text-sm bg-white border border-slate-300 px-3 py-2 rounded hover:bg-slate-100 mr-2">Imprimir Relatório</button>
+                        <button onClick={() => setShowCommissionReport(false)} className="bg-slate-800 text-white px-4 py-2 rounded hover:bg-slate-700 font-bold text-sm">Fechar</button>
+                    </div>
+                </div>
+            </div>
+        )}
 
         {showNewPackageForm && (
             <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 max-w-2xl">

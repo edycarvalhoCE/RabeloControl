@@ -164,6 +164,15 @@ export interface PackagePassenger {
   agreedPrice: number;
   paidAmount: number;
   status: 'PENDING' | 'PARTIAL' | 'PAID';
+  
+  // Commission Fields
+  saleType?: 'DIRECT' | 'AGENCY';
+  agencyName?: string;
+  agencyPhone?: string;
+  paxList?: string; // Text field for PAX names in agency sale
+  commissionRate?: number; // 0.01 or 0.12
+  commissionValue?: number;
+  sellerId?: string;
 }
 
 export interface PackagePayment {
