@@ -1,10 +1,10 @@
 
 import React, { useState } from 'react';
 import { useStore } from '../services/store';
-import { UserRole } from '../types';
+import { UserRole, DriverLiability } from '../types';
 
 const FinanceView: React.FC = () => {
-  const { transactions, addTransaction, users, addDriverLiability, driverLiabilities } = useStore();
+  const { transactions, addTransaction, users, addDriverLiability, driverLiabilities, payDriverLiability } = useStore();
   const [filter, setFilter] = useState<'ALL' | 'INCOME' | 'EXPENSE'>('ALL');
   const [activeTab, setActiveTab] = useState<'CASHBOOK' | 'LIABILITIES'>('CASHBOOK');
 
@@ -31,6 +31,9 @@ const FinanceView: React.FC = () => {
       createExpense: true // Default to paying the cost immediately
   });
 
+  // --- RECEIVE PAYMENT MODAL STATE ---
+  const [paymentModal, setPaymentModal] = useState<{ open: boolean, liability: DriverLiability | null, amount: number }>({ open: false, liability: null, amount: 0 });
+
   const drivers = users.filter(u => u.role === UserRole.DRIVER);
 
   // --- FILTERS ---
@@ -56,19 +59,12 @@ const FinanceView: React.FC = () => {
         const transDate = new Date(newTrans.date);
         transDate.setMonth(transDate.getMonth() + i); // Add months
         
-        // If recurring, future ones are typically PENDING (Scheduled) unless marked otherwise,
-        // but for simplicity, let's keep the user's status choice or force pending for future?
-        // Let's adhere to user choice but if it's recurrence, usually it's "Scheduled".
-        // However, user might be back-filling past recurring expenses.
-        
         // Let's clone the transaction
         const payload = {
             ...newTrans,
             type: newTrans.type as 'INCOME' | 'EXPENSE',
             date: transDate.toISOString().split('T')[0], // format YYYY-MM-DD for consistency
             description: count > 1 ? `${newTrans.description} (${i + 1}/${count})` : newTrans.description,
-            // If it's a future recurring transaction, maybe mark as PENDING? 
-            // For now, trust the user status or default to PENDING for future iterations if desired.
             status: (isRecurring && i > 0) ? 'PENDING' : newTrans.status as 'COMPLETED' | 'PENDING'
         };
         addTransaction(payload);
@@ -99,6 +95,15 @@ const FinanceView: React.FC = () => {
       });
   };
 
+  const handleReceivePayment = async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (paymentModal.liability && paymentModal.amount > 0) {
+          await payDriverLiability(paymentModal.liability.id, paymentModal.amount);
+          setPaymentModal({ open: false, liability: null, amount: 0 });
+          alert('Pagamento recebido e lançado no caixa!');
+      }
+  };
+
   // Currency Helpers
   const handleCurrencyChange = (e: React.ChangeEvent<HTMLInputElement>, setter: any) => {
     const value = e.target.value;
@@ -111,8 +116,42 @@ const FinanceView: React.FC = () => {
   const projectedIncome = pendingTransactions.filter(t => t.type === 'INCOME').reduce((acc, t) => acc + t.amount, 0);
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-6 animate-fade-in relative">
         
+        {/* PAYMENT MODAL */}
+        {paymentModal.open && paymentModal.liability && (
+            <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+                <div className="bg-white rounded-xl shadow-2xl max-w-sm w-full p-6">
+                    <h3 className="font-bold text-lg text-slate-800 mb-2">Receber de Motorista</h3>
+                    <p className="text-sm text-slate-600 mb-4">
+                        Quanto está sendo pago agora? <br/>
+                        <span className="text-xs text-slate-400">Total Devido: R$ {(paymentModal.liability.totalAmount - paymentModal.liability.paidAmount).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                    </p>
+                    <form onSubmit={handleReceivePayment}>
+                        <div className="flex items-center border border-slate-300 rounded-lg overflow-hidden bg-white mb-4">
+                            <span className="bg-slate-100 text-slate-600 px-3 py-2 font-bold border-r border-slate-300">R$</span>
+                            <input 
+                                type="text" 
+                                inputMode="numeric"
+                                autoFocus
+                                required 
+                                value={paymentModal.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} 
+                                onChange={e => {
+                                    const val = Number(e.target.value.replace(/\D/g, "")) / 100;
+                                    setPaymentModal(prev => ({...prev, amount: val}));
+                                }}
+                                className="w-full p-2 outline-none text-right font-bold text-green-700"
+                            />
+                        </div>
+                        <div className="flex gap-2">
+                            <button type="button" onClick={() => setPaymentModal({open:false, liability: null, amount: 0})} className="flex-1 bg-slate-200 text-slate-700 py-2 rounded font-bold">Cancelar</button>
+                            <button type="submit" className="flex-1 bg-green-600 text-white py-2 rounded font-bold hover:bg-green-700">Confirmar</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        )}
+
         {/* TABS */}
         <div className="flex border-b border-slate-300">
             <button 
@@ -416,10 +455,10 @@ const FinanceView: React.FC = () => {
                                 <tr>
                                     <th className="p-3">Data</th>
                                     <th className="p-3">Motorista</th>
-                                    <th className="p-3">Descrição</th>
                                     <th className="p-3">Tipo</th>
-                                    <th className="p-3 text-right">Valor</th>
-                                    <th className="p-3 text-center">Parc.</th>
+                                    <th className="p-3 text-right">Valor Total</th>
+                                    <th className="p-3 text-right">Pago</th>
+                                    <th className="p-3 text-right">Ação</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100">
@@ -428,18 +467,34 @@ const FinanceView: React.FC = () => {
                                 ) : (
                                     driverLiabilities.map(l => {
                                         const drv = drivers.find(d => d.id === l.driverId);
+                                        const pendingAmount = l.totalAmount - l.paidAmount;
                                         return (
                                             <tr key={l.id} className="hover:bg-slate-50">
-                                                <td className="p-3 text-sm text-slate-600">{new Date(l.date).toLocaleDateString()}</td>
+                                                <td className="p-3 text-sm text-slate-600">
+                                                    {new Date(l.date).toLocaleDateString()}
+                                                    <span className="block text-[10px] text-slate-400">{l.description}</span>
+                                                </td>
                                                 <td className="p-3 font-bold text-slate-800">{drv?.name}</td>
-                                                <td className="p-3 text-sm text-slate-700">{l.description}</td>
                                                 <td className="p-3">
                                                     <span className={`text-xs px-2 py-1 rounded font-bold ${l.type === 'AVARIA' ? 'bg-orange-100 text-orange-700' : 'bg-red-100 text-red-700'}`}>
                                                         {l.type}
                                                     </span>
                                                 </td>
                                                 <td className="p-3 text-right font-bold text-red-600">R$ {l.totalAmount.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
-                                                <td className="p-3 text-center text-sm">{l.installments}x</td>
+                                                <td className="p-3 text-right font-bold text-green-600">
+                                                    R$ {l.paidAmount.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
+                                                    {l.status === 'PAID' && <span className="ml-1 text-[10px] bg-green-100 px-1 rounded">QUITADO</span>}
+                                                </td>
+                                                <td className="p-3 text-right">
+                                                    {l.status === 'OPEN' && (
+                                                        <button 
+                                                            onClick={() => setPaymentModal({open: true, liability: l, amount: pendingAmount})}
+                                                            className="text-xs bg-slate-800 text-white px-3 py-1 rounded hover:bg-slate-700"
+                                                        >
+                                                            Receber
+                                                        </button>
+                                                    )}
+                                                </td>
                                             </tr>
                                         );
                                     })

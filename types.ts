@@ -1,17 +1,16 @@
-
 export enum UserRole {
-  DEVELOPER = 'DESENVOLVEDOR',
-  MANAGER = 'GERENTE',
-  FINANCE = 'FINANCEIRO',
-  DRIVER = 'MOTORISTA',
-  MECHANIC = 'MECANICO'
+  DEVELOPER = 'DEVELOPER',
+  MANAGER = 'MANAGER',
+  FINANCE = 'FINANCE',
+  DRIVER = 'DRIVER',
+  MECHANIC = 'MECHANIC'
 }
 
 export interface User {
   id: string;
   name: string;
-  role: UserRole;
   email: string;
+  role: UserRole;
   avatar: string;
 }
 
@@ -20,57 +19,54 @@ export interface Bus {
   plate: string;
   model: string;
   capacity: number;
-  status: 'AVAILABLE' | 'MAINTENANCE' | 'BUSY';
-  features: string[]; // List of options like 'WiFi', 'WC', 'AC'
-}
-
-export interface Part {
-  id: string;
-  name: string;
-  quantity: number;
-  minQuantity: number; // Threshold for alert
-  price: number;
-}
-
-export interface Transaction {
-  id: string;
-  type: 'INCOME' | 'EXPENSE';
-  status: 'COMPLETED' | 'PENDING'; // Completed = Paid/Received, Pending = Future
-  category: string;
-  amount: number;
-  date: string; // ISO Date (Date of payment or expected date)
-  description: string;
-  relatedBookingId?: string;
+  status: 'AVAILABLE' | 'BUSY' | 'MAINTENANCE';
+  features: string[];
 }
 
 export interface Booking {
   id: string;
   busId: string;
   driverId: string | null;
-  freelanceDriverName?: string | null; // Option for non-registered drivers
+  freelanceDriverName?: string | null;
   clientName: string;
-  clientPhone?: string; // Contact phone for Service Order
+  clientPhone?: string;
   destination: string;
-  startTime: string; // ISO Date
-  endTime: string;   // ISO Date
+  startTime: string; // ISO string
+  endTime: string; // ISO string
   value: number;
-  status: 'PENDING' | 'CONFIRMED' | 'COMPLETED' | 'CANCELLED';
-  // Financial fields
-  paymentStatus: 'PAID' | 'PENDING' | 'SCHEDULED'; 
-  paymentDate: string | null; // Date paid OR Date scheduled to pay
-  // Logistics fields
-  departureLocation: string;
-  presentationTime: string; // ISO Date (Garage presentation)
-  type?: 'TURISMO' | 'FRETAMENTO'; // Distinguish between types
-  observations?: string; // New field for OS notes
+  paymentStatus: 'PAID' | 'PENDING' | 'SCHEDULED';
+  paymentDate?: string | null;
+  departureLocation?: string;
+  presentationTime?: string;
+  observations?: string;
+  status: 'CONFIRMED' | 'PENDING' | 'COMPLETED' | 'CANCELLED';
+}
+
+export interface Part {
+  id: string;
+  name: string;
+  quantity: number;
+  minQuantity: number;
+  price: number;
+}
+
+export interface Transaction {
+  id: string;
+  type: 'INCOME' | 'EXPENSE';
+  status: 'COMPLETED' | 'PENDING';
+  category: string;
+  amount: number;
+  date: string;
+  description: string;
+  relatedBookingId?: string;
 }
 
 export interface TimeOff {
   id: string;
   driverId: string;
-  date: string; // ISO Date (YYYY-MM-DD)
+  date: string; // YYYY-MM-DD
   type: 'FOLGA' | 'FERIAS';
-  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  status: 'APPROVED' | 'PENDING' | 'REJECTED';
 }
 
 export interface DriverDocument {
@@ -78,96 +74,86 @@ export interface DriverDocument {
   driverId: string;
   title: string;
   fileName: string;
-  fileContent: string; // Base64 string for demo purposes
+  fileContent: string; // Base64
   uploadDate: string;
 }
 
 export interface MaintenanceRecord {
   id: string;
-  date: string;
   busId: string;
   partId: string;
   quantityUsed: number;
-  type: 'PREVENTIVA' | 'CORRETIVA';
+  type: 'CORRETIVA' | 'PREVENTIVA';
+  date: string;
   mechanicId: string;
 }
 
 export interface PurchaseRequest {
   id: string;
-  requesterId: string;
   partName: string;
   quantity: number;
-  relatedBusId?: string; // Optional
-  status: 'PENDING' | 'APPROVED' | 'COMPLETED';
+  relatedBusId?: string;
+  requesterId: string;
+  status: 'PENDING' | 'COMPLETED';
   requestDate: string;
 }
 
 export interface MaintenanceReport {
   id: string;
-  driverId: string;
   busId: string;
-  date: string;
-  type: string; // 'MECANICA', 'ELETRICA', 'LIMPEZA', 'OUTROS'
+  driverId: string;
+  type: string; // MECANICA, ELETRICA, etc.
   description: string;
+  date: string;
   status: 'PENDING' | 'IN_PROGRESS' | 'RESOLVED';
 }
 
 export interface CharterContract {
   id: string;
-  clientName: string; // e.g., Carbografite
-  route: string; // e.g., Linha Administrativa
+  clientName: string;
+  route: string;
   busId: string;
   driverId: string;
-  weekDays: number[]; // 0 = Sunday, 1 = Monday...
-  morningDeparture: string; // HH:mm
-  afternoonDeparture: string; // HH:mm
-  startDate: string; // ISO Date
-  endDate: string; // ISO Date
-  status: 'ACTIVE' | 'ENDED';
+  weekDays: number[];
+  morningDeparture: string;
+  afternoonDeparture: string;
+  startDate: string;
+  endDate: string;
+  status: 'ACTIVE' | 'INACTIVE';
 }
 
-// --- New Types for Travel Packages & Clients ---
+export interface TravelPackage {
+  id: string;
+  title: string;
+  date: string;
+  adultPrice: number;
+  childPrice: number;
+  seniorPrice: number;
+  status: 'OPEN' | 'CLOSED';
+}
 
 export interface Client {
   id: string;
   name: string;
   cpf: string;
-  rg: string;
-  birthDate: string;
-  phone: string;
-  address: string;
-  notes?: string;
-}
-
-export interface TravelPackage {
-  id: string;
-  title: string; // e.g., "Trem das Montanhas"
-  date: string; // ISO Date
-  adultPrice: number;
-  childPrice: number;
-  seniorPrice: number; // Melhor Idade
-  status: 'OPEN' | 'CLOSED';
+  rg?: string;
+  birthDate?: string;
+  phone?: string;
+  address?: string;
 }
 
 export interface PackagePassenger {
   id: string;
   packageId: string;
-  clientId: string; // Link to Client
-  
-  // Sale Details
+  clientId: string;
   titularName: string;
   titularCpf: string;
-  
-  // Quantities
   qtdAdult: number;
   qtdChild: number;
   qtdSenior: number;
-  
-  // Financials
-  agreedPrice: number; // Total to pay after discount
   discount: number;
+  agreedPrice: number;
   paidAmount: number;
-  
   status: 'PENDING' | 'PARTIAL' | 'PAID';
 }
 
@@ -177,7 +163,7 @@ export interface PackagePayment {
   amount: number;
   date: string;
   method: 'PIX' | 'DINHEIRO' | 'CARTAO_CREDITO' | 'CARTAO_DEBITO';
-  installments?: number; // If credit card
+  installments?: number;
   notes?: string;
 }
 
@@ -186,12 +172,12 @@ export interface FuelRecord {
   date: string;
   busId: string;
   dieselLiters: number;
-  arlaLiters: number;
   hasArla: boolean;
-  location: 'GARAGE' | 'STREET'; // New field
-  cost?: number; // New field (Street only)
-  stationName?: string; // New field (Street only)
-  loggedBy: string; // User ID
+  arlaLiters: number;
+  location: 'GARAGE' | 'STREET';
+  cost: number;
+  stationName?: string;
+  loggedBy: string;
 }
 
 export interface FuelSupply {
@@ -208,9 +194,10 @@ export interface DriverLiability {
   id: string;
   driverId: string;
   type: 'AVARIA' | 'MULTA';
-  date: string; // Date of incident
-  description: string; // Or infraction type
+  date: string; 
+  description: string; 
   totalAmount: number;
-  installments: number; // How many times to pay
+  paidAmount: number; 
+  installments: number; 
   status: 'OPEN' | 'PAID';
 }

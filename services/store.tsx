@@ -69,7 +69,8 @@ interface StoreContextType {
   addPackagePayment: (payment: Omit<PackagePayment, 'id'>) => void;
   addFuelRecord: (record: Omit<FuelRecord, 'id'>) => void;
   addFuelSupply: (supply: Omit<FuelSupply, 'id'>) => void;
-  addDriverLiability: (liability: Omit<DriverLiability, 'id' | 'status'>, createExpense?: boolean) => void;
+  addDriverLiability: (liability: Omit<DriverLiability, 'id' | 'status' | 'paidAmount'>, createExpense?: boolean) => void;
+  payDriverLiability: (id: string, amount: number) => Promise<void>;
   seedDatabase: () => Promise<void>; // Setup initial data
 }
 
@@ -403,9 +404,9 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       }
   };
 
-  const addDriverLiability = async (liability: Omit<DriverLiability, 'id' | 'status'>, createExpense = false) => {
+  const addDriverLiability = async (liability: Omit<DriverLiability, 'id' | 'status' | 'paidAmount'>, createExpense = false) => {
       if (!isConfigured) return;
-      await addDoc(collection(db, 'driverLiabilities'), { ...liability, status: 'OPEN' });
+      await addDoc(collection(db, 'driverLiabilities'), { ...liability, paidAmount: 0, status: 'OPEN' });
 
       // If the company paid for the damage/fine immediately, record it as expense
       if (createExpense) {
@@ -421,12 +422,37 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       }
   };
 
+  const payDriverLiability = async (id: string, amount: number) => {
+      if (!isConfigured) return;
+      const liability = driverLiabilities.find(l => l.id === id);
+      if (!liability) return;
+
+      const newPaid = liability.paidAmount + amount;
+      const newStatus = newPaid >= liability.totalAmount ? 'PAID' : 'OPEN';
+
+      await updateDoc(doc(db, 'driverLiabilities', id), {
+          paidAmount: newPaid,
+          status: newStatus
+      });
+
+      // Income record (reimbursement)
+      const driver = users.find(u => u.id === liability.driverId);
+      await addDoc(collection(db, 'transactions'), {
+          type: 'INCOME',
+          status: 'COMPLETED',
+          category: 'Reembolso Avaria/Multa',
+          amount: amount,
+          date: new Date().toISOString().split('T')[0],
+          description: `Abatimento ${liability.type} - ${driver?.name} (${liability.description})`
+      });
+  };
+
   const seedDatabase = async () => { if (!isConfigured) return; const batch = writeBatch(db); MOCK_BUSES.forEach(b => batch.set(doc(collection(db, 'buses')), { ...b, id: doc(collection(db, 'buses')).id })); MOCK_PARTS.forEach(p => batch.set(doc(collection(db, 'parts')), { ...p, id: doc(collection(db, 'parts')).id })); await batch.commit(); };
 
   return (
     <StoreContext.Provider value={{
       currentUser: currentUser!, isAuthenticated, users, buses, bookings, parts, transactions, timeOffs, documents, maintenanceRecords, purchaseRequests, maintenanceReports, charterContracts, travelPackages, packagePassengers, packagePayments, clients, fuelRecords, fuelSupplies, fuelStockLevel, driverLiabilities,
-      switchUser, addUser, updateUser, deleteUser, addBooking, updateBooking, updateBookingStatus, addPart, updateStock, addTransaction, addTimeOff, updateTimeOffStatus, addDocument, deleteDocument, addMaintenanceRecord, addPurchaseRequest, updatePurchaseRequestStatus, addMaintenanceReport, updateMaintenanceReportStatus, addBus, updateBusStatus, addCharterContract, addTravelPackage, registerPackageSale, addPackagePayment, addFuelRecord, addFuelSupply, addDriverLiability,
+      switchUser, addUser, updateUser, deleteUser, addBooking, updateBooking, updateBookingStatus, addPart, updateStock, addTransaction, addTimeOff, updateTimeOffStatus, addDocument, deleteDocument, addMaintenanceRecord, addPurchaseRequest, updatePurchaseRequestStatus, addMaintenanceReport, updateMaintenanceReportStatus, addBus, updateBusStatus, addCharterContract, addTravelPackage, registerPackageSale, addPackagePayment, addFuelRecord, addFuelSupply, addDriverLiability, payDriverLiability,
       login, logout, register, seedDatabase
     }}>
       {children}
