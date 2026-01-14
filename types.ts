@@ -175,6 +175,17 @@ export interface PackagePassenger {
   sellerId?: string;
 }
 
+export interface PackageLead {
+  id: string;
+  name: string;
+  phone: string;
+  packageId: string;
+  notes: string;
+  callbackDate: string; // YYYY-MM-DD
+  status: 'PENDING' | 'CONTACTED' | 'CONVERTED' | 'LOST';
+  createdAt: string;
+}
+
 export interface PackagePayment {
   id: string;
   passengerId: string;

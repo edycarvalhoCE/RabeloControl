@@ -1,17 +1,21 @@
 
 import React, { useState, useEffect } from 'react';
 import { useStore } from '../services/store';
-import { PackagePassenger, TravelPackage, Client } from '../types';
+import { PackagePassenger, TravelPackage, Client, PackageLead } from '../types';
 
 const TravelPackagesView: React.FC = () => {
-  const { travelPackages, packagePassengers, packagePayments, clients, addTravelPackage, registerPackageSale, updatePackagePassenger, deletePackagePassenger, addPackagePayment, currentUser } = useStore();
+  const { travelPackages, packagePassengers, packagePayments, clients, addTravelPackage, registerPackageSale, updatePackagePassenger, deletePackagePassenger, addPackagePayment, currentUser, packageLeads, addPackageLead, updatePackageLead, deletePackageLead } = useStore();
   
   const [selectedPackage, setSelectedPackage] = useState<TravelPackage | null>(null);
   const [showNewPackageForm, setShowNewPackageForm] = useState(false);
   const [showCommissionReport, setShowCommissionReport] = useState(false);
+  const [showLeadsModal, setShowLeadsModal] = useState(false);
   
   // Edit State
   const [editingPassenger, setEditingPassenger] = useState<PackagePassenger | null>(null);
+
+  // Leads State
+  const [newLead, setNewLead] = useState({ name: '', phone: '', packageId: '', notes: '', callbackDate: '' });
 
   // Create Package Form
   const [newPkg, setNewPkg] = useState({ title: '', date: '', adultPrice: 0, childPrice: 0, seniorPrice: 0 });
@@ -50,6 +54,31 @@ const TravelPackagesView: React.FC = () => {
         setShowNewPackageForm(false);
         setNewPkg({ title: '', date: '', adultPrice: 0, childPrice: 0, seniorPrice: 0 });
     }
+  };
+
+  const handleAddLead = (e: React.FormEvent) => {
+      e.preventDefault();
+      if(newLead.name && newLead.packageId) {
+          addPackageLead(newLead);
+          setNewLead({ name: '', phone: '', packageId: '', notes: '', callbackDate: '' });
+          alert("Interessado cadastrado com sucesso!");
+      }
+  };
+
+  const getLeadStatusColor = (status: string) => {
+      switch(status) {
+          case 'CONTACTED': return 'bg-blue-100 text-blue-700';
+          case 'CONVERTED': return 'bg-green-100 text-green-700';
+          case 'LOST': return 'bg-red-100 text-red-700';
+          default: return 'bg-yellow-100 text-yellow-700';
+      }
+  };
+
+  // Check if callback date is today or passed for pending leads
+  const isUrgent = (lead: PackageLead) => {
+      if(lead.status !== 'PENDING' || !lead.callbackDate) return false;
+      const today = new Date().toISOString().split('T')[0];
+      return lead.callbackDate <= today;
   };
 
   const handleCpfBlur = () => {
@@ -903,6 +932,12 @@ const TravelPackagesView: React.FC = () => {
             <h2 className="text-2xl font-bold text-slate-800">Pacotes de Viagem</h2>
             <div className="flex gap-2">
                 <button 
+                    onClick={() => setShowLeadsModal(true)}
+                    className="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-lg font-medium shadow-sm transition-colors text-sm flex items-center gap-1"
+                >
+                    📋 Interessados / CRM
+                </button>
+                <button 
                     onClick={() => setShowCommissionReport(true)}
                     className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg font-medium shadow-sm transition-colors text-sm flex items-center gap-1"
                 >
@@ -916,6 +951,143 @@ const TravelPackagesView: React.FC = () => {
                 </button>
             </div>
         </div>
+
+        {/* LEADS CRM MODAL */}
+        {showLeadsModal && (
+            <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+                <div className="bg-white rounded-xl shadow-2xl max-w-5xl w-full max-h-[90vh] flex flex-col overflow-hidden animate-fade-in">
+                    <div className="bg-slate-800 p-4 text-white flex justify-between items-center">
+                        <h3 className="font-bold text-lg flex items-center gap-2">
+                            📋 Controle de Interessados (Prospecção)
+                        </h3>
+                        <button onClick={() => setShowLeadsModal(false)} className="text-slate-400 hover:text-white text-xl">&times;</button>
+                    </div>
+                    
+                    <div className="flex-1 overflow-hidden flex flex-col md:flex-row">
+                        {/* LEFT: FORM */}
+                        <div className="w-full md:w-1/3 bg-slate-50 p-6 border-r border-slate-200 overflow-y-auto">
+                            <h4 className="font-bold text-slate-700 mb-4">Cadastrar Novo Interessado</h4>
+                            <form onSubmit={handleAddLead} className="space-y-4">
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 mb-1">Nome</label>
+                                    <input 
+                                        required value={newLead.name} onChange={e => setNewLead({...newLead, name: e.target.value})}
+                                        className="w-full border p-2 rounded text-sm" placeholder="Ex: Dona Maria"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 mb-1">Telefone</label>
+                                    <input 
+                                        value={newLead.phone} onChange={e => setNewLead({...newLead, phone: e.target.value})}
+                                        className="w-full border p-2 rounded text-sm" placeholder="(00) 00000-0000"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 mb-1">Interesse na Viagem:</label>
+                                    <select 
+                                        required value={newLead.packageId} onChange={e => setNewLead({...newLead, packageId: e.target.value})}
+                                        className="w-full border p-2 rounded text-sm bg-white"
+                                    >
+                                        <option value="">Selecione...</option>
+                                        {travelPackages.filter(p => p.status === 'OPEN').map(p => (
+                                            <option key={p.id} value={p.id}>{p.title} ({new Date(p.date).toLocaleDateString()})</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 mb-1">Data para Retorno (Lembrete)</label>
+                                    <input 
+                                        type="date" 
+                                        value={newLead.callbackDate} onChange={e => setNewLead({...newLead, callbackDate: e.target.value})}
+                                        className="w-full border p-2 rounded text-sm"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 mb-1">Observações</label>
+                                    <textarea 
+                                        value={newLead.notes} onChange={e => setNewLead({...newLead, notes: e.target.value})}
+                                        className="w-full border p-2 rounded text-sm h-20" placeholder="Ex: Quer ir com a neta, ligar a tarde..."
+                                    />
+                                </div>
+                                <button type="submit" className="w-full bg-slate-800 text-white py-2 rounded font-bold text-sm hover:bg-slate-700">
+                                    Salvar Interessado
+                                </button>
+                            </form>
+                        </div>
+
+                        {/* RIGHT: LIST */}
+                        <div className="w-full md:w-2/3 p-6 overflow-y-auto bg-white">
+                            {/* ALERTS SECTION */}
+                            {packageLeads.some(l => isUrgent(l)) && (
+                                <div className="mb-6">
+                                    <h4 className="font-bold text-red-600 mb-2 flex items-center gap-2">
+                                        ⚠️ Retornos Pendentes (Hoje ou Atrasados)
+                                    </h4>
+                                    <div className="space-y-2">
+                                        {packageLeads.filter(l => isUrgent(l)).map(l => {
+                                            const pkg = travelPackages.find(p => p.id === l.packageId);
+                                            return (
+                                                <div key={l.id} className="bg-red-50 border border-red-200 p-3 rounded-lg flex justify-between items-start">
+                                                    <div>
+                                                        <span className="font-bold text-slate-800">{l.name}</span>
+                                                        <span className="text-xs text-slate-500 ml-2">{l.phone}</span>
+                                                        <p className="text-xs text-red-700 font-bold mt-1">Ligar: {new Date(l.callbackDate).toLocaleDateString()}</p>
+                                                        <p className="text-xs text-slate-600 mt-1">Interesse: {pkg?.title}</p>
+                                                        {l.notes && <p className="text-xs text-slate-500 italic mt-1">"{l.notes}"</p>}
+                                                    </div>
+                                                    <div className="flex gap-1">
+                                                        <button onClick={() => updatePackageLead(l.id, {status: 'CONTACTED'})} className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded hover:bg-blue-200">Já falei</button>
+                                                        <button onClick={() => deletePackageLead(l.id)} className="text-xs bg-white border border-red-200 text-red-500 px-2 py-1 rounded">✕</button>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            )}
+
+                            <h4 className="font-bold text-slate-700 mb-4 border-b pb-2">Todos os Interessados</h4>
+                            <div className="space-y-3">
+                                {packageLeads.sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).map(l => {
+                                    const pkg = travelPackages.find(p => p.id === l.packageId);
+                                    return (
+                                        <div key={l.id} className="bg-white border border-slate-200 p-3 rounded hover:shadow-sm flex flex-col md:flex-row justify-between gap-3">
+                                            <div>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="font-bold text-slate-800">{l.name}</span>
+                                                    <span className={`text-[10px] px-2 py-0.5 rounded font-bold ${getLeadStatusColor(l.status)}`}>
+                                                        {l.status === 'PENDING' ? 'PENDENTE' : l.status === 'CONTACTED' ? 'CONTACTADO' : l.status === 'CONVERTED' ? 'VENDIDO' : 'PERDIDO'}
+                                                    </span>
+                                                </div>
+                                                <p className="text-xs text-slate-500 mt-1">Tel: {l.phone} • Interesse: <strong>{pkg?.title}</strong></p>
+                                                {l.callbackDate && <p className="text-xs text-slate-400 mt-1">Retorno: {new Date(l.callbackDate).toLocaleDateString()}</p>}
+                                                {l.notes && <p className="text-xs text-slate-500 italic bg-slate-50 p-1 rounded mt-1 border border-slate-100">{l.notes}</p>}
+                                            </div>
+                                            <div className="flex items-start gap-2 flex-wrap">
+                                                <select 
+                                                    value={l.status}
+                                                    onChange={(e) => updatePackageLead(l.id, {status: e.target.value as any})}
+                                                    className="text-xs border p-1 rounded bg-slate-50"
+                                                >
+                                                    <option value="PENDING">Pendente</option>
+                                                    <option value="CONTACTED">Contactado</option>
+                                                    <option value="CONVERTED">Venda Feita</option>
+                                                    <option value="LOST">Desistiu</option>
+                                                </select>
+                                                <button onClick={() => deletePackageLead(l.id)} className="text-slate-400 hover:text-red-500">
+                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                                {packageLeads.length === 0 && <p className="text-center text-slate-400 py-4 italic">Nenhum interessado cadastrado.</p>}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        )}
 
         {/* COMMISSION REPORT MODAL */}
         {showCommissionReport && (

@@ -1,6 +1,6 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { User, Bus, Booking, Part, Transaction, TimeOff, UserRole, DriverDocument, MaintenanceRecord, PurchaseRequest, MaintenanceReport, CharterContract, TravelPackage, PackagePassenger, PackagePayment, Client, FuelRecord, FuelSupply, DriverLiability } from '../types';
+import { User, Bus, Booking, Part, Transaction, TimeOff, UserRole, DriverDocument, MaintenanceRecord, PurchaseRequest, MaintenanceReport, CharterContract, TravelPackage, PackagePassenger, PackagePayment, Client, FuelRecord, FuelSupply, DriverLiability, PackageLead } from '../types';
 import { MOCK_USERS, MOCK_BUSES, MOCK_PARTS } from '../constants';
 
 // Firebase Imports
@@ -29,6 +29,7 @@ interface StoreContextType {
   travelPackages: TravelPackage[];
   packagePassengers: PackagePassenger[];
   packagePayments: PackagePayment[];
+  packageLeads: PackageLead[];
   clients: Client[];
   fuelRecords: FuelRecord[];
   fuelSupplies: FuelSupply[];
@@ -69,6 +70,9 @@ interface StoreContextType {
   updatePackagePassenger: (id: string, data: Partial<PackagePassenger>) => Promise<void>;
   deletePackagePassenger: (id: string) => Promise<void>;
   addPackagePayment: (payment: Omit<PackagePayment, 'id'>) => void;
+  addPackageLead: (lead: Omit<PackageLead, 'id' | 'status' | 'createdAt'>) => void;
+  updatePackageLead: (id: string, data: Partial<PackageLead>) => void;
+  deletePackageLead: (id: string) => void;
   addFuelRecord: (record: Omit<FuelRecord, 'id'>) => void;
   addFuelSupply: (supply: Omit<FuelSupply, 'id'>) => void;
   addDriverLiability: (liability: Omit<DriverLiability, 'id' | 'status' | 'paidAmount'>, createExpense?: boolean) => void;
@@ -97,6 +101,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   const [travelPackages, setTravelPackages] = useState<TravelPackage[]>([]);
   const [packagePassengers, setPackagePassengers] = useState<PackagePassenger[]>([]);
   const [packagePayments, setPackagePayments] = useState<PackagePayment[]>([]);
+  const [packageLeads, setPackageLeads] = useState<PackageLead[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [fuelRecords, setFuelRecords] = useState<FuelRecord[]>([]);
   const [fuelSupplies, setFuelSupplies] = useState<FuelSupply[]>([]);
@@ -133,6 +138,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         { name: 'travelPackages', setter: setTravelPackages },
         { name: 'packagePassengers', setter: setPackagePassengers },
         { name: 'packagePayments', setter: setPackagePayments },
+        { name: 'packageLeads', setter: setPackageLeads },
         { name: 'clients', setter: setClients },
         { name: 'fuelRecords', setter: setFuelRecords },
         { name: 'fuelSupplies', setter: setFuelSupplies },
@@ -413,6 +419,25 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         });
       }
   };
+
+  const addPackageLead = async (lead: Omit<PackageLead, 'id' | 'status' | 'createdAt'>) => {
+      if (!isConfigured) return;
+      await addDoc(collection(db, 'packageLeads'), {
+          ...lead,
+          status: 'PENDING',
+          createdAt: new Date().toISOString()
+      });
+  };
+
+  const updatePackageLead = async (id: string, data: Partial<PackageLead>) => {
+      if (!isConfigured) return;
+      await updateDoc(doc(db, 'packageLeads', id), data);
+  };
+
+  const deletePackageLead = async (id: string) => {
+      if (!isConfigured) return;
+      await deleteDoc(doc(db, 'packageLeads', id));
+  };
   
   const addFuelRecord = async (record: Omit<FuelRecord, 'id'>) => {
       if (!isConfigured) return;
@@ -529,8 +554,8 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
   return (
     <StoreContext.Provider value={{
-      currentUser: currentUser!, isAuthenticated, users, buses, bookings, parts, transactions, timeOffs, documents, maintenanceRecords, purchaseRequests, maintenanceReports, charterContracts, travelPackages, packagePassengers, packagePayments, clients, fuelRecords, fuelSupplies, fuelStockLevel, driverLiabilities,
-      switchUser, addUser, updateUser, deleteUser, addBooking, updateBooking, updateBookingStatus, addPart, updateStock, addTransaction, addTimeOff, updateTimeOffStatus, addDocument, deleteDocument, addMaintenanceRecord, addPurchaseRequest, updatePurchaseRequestStatus, addMaintenanceReport, updateMaintenanceReportStatus, addBus, updateBusStatus, addCharterContract, addTravelPackage, registerPackageSale, updatePackagePassenger, deletePackagePassenger, addPackagePayment, addFuelRecord, addFuelSupply, addDriverLiability, payDriverLiability,
+      currentUser: currentUser!, isAuthenticated, users, buses, bookings, parts, transactions, timeOffs, documents, maintenanceRecords, purchaseRequests, maintenanceReports, charterContracts, travelPackages, packagePassengers, packagePayments, clients, packageLeads, fuelRecords, fuelSupplies, fuelStockLevel, driverLiabilities,
+      switchUser, addUser, updateUser, deleteUser, addBooking, updateBooking, updateBookingStatus, addPart, updateStock, addTransaction, addTimeOff, updateTimeOffStatus, addDocument, deleteDocument, addMaintenanceRecord, addPurchaseRequest, updatePurchaseRequestStatus, addMaintenanceReport, updateMaintenanceReportStatus, addBus, updateBusStatus, addCharterContract, addTravelPackage, registerPackageSale, updatePackagePassenger, deletePackagePassenger, addPackagePayment, addPackageLead, updatePackageLead, deletePackageLead, addFuelRecord, addFuelSupply, addDriverLiability, payDriverLiability,
       login, logout, register, seedDatabase
     }}>
       {children}
