@@ -7,12 +7,15 @@ interface CalendarViewProps {
 }
 
 const CalendarView: React.FC<CalendarViewProps> = ({ onEventClick }) => {
-  const { bookings, timeOffs, users, currentUser, addTimeOff, updateTimeOffStatus } = useStore();
+  const { bookings, timeOffs, users, currentUser, addTimeOff, updateTimeOffStatus, buses } = useStore();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [showModal, setShowModal] = useState(false);
   
   // Manager "Add Time Off" State
   const [newTimeOff, setNewTimeOff] = useState({ driverId: '', date: '', type: 'FOLGA' });
+
+  // Booking Details Modal State (For Managers when no external handler is passed)
+  const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
 
   const drivers = users.filter(u => u.role === UserRole.DRIVER);
   
@@ -43,6 +46,15 @@ const CalendarView: React.FC<CalendarViewProps> = ({ onEventClick }) => {
     return `${day}/${month}/${year}`;
   };
 
+  // Helper for DateTime display in Modal
+  const formatDateTime = (isoString: string) => {
+      if (!isoString) return 'N/A';
+      try {
+          const d = new Date(isoString);
+          return d.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+      } catch (e) { return isoString; }
+  };
+
   const handleAddFolga = (e: React.FormEvent) => {
     e.preventDefault();
     if(newTimeOff.driverId && newTimeOff.date) {
@@ -59,7 +71,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ onEventClick }) => {
   const canManage = currentUser.role === UserRole.MANAGER || currentUser.role === UserRole.DEVELOPER;
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-6 animate-fade-in relative">
       <div className="flex flex-col md:flex-row justify-between items-center gap-4">
         <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
             📅 Calendário de Escala
@@ -195,12 +207,15 @@ const CalendarView: React.FC<CalendarViewProps> = ({ onEventClick }) => {
                                     <div 
                                         key={b.id} 
                                         onClick={(e) => {
+                                            e.preventDefault();
                                             e.stopPropagation();
-                                            if (onEventClick) onEventClick(b);
+                                            if (onEventClick) {
+                                                onEventClick(b);
+                                            } else {
+                                                setSelectedBooking(b);
+                                            }
                                         }}
-                                        className={`text-[10px] px-2 py-1 rounded truncate font-medium border cursor-pointer hover:opacity-80 transition-opacity ${
-                                            onEventClick ? 'cursor-pointer' : ''
-                                        } ${
+                                        className={`relative z-10 text-[10px] px-2 py-1 rounded truncate font-medium border cursor-pointer hover:opacity-80 transition-opacity hover:scale-[1.02] transform transition-transform ${
                                             b.driverId === currentUser.id && currentUser.role === UserRole.DRIVER 
                                             ? 'bg-blue-600 text-white border-blue-700' // Highlight own trips
                                             : 'bg-blue-100 text-blue-800 border-blue-200'
@@ -218,10 +233,85 @@ const CalendarView: React.FC<CalendarViewProps> = ({ onEventClick }) => {
         </div>
       </div>
 
+      {/* TRIP DETAILS MODAL (Pop-up igual ao do Motorista) */}
+      {selectedBooking && (
+            <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[100] p-4" onClick={() => setSelectedBooking(null)}>
+                <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full overflow-hidden animate-fade-in relative z-[101]" onClick={e => e.stopPropagation()}>
+                    <div className="bg-slate-800 p-4 flex justify-between items-center text-white">
+                        <h3 className="font-bold text-lg">Detalhes da Viagem</h3>
+                        <button onClick={() => setSelectedBooking(null)} className="text-slate-400 hover:text-white font-bold text-xl">&times;</button>
+                    </div>
+                    <div className="p-6 space-y-4">
+                        <div className="flex items-start gap-4 mb-2">
+                            <div className="bg-blue-100 p-3 rounded-lg">
+                                <span className="text-2xl">🚌</span>
+                            </div>
+                            <div>
+                                <h2 className="text-2xl font-bold text-slate-800">{selectedBooking.destination}</h2>
+                                {(() => {
+                                    const bus = buses.find(b => b.id === selectedBooking.busId);
+                                    return bus ? <p className="text-slate-600 font-medium">{bus.plate} - {bus.model}</p> : null;
+                                })()}
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4 bg-slate-50 p-3 rounded-lg border border-slate-100">
+                            <div>
+                                <p className="text-xs text-slate-500 font-bold uppercase">Saída</p>
+                                <p className="text-sm font-semibold text-slate-800">{formatDateTime(selectedBooking.startTime)}</p>
+                            </div>
+                            <div>
+                                <p className="text-xs text-slate-500 font-bold uppercase">Retorno</p>
+                                <p className="text-sm font-semibold text-slate-800">{formatDateTime(selectedBooking.endTime)}</p>
+                            </div>
+                            <div className="col-span-2">
+                                <p className="text-xs text-slate-500 font-bold uppercase">Local de Apresentação</p>
+                                <p className="text-sm text-slate-800">{selectedBooking.presentationTime ? formatDateTime(selectedBooking.presentationTime) : formatDateTime(selectedBooking.startTime)} - {selectedBooking.departureLocation || 'Garagem'}</p>
+                            </div>
+                        </div>
+
+                        <div className="space-y-3">
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <p className="text-xs text-slate-500 font-bold uppercase">Cliente / Contratante</p>
+                                    <p className="text-sm font-medium">{selectedBooking.clientName}</p>
+                                    {selectedBooking.clientPhone && <p className="text-sm text-blue-600">{selectedBooking.clientPhone}</p>}
+                                </div>
+                                <div>
+                                    <p className="text-xs text-slate-500 font-bold uppercase">Motorista</p>
+                                    <p className="text-sm font-medium">
+                                        {selectedBooking.driverId 
+                                            ? users.find(u => u.id === selectedBooking.driverId)?.name 
+                                            : selectedBooking.freelanceDriverName 
+                                                ? `${selectedBooking.freelanceDriverName} (Freelance)` 
+                                                : 'Não atribuído'}
+                                    </p>
+                                </div>
+                            </div>
+                            
+                            {selectedBooking.observations && (
+                                <div className="bg-yellow-50 p-3 rounded border border-yellow-100">
+                                    <p className="text-xs text-yellow-700 font-bold uppercase mb-1">Observações / Instruções</p>
+                                    <p className="text-sm text-slate-700 whitespace-pre-wrap">{selectedBooking.observations}</p>
+                                </div>
+                            )}
+                        </div>
+
+                        <button 
+                            onClick={() => setSelectedBooking(null)}
+                            className="w-full bg-slate-800 text-white py-3 rounded-lg font-bold hover:bg-slate-700 mt-2"
+                        >
+                            Fechar Detalhes
+                        </button>
+                    </div>
+                </div>
+            </div>
+      )}
+
       {/* Modal for adding Time Off (Manager Only) */}
       {showModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-            <div className="bg-white p-6 rounded-xl w-full max-w-md shadow-2xl">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100]">
+            <div className="bg-white p-6 rounded-xl w-full max-w-md shadow-2xl relative z-[101]">
                 <h3 className="text-xl font-bold mb-4">Lançar Folga / Férias</h3>
                 <form onSubmit={handleAddFolga} className="space-y-4">
                     <div>
