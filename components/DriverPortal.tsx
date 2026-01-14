@@ -1,19 +1,32 @@
+
 import React, { useState } from 'react';
 import { useStore } from '../services/store';
 import CalendarView from './CalendarView';
 import { Booking } from '../types';
 
 const DriverPortal: React.FC = () => {
-  const { currentUser, bookings, timeOffs, addTimeOff, documents, buses, addMaintenanceReport, maintenanceReports } = useStore();
+  const { currentUser, bookings, timeOffs, addTimeOff, documents, buses, addMaintenanceReport, maintenanceReports, addFuelRecord } = useStore();
   const [requestDate, setRequestDate] = useState('');
   const [requestType, setRequestType] = useState<'FOLGA' | 'FERIAS'>('FOLGA');
-  const [activeTab, setActiveTab] = useState<'schedule' | 'documents' | 'requests' | 'report'>('schedule');
+  const [activeTab, setActiveTab] = useState<'schedule' | 'documents' | 'requests' | 'report' | 'fuel'>('schedule');
 
   // Trip Details Modal State
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
 
   // Maintenance Report State
   const [reportForm, setReportForm] = useState({ busId: '', type: 'MECANICA', description: '', date: new Date().toISOString().split('T')[0] });
+
+  // Fuel Form State
+  const [fuelForm, setFuelForm] = useState({
+      date: new Date().toISOString().split('T')[0],
+      busId: '',
+      dieselLiters: 0,
+      hasArla: false,
+      arlaLiters: 0,
+      location: 'STREET' as 'GARAGE' | 'STREET',
+      cost: 0,
+      stationName: ''
+  });
 
   const myBookings = bookings
     .filter(b => b.driverId === currentUser.id && b.status !== 'CANCELLED')
@@ -46,6 +59,33 @@ const DriverPortal: React.FC = () => {
           alert('Problema reportado ao mecânico!');
           setReportForm({ ...reportForm, description: '', busId: '' });
       }
+  };
+
+  const handleFuelSubmit = (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!fuelForm.busId || fuelForm.dieselLiters <= 0) {
+          alert('Preencha os dados corretamente.');
+          return;
+      }
+      
+      addFuelRecord({
+          ...fuelForm,
+          cost: fuelForm.location === 'STREET' ? fuelForm.cost : 0,
+          stationName: fuelForm.location === 'STREET' ? fuelForm.stationName : '',
+          loggedBy: currentUser.id
+      });
+      
+      alert('Abastecimento registrado!');
+      setFuelForm({
+        date: new Date().toISOString().split('T')[0],
+        busId: '',
+        dieselLiters: 0,
+        hasArla: false,
+        arlaLiters: 0,
+        location: 'STREET',
+        cost: 0,
+        stationName: ''
+      });
   };
 
   const handleBookingClick = (booking: Booking) => {
@@ -104,6 +144,12 @@ const DriverPortal: React.FC = () => {
             📅 Minha Escala
         </button>
         <button 
+            onClick={() => setActiveTab('fuel')}
+            className={`pb-2 px-1 font-medium text-sm transition-colors whitespace-nowrap ${activeTab === 'fuel' ? 'border-b-2 border-green-600 text-green-600' : 'text-slate-500 hover:text-slate-700'}`}
+        >
+            ⛽ Abastecer
+        </button>
+        <button 
             onClick={() => setActiveTab('documents')}
             className={`pb-2 px-1 font-medium text-sm transition-colors whitespace-nowrap ${activeTab === 'documents' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}
         >
@@ -158,6 +204,120 @@ const DriverPortal: React.FC = () => {
                         )}
                     </div>
                 </div>
+            </div>
+        )}
+
+        {/* FUEL TAB */}
+        {activeTab === 'fuel' && (
+            <div className="max-w-2xl mx-auto bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                <h2 className="text-xl font-bold text-slate-800 mb-6 flex items-center gap-2">
+                    <span className="bg-green-100 text-green-600 p-2 rounded-lg">⛽</span>
+                    Registrar Abastecimento
+                </h2>
+                
+                <form onSubmit={handleFuelSubmit} className="space-y-5">
+                    {/* Location Toggle */}
+                    <div className="grid grid-cols-2 gap-3 p-1 bg-slate-100 rounded-lg mb-4">
+                          <button
+                            type="button"
+                            onClick={() => setFuelForm({...fuelForm, location: 'GARAGE'})}
+                            className={`py-3 text-sm font-bold rounded-md transition-all ${fuelForm.location === 'GARAGE' ? 'bg-white shadow-md text-blue-700 ring-1 ring-blue-100' : 'text-slate-500 hover:text-slate-700'}`}
+                          >
+                              🏢 Na Garagem
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setFuelForm({...fuelForm, location: 'STREET'})}
+                            className={`py-3 text-sm font-bold rounded-md transition-all ${fuelForm.location === 'STREET' ? 'bg-white shadow-md text-orange-600 ring-1 ring-orange-100' : 'text-slate-500 hover:text-slate-700'}`}
+                          >
+                              🛣️ Na Rua (Posto)
+                          </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Veículo</label>
+                            <select 
+                                required value={fuelForm.busId}
+                                onChange={e => setFuelForm({...fuelForm, busId: e.target.value})}
+                                className="w-full border p-3 rounded-lg focus:ring-2 focus:ring-green-500 outline-none bg-slate-50"
+                            >
+                                <option value="">Selecione o ônibus...</option>
+                                {buses.map(b => (
+                                    <option key={b.id} value={b.id}>{b.plate} - {b.model}</option>
+                                ))}
+                            </select>
+                        </div>
+                         <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Data</label>
+                            <input 
+                                type="date" required 
+                                value={fuelForm.date} onChange={e => setFuelForm({...fuelForm, date: e.target.value})}
+                                className="w-full border p-3 rounded-lg focus:ring-2 focus:ring-green-500 outline-none bg-slate-50"
+                            />
+                        </div>
+                    </div>
+
+                    <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
+                        <label className="block text-sm font-bold text-slate-800 mb-2">Quantidade Diesel (Litros)</label>
+                        <input 
+                            type="number" step="0.1" min="0" required
+                            value={fuelForm.dieselLiters || ''} 
+                            onChange={e => setFuelForm({...fuelForm, dieselLiters: parseFloat(e.target.value)})}
+                            className="w-full border p-3 rounded-lg text-lg font-bold outline-none"
+                            placeholder="0.0 L"
+                        />
+                    </div>
+
+                    {fuelForm.location === 'STREET' && (
+                        <div className="bg-orange-50 p-4 rounded-xl border border-orange-100 space-y-3 animate-fade-in">
+                            <h4 className="text-sm font-bold text-orange-800 uppercase tracking-wide">Detalhes do Posto</h4>
+                            <div>
+                                <label className="block text-xs font-bold text-orange-700 mb-1">Valor Pago (R$)</label>
+                                <input 
+                                type="number" step="0.01"
+                                value={fuelForm.cost || ''} onChange={e => setFuelForm({...fuelForm, cost: parseFloat(e.target.value)})}
+                                className="w-full border border-orange-200 p-2 rounded text-sm" placeholder="0.00"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-orange-700 mb-1">Nome do Posto</label>
+                                <input 
+                                value={fuelForm.stationName} onChange={e => setFuelForm({...fuelForm, stationName: e.target.value})}
+                                className="w-full border border-orange-200 p-2 rounded text-sm" placeholder="Ex: Posto Shell"
+                                />
+                            </div>
+                        </div>
+                    )}
+
+                    <div className="flex items-center gap-3 pt-2">
+                        <input 
+                            type="checkbox" 
+                            id="driverHasArla"
+                            checked={fuelForm.hasArla}
+                            onChange={e => setFuelForm({...fuelForm, hasArla: e.target.checked})}
+                            className="w-5 h-5 text-green-600 rounded focus:ring-green-500"
+                        />
+                        <label htmlFor="driverHasArla" className="text-sm font-medium text-slate-700">Abasteceu Arla 32 também?</label>
+                    </div>
+
+                    {fuelForm.hasArla && (
+                        <div className="animate-fade-in pl-8">
+                             <label className="block text-xs font-bold text-slate-600 mb-1">Qtd. Arla (Litros)</label>
+                             <input 
+                                type="number" step="0.1" min="0"
+                                value={fuelForm.arlaLiters || ''} 
+                                onChange={e => setFuelForm({...fuelForm, arlaLiters: parseFloat(e.target.value)})}
+                                className="w-full border p-2 rounded outline-none"
+                                placeholder="0.0 L"
+                            />
+                        </div>
+                    )}
+
+                    <button type="submit" className="w-full bg-green-600 text-white font-bold py-4 rounded-xl hover:bg-green-700 shadow-lg transform active:scale-95 transition-all">
+                        Confirmar Abastecimento
+                    </button>
+                </form>
             </div>
         )}
 

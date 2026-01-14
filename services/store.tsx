@@ -1,6 +1,6 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { User, Bus, Booking, Part, Transaction, TimeOff, UserRole, DriverDocument, MaintenanceRecord, PurchaseRequest, MaintenanceReport, CharterContract, TravelPackage, PackagePassenger, PackagePayment, Client, FuelRecord } from '../types';
+import { User, Bus, Booking, Part, Transaction, TimeOff, UserRole, DriverDocument, MaintenanceRecord, PurchaseRequest, MaintenanceReport, CharterContract, TravelPackage, PackagePassenger, PackagePayment, Client, FuelRecord, FuelSupply } from '../types';
 import { MOCK_USERS, MOCK_BUSES, MOCK_PARTS } from '../constants';
 
 // Firebase Imports
@@ -31,6 +31,8 @@ interface StoreContextType {
   packagePayments: PackagePayment[];
   clients: Client[];
   fuelRecords: FuelRecord[];
+  fuelSupplies: FuelSupply[];
+  fuelStockLevel: number; // Calculated on fly
   
   // Actions
   login: (email: string, password: string) => Promise<{success: boolean, message?: string}>;
@@ -65,6 +67,7 @@ interface StoreContextType {
   ) => void;
   addPackagePayment: (payment: Omit<PackagePayment, 'id'>) => void;
   addFuelRecord: (record: Omit<FuelRecord, 'id'>) => void;
+  addFuelSupply: (supply: Omit<FuelSupply, 'id'>) => void;
   seedDatabase: () => Promise<void>; // Setup initial data
 }
 
@@ -91,6 +94,10 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   const [packagePayments, setPackagePayments] = useState<PackagePayment[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [fuelRecords, setFuelRecords] = useState<FuelRecord[]>([]);
+  const [fuelSupplies, setFuelSupplies] = useState<FuelSupply[]>([]);
+  
+  // Calculated State
+  const [fuelStockLevel, setFuelStockLevel] = useState(0);
 
   // --- FIREBASE LISTENERS (REAL-TIME SYNC) ---
   useEffect(() => {
@@ -122,6 +129,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         { name: 'packagePayments', setter: setPackagePayments },
         { name: 'clients', setter: setClients },
         { name: 'fuelRecords', setter: setFuelRecords },
+        { name: 'fuelSupplies', setter: setFuelSupplies },
     ];
 
     const unsubscribes = collectionsToSync.map(c => 
@@ -136,6 +144,17 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         unsubscribes.forEach(unsub => unsub());
     };
   }, []);
+
+  // Update Fuel Stock Level whenever records change
+  useEffect(() => {
+    const totalSupplied = fuelSupplies.reduce((acc, curr) => acc + curr.liters, 0);
+    // Only subtract if location is GARAGE
+    const totalConsumed = fuelRecords
+        .filter(r => r.location === 'GARAGE')
+        .reduce((acc, curr) => acc + curr.dieselLiters, 0);
+    
+    setFuelStockLevel(Math.max(0, totalSupplied - totalConsumed));
+  }, [fuelSupplies, fuelRecords]);
 
   // Sync CurrentUser with Users list
   useEffect(() => {
@@ -344,18 +363,48 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         });
       }
   };
+  
   const addFuelRecord = async (record: Omit<FuelRecord, 'id'>) => {
       if (!isConfigured) return;
       await addDoc(collection(db, 'fuelRecords'), record);
-      // Optional: Log transaction? For now just log record.
+      
+      // If refueled on STREET, it costs money immediately
+      if (record.location === 'STREET' && record.cost && record.cost > 0) {
+          const bus = buses.find(b => b.id === record.busId);
+          const user = users.find(u => u.id === record.loggedBy);
+          await addDoc(collection(db, 'transactions'), {
+              type: 'EXPENSE',
+              status: 'COMPLETED',
+              category: 'Combustível',
+              amount: record.cost,
+              date: record.date,
+              description: `Abastecimento Externo (${user?.name}): ${bus?.plate} - ${record.dieselLiters}L @ ${record.stationName || 'Posto'}`
+          });
+      }
+  };
+
+  const addFuelSupply = async (supply: Omit<FuelSupply, 'id'>) => {
+      if (!isConfigured) return;
+      await addDoc(collection(db, 'fuelSupplies'), supply);
+
+      if (supply.registeredInFinance && supply.cost > 0) {
+          await addDoc(collection(db, 'transactions'), {
+              type: 'EXPENSE',
+              status: 'COMPLETED',
+              category: 'Compra Combustível',
+              amount: supply.cost,
+              date: supply.date,
+              description: `Abastecimento Tanque Garagem: ${supply.liters}L (Recebido por: ${supply.receiverName})`
+          });
+      }
   };
 
   const seedDatabase = async () => { if (!isConfigured) return; const batch = writeBatch(db); MOCK_BUSES.forEach(b => batch.set(doc(collection(db, 'buses')), { ...b, id: doc(collection(db, 'buses')).id })); MOCK_PARTS.forEach(p => batch.set(doc(collection(db, 'parts')), { ...p, id: doc(collection(db, 'parts')).id })); await batch.commit(); };
 
   return (
     <StoreContext.Provider value={{
-      currentUser: currentUser!, isAuthenticated, users, buses, bookings, parts, transactions, timeOffs, documents, maintenanceRecords, purchaseRequests, maintenanceReports, charterContracts, travelPackages, packagePassengers, packagePayments, clients, fuelRecords,
-      switchUser, addUser, updateUser, deleteUser, addBooking, updateBooking, updateBookingStatus, addPart, updateStock, addTransaction, addTimeOff, updateTimeOffStatus, addDocument, deleteDocument, addMaintenanceRecord, addPurchaseRequest, updatePurchaseRequestStatus, addMaintenanceReport, updateMaintenanceReportStatus, addBus, updateBusStatus, addCharterContract, addTravelPackage, registerPackageSale, addPackagePayment, addFuelRecord,
+      currentUser: currentUser!, isAuthenticated, users, buses, bookings, parts, transactions, timeOffs, documents, maintenanceRecords, purchaseRequests, maintenanceReports, charterContracts, travelPackages, packagePassengers, packagePayments, clients, fuelRecords, fuelSupplies, fuelStockLevel,
+      switchUser, addUser, updateUser, deleteUser, addBooking, updateBooking, updateBookingStatus, addPart, updateStock, addTransaction, addTimeOff, updateTimeOffStatus, addDocument, deleteDocument, addMaintenanceRecord, addPurchaseRequest, updatePurchaseRequestStatus, addMaintenanceReport, updateMaintenanceReportStatus, addBus, updateBusStatus, addCharterContract, addTravelPackage, registerPackageSale, addPackagePayment, addFuelRecord, addFuelSupply,
       login, logout, register, seedDatabase
     }}>
       {children}
