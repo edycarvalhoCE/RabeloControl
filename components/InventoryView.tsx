@@ -1,12 +1,25 @@
+
 import React, { useState } from 'react';
 import { useStore } from '../services/store';
 import { UserRole } from '../types';
 
 const InventoryView: React.FC = () => {
-  const { parts, updateStock, addPart, currentUser, purchaseRequests, users, buses, updatePurchaseRequestStatus } = useStore();
+  const { parts, updateStock, addPart, currentUser, purchaseRequests, users, buses, updatePurchaseRequestStatus, addFuelRecord, fuelRecords } = useStore();
   const [showAddForm, setShowAddForm] = useState(false);
   const [newPart, setNewPart] = useState({ name: '', quantity: 0, minQuantity: 5, price: 0 });
-  const [viewMode, setViewMode] = useState<'STOCK' | 'REQUESTS'>('STOCK');
+  const [viewMode, setViewMode] = useState<'STOCK' | 'REQUESTS' | 'FUEL'>('STOCK');
+
+  // Search State
+  const [searchTerm, setSearchTerm] = useState('');
+
+  // Fuel Form State
+  const [fuelForm, setFuelForm] = useState({
+      date: new Date().toISOString().split('T')[0],
+      busId: '',
+      dieselLiters: 0,
+      hasArla: false,
+      arlaLiters: 0
+  });
 
   const isMechanic = currentUser.role === UserRole.MECHANIC;
 
@@ -24,37 +37,87 @@ const InventoryView: React.FC = () => {
     setNewPart(prev => ({ ...prev, price: realValue }));
   };
 
+  const handleFuelSubmit = (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!fuelForm.busId || fuelForm.dieselLiters <= 0) {
+          alert("Selecione o ônibus e informe a quantidade de Diesel.");
+          return;
+      }
+      
+      addFuelRecord({
+          date: fuelForm.date,
+          busId: fuelForm.busId,
+          dieselLiters: fuelForm.dieselLiters,
+          arlaLiters: fuelForm.hasArla ? fuelForm.arlaLiters : 0,
+          hasArla: fuelForm.hasArla,
+          loggedBy: currentUser.id
+      });
+      alert("Abastecimento registrado com sucesso!");
+      setFuelForm({
+        date: new Date().toISOString().split('T')[0],
+        busId: '',
+        dieselLiters: 0,
+        hasArla: false,
+        arlaLiters: 0
+      });
+  };
+
+  // Filter Parts Logic
+  const filteredParts = parts.filter(p => 
+      p.name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex flex-col md:flex-row justify-between items-center gap-4">
         <h2 className="text-2xl font-bold text-slate-800">Controle de Estoque</h2>
         
-        <div className="flex gap-2">
-            <button 
-                onClick={() => setViewMode('STOCK')}
-                className={`px-4 py-2 rounded-lg font-medium transition-colors ${viewMode === 'STOCK' ? 'bg-slate-800 text-white' : 'bg-white border text-slate-600'}`}
-            >
-                Peças em Estoque
-            </button>
-            <button 
-                onClick={() => setViewMode('REQUESTS')}
-                className={`px-4 py-2 rounded-lg font-medium transition-colors ${viewMode === 'REQUESTS' ? 'bg-slate-800 text-white' : 'bg-white border text-slate-600'}`}
-            >
-                Solicitações de Compra
-                {purchaseRequests.filter(r => r.status === 'PENDING').length > 0 && (
-                    <span className="ml-2 bg-red-500 text-white text-xs px-2 py-0.5 rounded-full">
-                        {purchaseRequests.filter(r => r.status === 'PENDING').length}
-                    </span>
-                )}
-            </button>
-            {!isMechanic && viewMode === 'STOCK' && (
-                <button 
-                onClick={() => setShowAddForm(!showAddForm)}
-                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors ml-2"
-                >
-                {showAddForm ? 'Cancelar' : '+ Nova Peça'}
-                </button>
+        <div className="flex flex-col md:flex-row gap-2 items-center w-full md:w-auto">
+            {viewMode === 'STOCK' && (
+                <div className="relative w-full md:w-64">
+                    <input 
+                        type="text" 
+                        placeholder="🔍 Buscar peça..." 
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="w-full pl-3 pr-8 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                    />
+                </div>
             )}
+
+            <div className="flex gap-2">
+                <button 
+                    onClick={() => setViewMode('STOCK')}
+                    className={`px-4 py-2 rounded-lg font-medium transition-colors ${viewMode === 'STOCK' ? 'bg-slate-800 text-white' : 'bg-white border text-slate-600'}`}
+                >
+                    Peças
+                </button>
+                <button 
+                    onClick={() => setViewMode('FUEL')}
+                    className={`px-4 py-2 rounded-lg font-medium transition-colors ${viewMode === 'FUEL' ? 'bg-slate-800 text-white' : 'bg-white border text-slate-600'}`}
+                >
+                    Combustível
+                </button>
+                <button 
+                    onClick={() => setViewMode('REQUESTS')}
+                    className={`px-4 py-2 rounded-lg font-medium transition-colors ${viewMode === 'REQUESTS' ? 'bg-slate-800 text-white' : 'bg-white border text-slate-600'}`}
+                >
+                    Solicitações
+                    {purchaseRequests.filter(r => r.status === 'PENDING').length > 0 && (
+                        <span className="ml-2 bg-red-500 text-white text-xs px-2 py-0.5 rounded-full">
+                            {purchaseRequests.filter(r => r.status === 'PENDING').length}
+                        </span>
+                    )}
+                </button>
+                {!isMechanic && viewMode === 'STOCK' && (
+                    <button 
+                    onClick={() => setShowAddForm(!showAddForm)}
+                    className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors ml-2"
+                    >
+                    {showAddForm ? 'Cancelar' : '+'}
+                    </button>
+                )}
+            </div>
         </div>
       </div>
 
@@ -110,45 +173,176 @@ const InventoryView: React.FC = () => {
                     </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                    {parts.map(part => (
-                    <tr key={part.id} className="hover:bg-slate-50">
-                        <td className="p-4 font-medium text-slate-800">{part.name}</td>
-                        <td className="p-4 text-slate-600">{part.price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
-                        <td className="p-4 text-center">
-                        <span className="font-bold text-lg">{part.quantity}</span>
-                        <span className="text-xs text-slate-400 block">Min: {part.minQuantity}</span>
-                        </td>
-                        <td className="p-4 text-center">
-                        {part.quantity <= part.minQuantity ? (
-                            <span className="inline-block px-2 py-1 bg-red-100 text-red-700 text-xs rounded-full font-bold">Crítico</span>
-                        ) : (
-                            <span className="inline-block px-2 py-1 bg-green-100 text-green-700 text-xs rounded-full font-bold">Normal</span>
-                        )}
-                        </td>
-                        {!isMechanic && (
-                            <td className="p-4 text-right space-x-2">
-                            <button 
-                                onClick={() => updateStock(part.id, -1)}
-                                className="w-8 h-8 rounded-full bg-red-50 text-red-600 hover:bg-red-100 border border-red-200"
-                                title="Registrar Saída"
-                            >
-                                -
-                            </button>
-                            <button 
-                                onClick={() => updateStock(part.id, 1)}
-                                className="w-8 h-8 rounded-full bg-green-50 text-green-600 hover:bg-green-100 border border-green-200"
-                                title="Registrar Entrada"
-                            >
-                                +
-                            </button>
+                    {filteredParts.length === 0 ? (
+                        <tr><td colSpan={5} className="p-8 text-center text-slate-500">Nenhuma peça encontrada.</td></tr>
+                    ) : (
+                        filteredParts.map(part => (
+                        <tr key={part.id} className="hover:bg-slate-50">
+                            <td className="p-4 font-medium text-slate-800">{part.name}</td>
+                            <td className="p-4 text-slate-600">{part.price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
+                            <td className="p-4 text-center">
+                            <span className="font-bold text-lg">{part.quantity}</span>
+                            <span className="text-xs text-slate-400 block">Min: {part.minQuantity}</span>
                             </td>
-                        )}
-                    </tr>
-                    ))}
+                            <td className="p-4 text-center">
+                            {part.quantity <= part.minQuantity ? (
+                                <span className="inline-block px-2 py-1 bg-red-100 text-red-700 text-xs rounded-full font-bold">Crítico</span>
+                            ) : (
+                                <span className="inline-block px-2 py-1 bg-green-100 text-green-700 text-xs rounded-full font-bold">Normal</span>
+                            )}
+                            </td>
+                            {!isMechanic && (
+                                <td className="p-4 text-right space-x-2">
+                                <button 
+                                    onClick={() => updateStock(part.id, -1)}
+                                    className="w-8 h-8 rounded-full bg-red-50 text-red-600 hover:bg-red-100 border border-red-200"
+                                    title="Registrar Saída"
+                                >
+                                    -
+                                </button>
+                                <button 
+                                    onClick={() => updateStock(part.id, 1)}
+                                    className="w-8 h-8 rounded-full bg-green-50 text-green-600 hover:bg-green-100 border border-green-200"
+                                    title="Registrar Entrada"
+                                >
+                                    +
+                                </button>
+                                </td>
+                            )}
+                        </tr>
+                        ))
+                    )}
                 </tbody>
                 </table>
             </div>
           </>
+      )}
+
+      {viewMode === 'FUEL' && (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Form de Abastecimento */}
+              <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 h-fit">
+                  <h3 className="font-bold text-lg text-slate-800 mb-4 flex items-center gap-2">
+                      <span className="bg-blue-100 text-blue-600 p-1.5 rounded">⛽</span>
+                      Registrar Consumo
+                  </h3>
+                  <form onSubmit={handleFuelSubmit} className="space-y-4">
+                      <div>
+                          <label className="block text-sm font-medium text-slate-700 mb-1">Data</label>
+                          <input 
+                              type="date" required 
+                              value={fuelForm.date} 
+                              onChange={e => setFuelForm({...fuelForm, date: e.target.value})}
+                              className="w-full border p-2 rounded bg-slate-50"
+                          />
+                      </div>
+                      <div>
+                          <label className="block text-sm font-medium text-slate-700 mb-1">Veículo / Modelo</label>
+                          <select 
+                              required 
+                              value={fuelForm.busId} 
+                              onChange={e => setFuelForm({...fuelForm, busId: e.target.value})}
+                              className="w-full border p-2 rounded bg-slate-50"
+                          >
+                              <option value="">Selecione o ônibus...</option>
+                              {buses.map(b => (
+                                  <option key={b.id} value={b.id}>{b.plate} - {b.model}</option>
+                              ))}
+                          </select>
+                      </div>
+                      
+                      <div className="border-t border-slate-100 pt-3">
+                        <label className="block text-sm font-bold text-slate-800 mb-2">Diesel</label>
+                        <div className="flex items-center border border-slate-300 rounded overflow-hidden bg-white">
+                            <input 
+                                type="number" step="0.1" min="0" required
+                                value={fuelForm.dieselLiters || ''} 
+                                onChange={e => setFuelForm({...fuelForm, dieselLiters: parseFloat(e.target.value)})}
+                                className="w-full p-2 outline-none"
+                                placeholder="Qtd. Litros"
+                            />
+                            <span className="bg-slate-100 text-slate-600 px-3 py-2 font-bold border-l border-slate-300 text-xs">L</span>
+                        </div>
+                      </div>
+
+                      <div className="bg-blue-50 p-3 rounded-lg border border-blue-100">
+                          <label className="flex items-center justify-between cursor-pointer">
+                              <span className="font-bold text-blue-800 text-sm">Abasteceu Arla 32?</span>
+                              <div className={`w-10 h-5 flex items-center rounded-full p-1 transition-colors ${fuelForm.hasArla ? 'bg-blue-600' : 'bg-gray-300'}`}>
+                                  <input 
+                                      type="checkbox" 
+                                      className="hidden" 
+                                      checked={fuelForm.hasArla}
+                                      onChange={e => setFuelForm({...fuelForm, hasArla: e.target.checked})}
+                                  />
+                                  <div className={`bg-white w-3 h-3 rounded-full shadow-md transform transition-transform ${fuelForm.hasArla ? 'translate-x-5' : ''}`}></div>
+                              </div>
+                          </label>
+                          
+                          {fuelForm.hasArla && (
+                              <div className="mt-3 animate-fade-in">
+                                  <label className="block text-xs font-bold text-blue-700 mb-1">Qtd. Arla (Litros)</label>
+                                  <div className="flex items-center border border-blue-200 rounded overflow-hidden bg-white">
+                                      <input 
+                                          type="number" step="0.1" min="0" required
+                                          value={fuelForm.arlaLiters || ''} 
+                                          onChange={e => setFuelForm({...fuelForm, arlaLiters: parseFloat(e.target.value)})}
+                                          className="w-full p-2 outline-none text-blue-900"
+                                          placeholder="0.0"
+                                      />
+                                      <span className="bg-blue-100 text-blue-600 px-3 py-2 font-bold border-l border-blue-200 text-xs">L</span>
+                                  </div>
+                              </div>
+                          )}
+                      </div>
+
+                      <button type="submit" className="w-full bg-slate-800 text-white font-bold py-3 rounded hover:bg-slate-700">
+                          Lançar Consumo
+                      </button>
+                  </form>
+              </div>
+
+              {/* Histórico */}
+              <div className="lg:col-span-2 space-y-4">
+                  <h3 className="font-bold text-slate-700">Histórico de Abastecimentos</h3>
+                  <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                      <table className="w-full text-left">
+                          <thead className="bg-slate-50 text-slate-600 text-xs uppercase font-bold border-b border-slate-200">
+                              <tr>
+                                  <th className="p-3">Data</th>
+                                  <th className="p-3">Veículo</th>
+                                  <th className="p-3">Diesel</th>
+                                  <th className="p-3">Arla</th>
+                                  <th className="p-3 text-right">Resp.</th>
+                              </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100">
+                              {fuelRecords.length === 0 ? (
+                                  <tr><td colSpan={5} className="p-8 text-center text-slate-500">Nenhum registro de abastecimento.</td></tr>
+                              ) : (
+                                  fuelRecords.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()).map(record => {
+                                      const bus = buses.find(b => b.id === record.busId);
+                                      const user = users.find(u => u.id === record.loggedBy);
+                                      return (
+                                          <tr key={record.id} className="hover:bg-slate-50">
+                                              <td className="p-3 text-sm text-slate-600">{new Date(record.date).toLocaleDateString()}</td>
+                                              <td className="p-3 font-medium text-slate-800">
+                                                  {bus?.plate} <span className="text-xs text-slate-500 block">{bus?.model}</span>
+                                              </td>
+                                              <td className="p-3 text-sm font-bold text-slate-700">{record.dieselLiters} L</td>
+                                              <td className="p-3 text-sm">
+                                                  {record.hasArla ? <span className="text-blue-600 font-bold">{record.arlaLiters} L</span> : <span className="text-slate-300">-</span>}
+                                              </td>
+                                              <td className="p-3 text-right text-xs text-slate-500">{user?.name?.split(' ')[0] || 'N/A'}</td>
+                                          </tr>
+                                      );
+                                  })
+                              )}
+                          </tbody>
+                      </table>
+                  </div>
+              </div>
+          </div>
       )}
 
       {viewMode === 'REQUESTS' && (

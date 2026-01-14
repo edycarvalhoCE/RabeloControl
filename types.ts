@@ -1,3 +1,4 @@
+
 export enum UserRole {
   DEVELOPER = 'DESENVOLVEDOR',
   MANAGER = 'GERENTE',
@@ -178,4 +179,14 @@ export interface PackagePayment {
   method: 'PIX' | 'DINHEIRO' | 'CARTAO_CREDITO' | 'CARTAO_DEBITO';
   installments?: number; // If credit card
   notes?: string;
+}
+
+export interface FuelRecord {
+  id: string;
+  date: string;
+  busId: string;
+  dieselLiters: number;
+  arlaLiters: number;
+  hasArla: boolean;
+  loggedBy: string; // User ID
 }
