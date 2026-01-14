@@ -143,7 +143,7 @@ const TravelPackagesView: React.FC = () => {
   const handleDeletePassenger = async (p: PackagePassenger) => {
       if(window.confirm(`Tem certeza que deseja excluir a venda para ${p.titularName}? Esta ação não pode ser desfeita.`)) {
           if (p.paidAmount > 0) {
-              alert("Atenção: Existem pagamentos registrados para esta venda. Verifique o caixa antes de excluir.");
+              if(!window.confirm("Atenção: Existem pagamentos registrados para esta venda. Deseja excluir mesmo assim?")) return;
           }
           await deletePackagePassenger(p.id);
       }
@@ -520,9 +520,11 @@ const TravelPackagesView: React.FC = () => {
                           </h3>
                           
                           {/* REGISTER SALE FORM */}
-                          <div className="bg-slate-50 p-5 rounded-xl border border-slate-200 mb-8 shadow-sm" id="sale-form-anchor">
+                          <div className={`p-5 rounded-xl border mb-8 shadow-sm transition-colors ${editingPassenger ? 'bg-blue-50 border-blue-200' : 'bg-slate-50 border-slate-200'}`} id="sale-form-anchor">
                               <div className="flex justify-between items-center mb-3 border-b border-slate-200 pb-2">
-                                  <h4 className="font-bold text-slate-700">{editingPassenger ? 'Editar Venda / Reserva' : 'Nova Venda / Reserva'}</h4>
+                                  <h4 className={`font-bold ${editingPassenger ? 'text-blue-700' : 'text-slate-700'}`}>
+                                      {editingPassenger ? '✏️ Editando Venda Existente' : '➕ Nova Venda / Reserva'}
+                                  </h4>
                                   {editingPassenger && (
                                       <button onClick={handleCancelEdit} className="text-xs text-red-500 font-bold hover:underline">
                                           Cancelar Edição
@@ -758,17 +760,17 @@ const TravelPackagesView: React.FC = () => {
                                                   </button>
                                                   <button 
                                                       onClick={() => handleEditPassenger(p)}
-                                                      className="text-xs flex items-center gap-1 bg-blue-50 hover:bg-blue-100 text-blue-700 px-2 py-1.5 rounded transition-colors"
+                                                      className="text-xs flex items-center gap-1 bg-blue-50 hover:bg-blue-100 text-blue-700 px-2 py-1.5 rounded transition-colors border border-blue-200"
                                                       title="Editar Venda"
                                                   >
                                                       ✏️ Editar
                                                   </button>
                                                   <button 
                                                       onClick={() => handleDeletePassenger(p)}
-                                                      className="text-xs flex items-center gap-1 bg-red-50 hover:bg-red-100 text-red-700 px-2 py-1.5 rounded transition-colors"
+                                                      className="text-xs flex items-center gap-1 bg-red-50 hover:bg-red-100 text-red-700 px-2 py-1.5 rounded transition-colors border border-red-200"
                                                       title="Excluir Venda"
                                                   >
-                                                      🗑️
+                                                      🗑️ Excluir
                                                   </button>
                                               </div>
 
