@@ -319,7 +319,7 @@ const FinanceView: React.FC = () => {
                                     onChange={e => setIsRecurring(e.target.checked)}
                                     className="rounded text-blue-600" 
                                 />
-                                <span className="text-sm font-bold text-slate-700">Despesa Recorrente?</span>
+                                <span className="text-sm font-bold text-slate-700">Recorrente?</span>
                             </label>
                             {isRecurring && (
                                 <div className="mt-2 flex items-center gap-2 animate-fade-in">
