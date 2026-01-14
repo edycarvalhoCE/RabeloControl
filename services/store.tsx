@@ -66,6 +66,8 @@ interface StoreContextType {
       clientData: Omit<Client, 'id'>, 
       saleData: Omit<PackagePassenger, 'id' | 'clientId' | 'paidAmount' | 'status' | 'titularName' | 'titularCpf'>
   ) => void;
+  updatePackagePassenger: (id: string, data: Partial<PackagePassenger>) => Promise<void>;
+  deletePackagePassenger: (id: string) => Promise<void>;
   addPackagePayment: (payment: Omit<PackagePayment, 'id'>) => void;
   addFuelRecord: (record: Omit<FuelRecord, 'id'>) => void;
   addFuelSupply: (supply: Omit<FuelSupply, 'id'>) => void;
@@ -362,9 +364,6 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       if (!isConfigured) return; 
       let clientId = '';
       
-      // If agency, we might skip creating a "Client" record in future, but for now we create/find one to act as the contact
-      // Or we can treat the Agency as a client.
-      
       const existingClient = clients.find(c => c.cpf === clientData.cpf);
       if (existingClient) { 
           clientId = existingClient.id; 
@@ -374,8 +373,6 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
           clientId = ref.id; 
       }
 
-      // Calculate Commission
-      // Default to 1% if Direct, 12% if Agency
       let commissionRate = saleData.saleType === 'AGENCY' ? 0.12 : 0.01;
       let commissionValue = (saleData.agreedPrice || 0) * commissionRate;
 
@@ -390,6 +387,16 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
           commissionValue,
           sellerId: currentUser.id
       });
+  };
+
+  const updatePackagePassenger = async (id: string, data: Partial<PackagePassenger>) => {
+      if (!isConfigured) return;
+      await updateDoc(doc(db, 'packagePassengers', id), data);
+  };
+
+  const deletePackagePassenger = async (id: string) => {
+      if (!isConfigured) return;
+      await deleteDoc(doc(db, 'packagePassengers', id));
   };
 
   const addPackagePayment = async (payment: Omit<PackagePayment, 'id'>) => {
@@ -523,7 +530,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   return (
     <StoreContext.Provider value={{
       currentUser: currentUser!, isAuthenticated, users, buses, bookings, parts, transactions, timeOffs, documents, maintenanceRecords, purchaseRequests, maintenanceReports, charterContracts, travelPackages, packagePassengers, packagePayments, clients, fuelRecords, fuelSupplies, fuelStockLevel, driverLiabilities,
-      switchUser, addUser, updateUser, deleteUser, addBooking, updateBooking, updateBookingStatus, addPart, updateStock, addTransaction, addTimeOff, updateTimeOffStatus, addDocument, deleteDocument, addMaintenanceRecord, addPurchaseRequest, updatePurchaseRequestStatus, addMaintenanceReport, updateMaintenanceReportStatus, addBus, updateBusStatus, addCharterContract, addTravelPackage, registerPackageSale, addPackagePayment, addFuelRecord, addFuelSupply, addDriverLiability, payDriverLiability,
+      switchUser, addUser, updateUser, deleteUser, addBooking, updateBooking, updateBookingStatus, addPart, updateStock, addTransaction, addTimeOff, updateTimeOffStatus, addDocument, deleteDocument, addMaintenanceRecord, addPurchaseRequest, updatePurchaseRequestStatus, addMaintenanceReport, updateMaintenanceReportStatus, addBus, updateBusStatus, addCharterContract, addTravelPackage, registerPackageSale, updatePackagePassenger, deletePackagePassenger, addPackagePayment, addFuelRecord, addFuelSupply, addDriverLiability, payDriverLiability,
       login, logout, register, seedDatabase
     }}>
       {children}

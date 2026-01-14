@@ -4,12 +4,15 @@ import { useStore } from '../services/store';
 import { PackagePassenger, TravelPackage, Client } from '../types';
 
 const TravelPackagesView: React.FC = () => {
-  const { travelPackages, packagePassengers, packagePayments, clients, addTravelPackage, registerPackageSale, addPackagePayment, currentUser } = useStore();
+  const { travelPackages, packagePassengers, packagePayments, clients, addTravelPackage, registerPackageSale, updatePackagePassenger, deletePackagePassenger, addPackagePayment, currentUser } = useStore();
   
   const [selectedPackage, setSelectedPackage] = useState<TravelPackage | null>(null);
   const [showNewPackageForm, setShowNewPackageForm] = useState(false);
   const [showCommissionReport, setShowCommissionReport] = useState(false);
   
+  // Edit State
+  const [editingPassenger, setEditingPassenger] = useState<PackagePassenger | null>(null);
+
   // Create Package Form
   const [newPkg, setNewPkg] = useState({ title: '', date: '', adultPrice: 0, childPrice: 0, seniorPrice: 0 });
 
@@ -50,7 +53,9 @@ const TravelPackagesView: React.FC = () => {
   };
 
   const handleCpfBlur = () => {
-      // Auto-fill client data if exists
+      // Auto-fill client data if exists (only when not editing an existing sale to prevent overwrite of form if user is changing client)
+      if (editingPassenger) return;
+
       const found = clients.find(c => c.cpf === saleForm.cpf);
       if (found) {
           setSaleForm(prev => ({
@@ -61,6 +66,57 @@ const TravelPackagesView: React.FC = () => {
               phone: found.phone,
               address: found.address
           }));
+      }
+  };
+
+  const handleEditPassenger = (p: PackagePassenger) => {
+      setEditingPassenger(p);
+      setSaleForm({
+          saleType: p.saleType || 'DIRECT',
+          agencyName: p.agencyName || '',
+          agencyPhone: p.agencyPhone || '',
+          paxList: p.paxList || '',
+          cpf: p.titularCpf,
+          name: p.titularName,
+          rg: '', // RG not stored in sale usually, client lookup required if needed, or leave blank
+          birthDate: '', // Same for birthdate
+          phone: '', // Same
+          address: '', // Same
+          qtdAdult: p.qtdAdult,
+          qtdChild: p.qtdChild,
+          qtdSenior: p.qtdSenior,
+          discount: p.discount
+      });
+      // Try to find client data to fill remaining fields
+      const client = clients.find(c => c.id === p.clientId);
+      if(client) {
+          setSaleForm(prev => ({
+              ...prev,
+              rg: client.rg || '',
+              birthDate: client.birthDate || '',
+              phone: client.phone || '',
+              address: client.address || ''
+          }));
+      }
+      // Scroll to form
+      const formEl = document.getElementById('sale-form-anchor');
+      if(formEl) formEl.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  const handleCancelEdit = () => {
+      setEditingPassenger(null);
+      setSaleForm({ 
+          saleType: 'DIRECT', agencyName: '', agencyPhone: '', paxList: '',
+          cpf: '', name: '', rg: '', birthDate: '', phone: '', address: '', qtdAdult: 0, qtdChild: 0, qtdSenior: 0, discount: 0 
+      });
+  };
+
+  const handleDeletePassenger = async (p: PackagePassenger) => {
+      if(window.confirm(`Tem certeza que deseja excluir a venda para ${p.titularName}? Esta ação não pode ser desfeita.`)) {
+          if (p.paidAmount > 0) {
+              alert("Atenção: Existem pagamentos registrados para esta venda. Verifique o caixa antes de excluir.");
+          }
+          await deletePackagePassenger(p.id);
       }
   };
 
@@ -83,7 +139,7 @@ const TravelPackagesView: React.FC = () => {
       setNewPayment(prev => ({ ...prev, amount: realValue }));
   };
 
-  const handleRegisterSale = (e: React.FormEvent) => {
+  const handleRegisterSale = async (e: React.FormEvent) => {
       e.preventDefault();
       if(selectedPackage) {
           // 1. Calculate Total
@@ -96,48 +152,73 @@ const TravelPackagesView: React.FC = () => {
               return;
           }
 
-          // 2. Check Discount Authorization
-          if (saleForm.discount > 0) {
-              const authorized = window.confirm(
-                  `ATENÇÃO: Você está aplicando um desconto de R$ ${saleForm.discount.toLocaleString('pt-BR', {minimumFractionDigits: 2})}.\n\n` + 
-                  `Todo desconto deve ser AUTORIZADO pelo gestor.\n` + 
-                  `Confirma que você possui esta autorização?`
-              );
-              if (!authorized) return;
-          }
-
           const finalPrice = Math.max(0, total - saleForm.discount);
 
-          // 3. Register
-          registerPackageSale(
-              {
-                  name: saleForm.name, // Will be Client Name OR Agency Contact Person
-                  cpf: saleForm.cpf,
-                  rg: saleForm.rg,
-                  birthDate: saleForm.birthDate,
-                  phone: saleForm.phone,
-                  address: saleForm.address
-              },
-              {
-                  packageId: selectedPackage.id,
+          // Calculate Commission
+          let commissionRate = saleForm.saleType === 'AGENCY' ? 0.12 : 0.01;
+          let commissionValue = finalPrice * commissionRate;
+
+          if (editingPassenger) {
+              // UPDATE EXISTING
+              await updatePackagePassenger(editingPassenger.id, {
+                  titularName: saleForm.name,
+                  titularCpf: saleForm.cpf,
                   qtdAdult: saleForm.qtdAdult,
                   qtdChild: saleForm.qtdChild,
                   qtdSenior: saleForm.qtdSenior,
                   discount: saleForm.discount,
                   agreedPrice: finalPrice,
                   saleType: saleForm.saleType,
-                  agencyName: saleForm.saleType === 'AGENCY' ? saleForm.agencyName : undefined,
-                  agencyPhone: saleForm.saleType === 'AGENCY' ? saleForm.agencyPhone : undefined,
-                  paxList: saleForm.saleType === 'AGENCY' ? saleForm.paxList : undefined
+                  agencyName: saleForm.saleType === 'AGENCY' ? saleForm.agencyName : '',
+                  agencyPhone: saleForm.saleType === 'AGENCY' ? saleForm.agencyPhone : '',
+                  paxList: saleForm.saleType === 'AGENCY' ? saleForm.paxList : '',
+                  commissionRate,
+                  commissionValue
+              });
+              alert("Venda atualizada com sucesso!");
+              setEditingPassenger(null);
+          } else {
+              // 2. Check Discount Authorization (Only for new sales usually, but good to keep)
+              if (saleForm.discount > 0) {
+                  const authorized = window.confirm(
+                      `ATENÇÃO: Você está aplicando um desconto de R$ ${saleForm.discount.toLocaleString('pt-BR', {minimumFractionDigits: 2})}.\n\n` + 
+                      `Todo desconto deve ser AUTORIZADO pelo gestor.\n` + 
+                      `Confirma que você possui esta autorização?`
+                  );
+                  if (!authorized) return;
               }
-          );
+
+              // 3. Register New
+              registerPackageSale(
+                  {
+                      name: saleForm.name, // Will be Client Name OR Agency Contact Person
+                      cpf: saleForm.cpf,
+                      rg: saleForm.rg,
+                      birthDate: saleForm.birthDate,
+                      phone: saleForm.phone,
+                      address: saleForm.address
+                  },
+                  {
+                      packageId: selectedPackage.id,
+                      qtdAdult: saleForm.qtdAdult,
+                      qtdChild: saleForm.qtdChild,
+                      qtdSenior: saleForm.qtdSenior,
+                      discount: saleForm.discount,
+                      agreedPrice: finalPrice,
+                      saleType: saleForm.saleType,
+                      agencyName: saleForm.saleType === 'AGENCY' ? saleForm.agencyName : undefined,
+                      agencyPhone: saleForm.saleType === 'AGENCY' ? saleForm.agencyPhone : undefined,
+                      paxList: saleForm.saleType === 'AGENCY' ? saleForm.paxList : undefined
+                  }
+              );
+              alert("Venda registrada com sucesso!");
+          }
 
           // Reset
           setSaleForm({ 
               saleType: 'DIRECT', agencyName: '', agencyPhone: '', paxList: '',
               cpf: '', name: '', rg: '', birthDate: '', phone: '', address: '', qtdAdult: 0, qtdChild: 0, qtdSenior: 0, discount: 0 
           });
-          alert("Venda registrada com sucesso!");
       }
   };
 
@@ -410,8 +491,15 @@ const TravelPackagesView: React.FC = () => {
                           </h3>
                           
                           {/* REGISTER SALE FORM */}
-                          <div className="bg-slate-50 p-5 rounded-xl border border-slate-200 mb-8 shadow-sm">
-                              <h4 className="font-bold text-slate-700 mb-3 border-b border-slate-200 pb-2">Nova Venda / Reserva</h4>
+                          <div className="bg-slate-50 p-5 rounded-xl border border-slate-200 mb-8 shadow-sm" id="sale-form-anchor">
+                              <div className="flex justify-between items-center mb-3 border-b border-slate-200 pb-2">
+                                  <h4 className="font-bold text-slate-700">{editingPassenger ? 'Editar Venda / Reserva' : 'Nova Venda / Reserva'}</h4>
+                                  {editingPassenger && (
+                                      <button onClick={handleCancelEdit} className="text-xs text-red-500 font-bold hover:underline">
+                                          Cancelar Edição
+                                      </button>
+                                  )}
+                              </div>
                               <form onSubmit={handleRegisterSale}>
                                   
                                   {/* TYPE OF SALE SELECTION */}
@@ -561,8 +649,8 @@ const TravelPackagesView: React.FC = () => {
                                       </div>
                                   </div>
 
-                                  <button type="submit" className="w-full bg-slate-800 text-white px-4 py-3 rounded font-bold text-sm hover:bg-slate-700 shadow-md">
-                                      Registrar Venda
+                                  <button type="submit" className={`w-full text-white px-4 py-3 rounded font-bold text-sm shadow-md transition-colors ${editingPassenger ? 'bg-blue-600 hover:bg-blue-700' : 'bg-slate-800 hover:bg-slate-700'}`}>
+                                      {editingPassenger ? 'Salvar Alterações' : 'Registrar Venda'}
                                   </button>
                               </form>
                           </div>
@@ -573,7 +661,7 @@ const TravelPackagesView: React.FC = () => {
                                   const progress = getPaymentProgress(p.paidAmount, p.agreedPrice);
                                   const client = clients.find(c => c.id === p.clientId);
                                   return (
-                                      <div key={p.id} className="bg-white border border-slate-200 p-4 rounded-lg hover:shadow-md transition-shadow relative">
+                                      <div key={p.id} className={`bg-white border p-4 rounded-lg hover:shadow-md transition-shadow relative ${editingPassenger?.id === p.id ? 'border-blue-500 ring-2 ring-blue-100' : 'border-slate-200'}`}>
                                           {p.saleType === 'AGENCY' && (
                                               <div className="absolute top-2 right-2 text-[10px] bg-purple-100 text-purple-700 px-2 py-0.5 rounded font-bold uppercase border border-purple-200">
                                                   Agência: {p.agencyName}
@@ -628,14 +716,30 @@ const TravelPackagesView: React.FC = () => {
                                                   <button 
                                                       onClick={() => handlePrintReceipt(p)}
                                                       className="text-xs flex items-center gap-1 bg-slate-100 hover:bg-slate-200 text-slate-700 px-2 py-1.5 rounded transition-colors"
+                                                      title="Imprimir Recibo"
                                                   >
                                                       🖨️ Recibo
                                                   </button>
                                                   <button 
                                                       onClick={() => handlePrintContract(p)}
                                                       className="text-xs flex items-center gap-1 bg-slate-100 hover:bg-slate-200 text-slate-700 px-2 py-1.5 rounded transition-colors"
+                                                      title="Imprimir Contrato"
                                                   >
                                                       📄 Contrato
+                                                  </button>
+                                                  <button 
+                                                      onClick={() => handleEditPassenger(p)}
+                                                      className="text-xs flex items-center gap-1 bg-blue-50 hover:bg-blue-100 text-blue-700 px-2 py-1.5 rounded transition-colors"
+                                                      title="Editar Venda"
+                                                  >
+                                                      ✏️ Editar
+                                                  </button>
+                                                  <button 
+                                                      onClick={() => handleDeletePassenger(p)}
+                                                      className="text-xs flex items-center gap-1 bg-red-50 hover:bg-red-100 text-red-700 px-2 py-1.5 rounded transition-colors"
+                                                      title="Excluir Venda"
+                                                  >
+                                                      🗑️
                                                   </button>
                                               </div>
 
