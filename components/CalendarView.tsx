@@ -204,10 +204,12 @@ const CalendarView: React.FC<CalendarViewProps> = ({ onEventClick }) => {
                 });
 
                 const dayTimeOffs = timeOffs.filter(t => {
-                    // Visibility Logic: Approved OR (Pending and (Manager OR Owner))
                     const isOwner = t.driverId === currentUser.id;
-                    const canSeePending = canManage || isOwner;
-                    if (t.status === 'PENDING' && !canSeePending) return false;
+                    
+                    // PRIVACY RULE: If NOT manager AND NOT owner, hide event.
+                    // This ensures drivers only see their own scale/vacation.
+                    if (!canManage && !isOwner) return false;
+
                     if (t.status === 'REJECTED') return false;
 
                     // 1. Exact Match (Start Date) - Always display
