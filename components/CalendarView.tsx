@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useStore } from '../services/store';
 import { UserRole, Booking } from '../types';
@@ -12,7 +13,14 @@ const CalendarView: React.FC<CalendarViewProps> = ({ onEventClick }) => {
   const [showModal, setShowModal] = useState(false);
   
   // Manager "Add Time Off" State
-  const [newTimeOff, setNewTimeOff] = useState({ driverId: '', date: '', type: 'FOLGA' });
+  const [newTimeOff, setNewTimeOff] = useState({ 
+      driverId: '', 
+      date: '', 
+      endDate: '',
+      type: 'FOLGA',
+      startTime: '',
+      endTime: '' 
+  });
 
   // Booking Details Modal State (For Managers when no external handler is passed)
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
@@ -61,11 +69,18 @@ const CalendarView: React.FC<CalendarViewProps> = ({ onEventClick }) => {
         addTimeOff({
             driverId: newTimeOff.driverId,
             date: newTimeOff.date,
-            type: newTimeOff.type as any
+            endDate: newTimeOff.type === 'FERIAS' ? newTimeOff.endDate : undefined,
+            type: newTimeOff.type as any,
+            startTime: newTimeOff.type === 'PLANTAO' ? newTimeOff.startTime : undefined,
+            endTime: newTimeOff.type === 'PLANTAO' ? newTimeOff.endTime : undefined,
         });
         setShowModal(false);
-        setNewTimeOff({ driverId: '', date: '', type: 'FOLGA' });
+        setNewTimeOff({ driverId: '', date: '', endDate: '', type: 'FOLGA', startTime: '', endTime: '' });
     }
+  };
+
+  const setShift = (start: string, end: string) => {
+      setNewTimeOff({ ...newTimeOff, startTime: start, endTime: end });
   };
 
   const canManage = currentUser.role === UserRole.MANAGER || currentUser.role === UserRole.DEVELOPER;
@@ -82,7 +97,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ onEventClick }) => {
                 onClick={() => setShowModal(true)}
                 className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm"
             >
-                + Lançar Folga/Férias
+                + Lançar Evento
             </button>
         )}
       </div>
@@ -103,6 +118,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ onEventClick }) => {
                                   <p className="font-bold text-slate-800">{driver?.name}</p>
                                   <p className="text-sm text-slate-600">
                                       {t.type} • {formatDateString(t.date)}
+                                      {t.endDate && ` até ${formatDateString(t.endDate)}`}
                                   </p>
                               </div>
                               <div className="flex gap-2">
@@ -160,20 +176,24 @@ const CalendarView: React.FC<CalendarViewProps> = ({ onEventClick }) => {
                 // Filter Events
                 const dayBookings = bookings.filter(b => {
                    if (b.status === 'CANCELLED') return false;
-                   // Parse booking times, ensuring we handle them correctly
                    const start = new Date(b.startTime);
                    const end = new Date(b.endTime);
-                   
-                   // Reset hours to compare purely by date overlap
                    start.setHours(0,0,0,0);
                    end.setHours(23,59,59,999);
-                   
-                   // Cell date needs to be within start and end (inclusive)
-                   // We use the cellDate (noon) to be safe against DST shifts
                    return cellDate >= start && cellDate <= end;
                 });
 
-                const dayTimeOffs = timeOffs.filter(t => t.date === cellDateStr && t.status === 'APPROVED');
+                const dayTimeOffs = timeOffs.filter(t => {
+                    if (t.status !== 'APPROVED') return false;
+                    
+                    // Logic for Vacation Ranges
+                    if (t.type === 'FERIAS' && t.endDate) {
+                        return cellDateStr >= t.date && cellDateStr <= t.endDate;
+                    }
+                    
+                    // Logic for Single Day Events (Folga / Plantão)
+                    return t.date === cellDateStr;
+                });
 
                 // For drivers, filter only their own events
                 const visibleBookings = currentUser.role === UserRole.DRIVER 
@@ -195,9 +215,26 @@ const CalendarView: React.FC<CalendarViewProps> = ({ onEventClick }) => {
                         <div className="mt-1 space-y-1 overflow-y-auto max-h-[80px]">
                             {visibleTimeOffs.map(t => {
                                 const driver = users.find(u => u.id === t.driverId);
+                                const isVacation = t.type === 'FERIAS';
+                                const isStandby = t.type === 'PLANTAO';
+                                
+                                let styleClass = 'bg-yellow-100 text-yellow-800 border-yellow-200';
+                                let icon = '🚫';
+                                let label = 'Folga';
+
+                                if (isVacation) {
+                                    styleClass = 'bg-green-100 text-green-800 border-green-200';
+                                    icon = '🏖️';
+                                    label = 'Férias';
+                                } else if (isStandby) {
+                                    styleClass = 'bg-purple-100 text-purple-800 border-purple-200';
+                                    icon = '🚨';
+                                    label = t.startTime ? `${t.startTime}-${t.endTime}` : 'Plantão';
+                                }
+
                                 return (
-                                    <div key={t.id} className="text-[10px] bg-yellow-100 text-yellow-800 px-1 py-0.5 rounded truncate font-medium border border-yellow-200" title={`${t.type} - ${driver?.name}`}>
-                                        🚫 {canManage ? driver?.name.split(' ')[0] : 'Folga'}
+                                    <div key={t.id} className={`text-[10px] px-1 py-0.5 rounded truncate font-medium border ${styleClass}`} title={`${t.type} - ${driver?.name}`}>
+                                        {icon} {canManage ? driver?.name.split(' ')[0] : ''} {label}
                                     </div>
                                 );
                             })}
@@ -308,12 +345,21 @@ const CalendarView: React.FC<CalendarViewProps> = ({ onEventClick }) => {
             </div>
       )}
 
-      {/* Modal for adding Time Off (Manager Only) */}
+      {/* Modal for adding Time Off / Shift / Vacation (Manager Only) */}
       {showModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100]">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100] p-4">
             <div className="bg-white p-6 rounded-xl w-full max-w-md shadow-2xl relative z-[101]">
-                <h3 className="text-xl font-bold mb-4">Lançar Folga / Férias</h3>
+                <h3 className="text-xl font-bold mb-4 text-slate-800">Lançar Evento na Escala</h3>
                 <form onSubmit={handleAddFolga} className="space-y-4">
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Tipo de Evento</label>
+                        <div className="flex gap-2">
+                            <button type="button" onClick={() => setNewTimeOff({...newTimeOff, type: 'FOLGA'})} className={`flex-1 py-2 text-sm font-bold rounded border ${newTimeOff.type === 'FOLGA' ? 'bg-yellow-100 text-yellow-800 border-yellow-300' : 'bg-white border-slate-200 text-slate-500'}`}>Folga</button>
+                            <button type="button" onClick={() => setNewTimeOff({...newTimeOff, type: 'PLANTAO'})} className={`flex-1 py-2 text-sm font-bold rounded border ${newTimeOff.type === 'PLANTAO' ? 'bg-purple-100 text-purple-800 border-purple-300' : 'bg-white border-slate-200 text-slate-500'}`}>Plantão</button>
+                            <button type="button" onClick={() => setNewTimeOff({...newTimeOff, type: 'FERIAS'})} className={`flex-1 py-2 text-sm font-bold rounded border ${newTimeOff.type === 'FERIAS' ? 'bg-green-100 text-green-800 border-green-300' : 'bg-white border-slate-200 text-slate-500'}`}>Férias</button>
+                        </div>
+                    </div>
+
                     <div>
                         <label className="block text-sm font-medium text-slate-700 mb-1">Motorista</label>
                         <select 
@@ -328,30 +374,63 @@ const CalendarView: React.FC<CalendarViewProps> = ({ onEventClick }) => {
                             ))}
                         </select>
                     </div>
-                    <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">Data</label>
-                        <input 
-                            type="date" 
-                            className="w-full border p-2 rounded"
-                            value={newTimeOff.date}
-                            onChange={(e) => setNewTimeOff({...newTimeOff, date: e.target.value})}
-                            required
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">Tipo</label>
-                        <select 
-                            className="w-full border p-2 rounded"
-                            value={newTimeOff.type}
-                            onChange={(e) => setNewTimeOff({...newTimeOff, type: e.target.value})}
-                        >
-                            <option value="FOLGA">Folga</option>
-                            <option value="FERIAS">Férias</option>
-                        </select>
-                    </div>
+
+                    {/* Date Logic */}
+                    {newTimeOff.type === 'FERIAS' ? (
+                        <div className="grid grid-cols-2 gap-3">
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-1">Data Início</label>
+                                <input 
+                                    type="date" 
+                                    className="w-full border p-2 rounded"
+                                    value={newTimeOff.date}
+                                    onChange={(e) => setNewTimeOff({...newTimeOff, date: e.target.value})}
+                                    required
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-1">Data Fim</label>
+                                <input 
+                                    type="date" 
+                                    className="w-full border p-2 rounded"
+                                    value={newTimeOff.endDate}
+                                    onChange={(e) => setNewTimeOff({...newTimeOff, endDate: e.target.value})}
+                                    required
+                                />
+                            </div>
+                        </div>
+                    ) : (
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Data</label>
+                            <input 
+                                type="date" 
+                                className="w-full border p-2 rounded"
+                                value={newTimeOff.date}
+                                onChange={(e) => setNewTimeOff({...newTimeOff, date: e.target.value})}
+                                required
+                            />
+                        </div>
+                    )}
+
+                    {/* Shift Logic for Plantão */}
+                    {newTimeOff.type === 'PLANTAO' && (
+                        <div className="bg-purple-50 p-3 rounded border border-purple-100">
+                            <label className="block text-xs font-bold text-purple-800 uppercase mb-2">Horário do Plantão</label>
+                            <div className="flex flex-wrap gap-2 mb-3">
+                                <button type="button" onClick={() => setShift('08:00', '16:20')} className="text-xs bg-white border border-purple-200 text-purple-700 px-2 py-1 rounded hover:bg-purple-200">08:00 - 16:20</button>
+                                <button type="button" onClick={() => setShift('14:00', '22:00')} className="text-xs bg-white border border-purple-200 text-purple-700 px-2 py-1 rounded hover:bg-purple-200">14:00 - 22:00</button>
+                                <button type="button" onClick={() => setShift('22:00', '06:00')} className="text-xs bg-white border border-purple-200 text-purple-700 px-2 py-1 rounded hover:bg-purple-200">22:00 - 06:00</button>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2">
+                                <input type="time" className="border p-1 rounded text-sm" value={newTimeOff.startTime} onChange={e => setNewTimeOff({...newTimeOff, startTime: e.target.value})} />
+                                <input type="time" className="border p-1 rounded text-sm" value={newTimeOff.endTime} onChange={e => setNewTimeOff({...newTimeOff, endTime: e.target.value})} />
+                            </div>
+                        </div>
+                    )}
+
                     <div className="flex gap-2 pt-2">
                         <button type="button" onClick={() => setShowModal(false)} className="flex-1 bg-gray-200 text-gray-800 py-2 rounded hover:bg-gray-300">Cancelar</button>
-                        <button type="submit" className="flex-1 bg-blue-600 text-white py-2 rounded hover:bg-blue-700">Confirmar</button>
+                        <button type="submit" className="flex-1 bg-slate-800 text-white py-2 rounded hover:bg-slate-700">Salvar Evento</button>
                     </div>
                 </form>
             </div>

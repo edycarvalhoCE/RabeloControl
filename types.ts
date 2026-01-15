@@ -73,8 +73,11 @@ export interface Transaction {
 export interface TimeOff {
   id: string;
   driverId: string;
-  date: string; // YYYY-MM-DD
-  type: 'FOLGA' | 'FERIAS';
+  date: string; // YYYY-MM-DD (Start Date)
+  endDate?: string; // YYYY-MM-DD (End Date for Vacations)
+  type: 'FOLGA' | 'FERIAS' | 'PLANTAO';
+  startTime?: string; // HH:mm for Plantão
+  endTime?: string; // HH:mm for Plantão
   status: 'APPROVED' | 'PENDING' | 'REJECTED';
 }
 

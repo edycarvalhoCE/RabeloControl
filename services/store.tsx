@@ -264,12 +264,23 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         const tripEnd = new Date(bookingData.endTime).getTime();
         const driverConflict = timeOffs.find(t => {
             if (t.driverId !== bookingData.driverId || t.status !== 'APPROVED') return false;
+            // Check ranges for Vacation
+            if (t.type === 'FERIAS' && t.endDate) {
+                const offStart = new Date(t.date).setHours(0,0,0,0);
+                const offEnd = new Date(t.endDate).setHours(23,59,59,999);
+                return (tripStart <= offEnd && tripEnd >= offStart);
+            }
+            // Check single days for Folga/Plantão
             const [y, m, d] = t.date.split('-').map(Number);
             const offStart = new Date(y, m - 1, d, 0, 0, 0).getTime();
             const offEnd = new Date(y, m - 1, d, 23, 59, 59).getTime();
+            
+            // Allow booking during Plantão? Usually yes, if it matches time, but simplistic check here flags it.
+            // Let's flag Plantão as "unavailable" for regular bookings unless specifically assigned (which logic isn't here yet)
+            // So essentially, if they are marked as anything, warn.
             return (tripStart <= offEnd && tripEnd >= offStart);
         });
-        if (driverConflict) return { success: false, message: `Motorista Indisponível! Ele está de ${driverConflict.type}.` };
+        if (driverConflict) return { success: false, message: `Motorista Indisponível! Ele está de ${driverConflict.type} (${driverConflict.date}).` };
     }
 
     try {
@@ -340,7 +351,17 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   const addPart = async (part: Omit<Part, 'id'>) => { if (isConfigured) await addDoc(collection(db, 'parts'), part); };
   const updateStock = async (id: string, quantityDelta: number) => { if (isConfigured) { const part = parts.find(p => p.id === id); if (part) await updateDoc(doc(db, 'parts', id), { quantity: Math.max(0, part.quantity + quantityDelta) }); } };
   const addTransaction = async (transaction: Omit<Transaction, 'id'>) => { if (isConfigured) await addDoc(collection(db, 'transactions'), transaction); };
-  const addTimeOff = async (timeOff: Omit<TimeOff, 'id' | 'status'>) => { if (isConfigured) { const isManager = currentUser?.role === UserRole.MANAGER || currentUser?.role === UserRole.DEVELOPER; await addDoc(collection(db, 'timeOffs'), { ...timeOff, status: isManager ? 'APPROVED' : 'PENDING' }); } };
+  
+  const addTimeOff = async (timeOff: Omit<TimeOff, 'id' | 'status'>) => { 
+      if (isConfigured) { 
+          const isManager = currentUser?.role === UserRole.MANAGER || currentUser?.role === UserRole.DEVELOPER; 
+          await addDoc(collection(db, 'timeOffs'), { 
+              ...timeOff, 
+              status: isManager ? 'APPROVED' : 'PENDING' 
+          }); 
+      } 
+  };
+  
   const updateTimeOffStatus = async (id: string, status: 'APPROVED' | 'REJECTED') => { if (isConfigured) await updateDoc(doc(db, 'timeOffs', id), { status }); };
   const addDocument = async (docData: Omit<DriverDocument, 'id' | 'uploadDate'>) => { if (isConfigured) await addDoc(collection(db, 'documents'), { ...docData, uploadDate: new Date().toISOString() }); };
   const deleteDocument = async (id: string) => { if (isConfigured) await deleteDoc(doc(db, 'documents', id)); };

@@ -6,8 +6,12 @@ import { Booking } from '../types';
 
 const DriverPortal: React.FC = () => {
   const { currentUser, bookings, timeOffs, addTimeOff, documents, buses, addMaintenanceReport, maintenanceReports, addFuelRecord, driverLiabilities } = useStore();
-  const [requestDate, setRequestDate] = useState('');
+  
+  // Request State
   const [requestType, setRequestType] = useState<'FOLGA' | 'FERIAS'>('FOLGA');
+  const [requestDate, setRequestDate] = useState('');
+  const [requestEndDate, setRequestEndDate] = useState('');
+
   const [activeTab, setActiveTab] = useState<'schedule' | 'documents' | 'requests' | 'report' | 'fuel' | 'finance'>('schedule');
 
   // Trip Details Modal State
@@ -43,9 +47,11 @@ const DriverPortal: React.FC = () => {
         addTimeOff({
             driverId: currentUser.id,
             date: requestDate,
+            endDate: requestType === 'FERIAS' ? requestEndDate : undefined,
             type: requestType
         });
         setRequestDate('');
+        setRequestEndDate('');
         alert('Solicitação enviada!');
     }
   };
@@ -492,24 +498,37 @@ const DriverPortal: React.FC = () => {
                     <h2 className="text-lg font-bold text-slate-800 mb-4">Solicitar Folga / Férias</h2>
                     <form onSubmit={handleRequest} className="space-y-4">
                         <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-1">Data</label>
-                            <input 
-                                type="date" required 
-                                value={requestDate} onChange={e => setRequestDate(e.target.value)}
-                                className="w-full border p-2 rounded focus:ring-2 focus:ring-blue-500 outline-none"
-                            />
-                        </div>
-                        <div>
                             <label className="block text-sm font-medium text-slate-700 mb-1">Tipo</label>
                             <select 
                                 value={requestType} 
                                 onChange={e => setRequestType(e.target.value as any)}
                                 className="w-full border p-2 rounded focus:ring-2 focus:ring-blue-500 outline-none"
                             >
-                                <option value="FOLGA">Folga</option>
-                                <option value="FERIAS">Férias</option>
+                                <option value="FOLGA">Folga (Dia Único)</option>
+                                <option value="FERIAS">Férias (Período)</option>
                             </select>
                         </div>
+                        
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Data Início</label>
+                            <input 
+                                type="date" required 
+                                value={requestDate} onChange={e => setRequestDate(e.target.value)}
+                                className="w-full border p-2 rounded focus:ring-2 focus:ring-blue-500 outline-none"
+                            />
+                        </div>
+
+                        {requestType === 'FERIAS' && (
+                            <div className="animate-fade-in">
+                                <label className="block text-sm font-medium text-slate-700 mb-1">Data Fim</label>
+                                <input 
+                                    type="date" required 
+                                    value={requestEndDate} onChange={e => setRequestEndDate(e.target.value)}
+                                    className="w-full border p-2 rounded focus:ring-2 focus:ring-blue-500 outline-none"
+                                />
+                            </div>
+                        )}
+
                         <button type="submit" className="w-full bg-slate-800 text-white font-medium py-2 rounded hover:bg-slate-700">
                             Enviar Solicitação
                         </button>
@@ -523,8 +542,10 @@ const DriverPortal: React.FC = () => {
                             <div key={t.id} className="bg-slate-50 p-3 rounded flex justify-between items-center text-sm border border-slate-200">
                                 <div>
                                     <span className="font-semibold block text-slate-800">{t.type}</span>
-                                    {/* Use format function to fix date display */}
-                                    <span className="text-slate-500">{formatDateString(t.date)}</span>
+                                    <span className="text-slate-500">
+                                        {formatDateString(t.date)}
+                                        {t.endDate && ` até ${formatDateString(t.endDate)}`}
+                                    </span>
                                 </div>
                                 {getStatusBadge(t.status)}
                             </div>
