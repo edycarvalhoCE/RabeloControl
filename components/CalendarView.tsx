@@ -1,11 +1,19 @@
 
 import React, { useState } from 'react';
 import { useStore } from '../services/store';
-import { UserRole, Booking } from '../types';
+import { UserRole, Booking, TimeOff, CharterContract } from '../types';
 
 interface CalendarViewProps {
   onEventClick?: (booking: Booking) => void;
 }
+
+// Helper Type for the Generic Modal
+type GenericEventType = {
+    type: 'TIMEOFF' | 'CHARTER';
+    data: any;
+    title: string;
+    colorClass: string;
+};
 
 const CalendarView: React.FC<CalendarViewProps> = ({ onEventClick }) => {
   const { bookings, timeOffs, users, currentUser, addTimeOff, updateTimeOffStatus, deleteTimeOff, buses, charterContracts } = useStore();
@@ -22,8 +30,11 @@ const CalendarView: React.FC<CalendarViewProps> = ({ onEventClick }) => {
       endTime: '' 
   });
 
-  // Booking Details Modal State (For Managers when no external handler is passed)
+  // Booking Details Modal State
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
+
+  // NEW: Generic Event Details Modal State (TimeOff / Charter)
+  const [selectedGenericEvent, setSelectedGenericEvent] = useState<GenericEventType | null>(null);
 
   const drivers = users.filter(u => u.role === UserRole.DRIVER);
   const canManage = currentUser.role === UserRole.MANAGER || currentUser.role === UserRole.DEVELOPER;
@@ -94,10 +105,10 @@ const CalendarView: React.FC<CalendarViewProps> = ({ onEventClick }) => {
     setNewTimeOff(prev => ({ ...prev, driverId: '', type: 'FOLGA', startTime: '', endTime: '', endDate: '' }));
   };
 
-  const handleDeleteTimeOff = (e: React.MouseEvent, id: string, name: string) => {
-      e.stopPropagation(); // Prevent bubble up
+  const handleDeleteTimeOff = (id: string, name: string) => {
       if (window.confirm(`Tem certeza que deseja excluir este evento de ${name}?`)) {
           deleteTimeOff(id);
+          setSelectedGenericEvent(null); // Close modal if open
       }
   };
 
@@ -271,29 +282,46 @@ const CalendarView: React.FC<CalendarViewProps> = ({ onEventClick }) => {
                                 }
 
                                 return (
-                                    <div key={t.id} className={`group text-[10px] px-1 py-0.5 rounded truncate font-medium border ${styleClass} flex justify-between items-center`} title={`${t.type} - ${driver?.name}`}>
+                                    <div 
+                                        key={t.id} 
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setSelectedGenericEvent({
+                                                type: 'TIMEOFF',
+                                                data: t,
+                                                title: isVacation ? 'Férias' : isStandby ? 'Plantão' : 'Folga',
+                                                colorClass: styleClass.replace('border', '').split(' ')[0] // Extract bg color
+                                            });
+                                        }}
+                                        className={`group text-[10px] px-1 py-0.5 rounded truncate font-medium border cursor-pointer hover:shadow-sm ${styleClass} flex justify-between items-center`} 
+                                        title={`${t.type} - ${driver?.name}`}
+                                    >
                                         <div className="truncate">
                                             {icon} <strong>{driver?.name?.split(' ')[0] || '...'}</strong> {label}
                                         </div>
-                                        {canManage && (
-                                            <button 
-                                                onClick={(e) => handleDeleteTimeOff(e, t.id, driver?.name || 'Motorista')}
-                                                className="ml-1 text-red-600 hover:text-red-800 hover:bg-red-200 rounded px-1 font-bold hidden group-hover:block"
-                                                title="Excluir"
-                                            >
-                                                &times;
-                                            </button>
-                                        )}
                                     </div>
                                 );
                             })}
                             
-                            {/* CHARTER EVENTS - Orange color for visibility */}
+                            {/* CHARTER EVENTS */}
                             {dayCharters.map(c => {
                                 const driver = users.find(u => u.id === c.driverId);
                                 const driverName = driver ? driver.name : c.freelanceDriverName ? `${c.freelanceDriverName} (F)` : 'S/ Mot';
                                 return (
-                                    <div key={`charter-${c.id}-${day}`} className="text-[10px] px-2 py-1 rounded truncate font-medium border bg-orange-100 text-orange-900 border-orange-300" title={`Fretamento: ${c.clientName}`}>
+                                    <div 
+                                        key={`charter-${c.id}-${day}`} 
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setSelectedGenericEvent({
+                                                type: 'CHARTER',
+                                                data: { ...c, currentDate: cellDateStr },
+                                                title: 'Fretamento',
+                                                colorClass: 'bg-orange-100'
+                                            });
+                                        }}
+                                        className="text-[10px] px-2 py-1 rounded truncate font-medium border bg-orange-100 text-orange-900 border-orange-300 cursor-pointer hover:bg-orange-200" 
+                                        title={`Fretamento: ${c.clientName}`}
+                                    >
                                         🏭 {canManage ? `${c.route.substring(0,12)}.. (${driverName.split(' ')[0]})` : c.route}
                                     </div>
                                 )
@@ -330,6 +358,121 @@ const CalendarView: React.FC<CalendarViewProps> = ({ onEventClick }) => {
             })}
         </div>
       </div>
+
+      {/* GENERIC EVENT MODAL (Folga, Férias, Plantão, Fretamento) */}
+      {selectedGenericEvent && (
+          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[100] p-4" onClick={() => setSelectedGenericEvent(null)}>
+              <div className="bg-white rounded-xl shadow-2xl max-w-sm w-full overflow-hidden animate-fade-in relative z-[101]" onClick={e => e.stopPropagation()}>
+                  <div className={`p-4 flex justify-between items-center text-slate-800 ${selectedGenericEvent.colorClass} bg-opacity-50`}>
+                      <h3 className="font-bold text-lg flex items-center gap-2">
+                          {selectedGenericEvent.type === 'TIMEOFF' ? (
+                              selectedGenericEvent.data.type === 'FERIAS' ? '🏖️ Férias' : 
+                              selectedGenericEvent.data.type === 'PLANTAO' ? '🚨 Plantão' : '🚫 Folga'
+                          ) : '🏭 Fretamento'}
+                      </h3>
+                      <button onClick={() => setSelectedGenericEvent(null)} className="text-slate-500 hover:text-slate-900 font-bold text-xl">&times;</button>
+                  </div>
+                  
+                  <div className="p-6 space-y-4">
+                      {/* TIMEOFF CONTENT */}
+                      {selectedGenericEvent.type === 'TIMEOFF' && (
+                          <>
+                              {(() => {
+                                  const t = selectedGenericEvent.data as TimeOff;
+                                  const driver = users.find(u => u.id === t.driverId);
+                                  return (
+                                      <div className="space-y-3">
+                                          <div>
+                                              <p className="text-xs text-slate-500 font-bold uppercase">Motorista</p>
+                                              <p className="text-lg font-bold text-slate-800">{driver?.name}</p>
+                                          </div>
+                                          <div>
+                                              <p className="text-xs text-slate-500 font-bold uppercase">Data</p>
+                                              <p className="text-slate-700">
+                                                  {formatDateString(t.date)}
+                                                  {t.endDate && ` até ${formatDateString(t.endDate)}`}
+                                              </p>
+                                          </div>
+                                          {t.type === 'PLANTAO' && (
+                                              <div>
+                                                  <p className="text-xs text-slate-500 font-bold uppercase">Horário</p>
+                                                  <p className="text-slate-700 font-medium bg-purple-50 p-2 rounded border border-purple-100 inline-block">
+                                                      {t.startTime} - {t.endTime}
+                                                  </p>
+                                              </div>
+                                          )}
+                                          <div>
+                                              <p className="text-xs text-slate-500 font-bold uppercase">Status</p>
+                                              <span className={`px-2 py-1 rounded text-xs font-bold ${
+                                                  t.status === 'APPROVED' ? 'bg-green-100 text-green-700' : 
+                                                  t.status === 'REJECTED' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'
+                                              }`}>
+                                                  {t.status === 'APPROVED' ? 'Aprovado' : t.status === 'REJECTED' ? 'Recusado' : 'Pendente'}
+                                              </span>
+                                          </div>
+
+                                          {canManage && (
+                                              <button 
+                                                  onClick={() => handleDeleteTimeOff(t.id, driver?.name || 'Motorista')}
+                                                  className="w-full mt-4 border border-red-200 text-red-600 py-2 rounded hover:bg-red-50 text-sm font-bold"
+                                              >
+                                                  Excluir Evento
+                                              </button>
+                                          )}
+                                      </div>
+                                  );
+                              })()}
+                          </>
+                      )}
+
+                      {/* CHARTER CONTENT */}
+                      {selectedGenericEvent.type === 'CHARTER' && (
+                          <>
+                              {(() => {
+                                  const c = selectedGenericEvent.data;
+                                  const bus = buses.find(b => b.id === c.busId);
+                                  const driver = users.find(u => u.id === c.driverId);
+                                  const driverDisplay = c.driverId ? driver?.name : c.freelanceDriverName ? `${c.freelanceDriverName} (Freelance)` : 'Não atribuído';
+                                  
+                                  return (
+                                      <div className="space-y-3">
+                                          <div>
+                                              <p className="text-xs text-slate-500 font-bold uppercase">Rota / Linha</p>
+                                              <p className="text-lg font-bold text-slate-800">{c.route}</p>
+                                          </div>
+                                          <div>
+                                              <p className="text-xs text-slate-500 font-bold uppercase">Cliente</p>
+                                              <p className="text-slate-700">{c.clientName}</p>
+                                          </div>
+                                          <div className="grid grid-cols-2 gap-4">
+                                              <div>
+                                                  <p className="text-xs text-slate-500 font-bold uppercase">Data</p>
+                                                  <p className="text-slate-700 font-medium">{formatDateString(c.currentDate)}</p>
+                                              </div>
+                                              <div>
+                                                  <p className="text-xs text-slate-500 font-bold uppercase">Horários</p>
+                                                  <p className="text-slate-700 text-sm">{c.morningDeparture} / {c.afternoonDeparture}</p>
+                                              </div>
+                                          </div>
+                                          <div className="bg-slate-50 p-3 rounded border border-slate-200">
+                                              <div className="mb-2">
+                                                  <p className="text-xs text-slate-500 font-bold uppercase">Motorista</p>
+                                                  <p className="text-sm font-medium text-slate-800">{driverDisplay}</p>
+                                              </div>
+                                              <div>
+                                                  <p className="text-xs text-slate-500 font-bold uppercase">Veículo</p>
+                                                  <p className="text-sm font-medium text-slate-800">{bus?.plate} - {bus?.model}</p>
+                                              </div>
+                                          </div>
+                                      </div>
+                                  );
+                              })()}
+                          </>
+                      )}
+                  </div>
+              </div>
+          </div>
+      )}
 
       {/* TRIP DETAILS MODAL (Pop-up igual ao do Motorista) */}
       {selectedBooking && (
