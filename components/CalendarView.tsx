@@ -8,7 +8,7 @@ interface CalendarViewProps {
 }
 
 const CalendarView: React.FC<CalendarViewProps> = ({ onEventClick }) => {
-  const { bookings, timeOffs, users, currentUser, addTimeOff, updateTimeOffStatus, buses } = useStore();
+  const { bookings, timeOffs, users, currentUser, addTimeOff, updateTimeOffStatus, deleteTimeOff, buses } = useStore();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [showModal, setShowModal] = useState(false);
   
@@ -79,6 +79,13 @@ const CalendarView: React.FC<CalendarViewProps> = ({ onEventClick }) => {
         // Reset only some fields, keep date for convenience
         setNewTimeOff(prev => ({ ...prev, driverId: '', type: 'FOLGA', startTime: '', endTime: '', endDate: '' }));
     }
+  };
+
+  const handleDeleteTimeOff = (e: React.MouseEvent, id: string, name: string) => {
+      e.stopPropagation(); // Prevent bubble up
+      if (window.confirm(`Tem certeza que deseja excluir este evento de ${name}?`)) {
+          deleteTimeOff(id);
+      }
   };
 
   const setShift = (start: string, end: string) => {
@@ -241,8 +248,19 @@ const CalendarView: React.FC<CalendarViewProps> = ({ onEventClick }) => {
                                 }
 
                                 return (
-                                    <div key={t.id} className={`text-[10px] px-1 py-0.5 rounded truncate font-medium border ${styleClass}`} title={`${t.type} - ${driver?.name}`}>
-                                        {icon} <strong>{driver?.name.split(' ')[0]}</strong> {label}
+                                    <div key={t.id} className={`group text-[10px] px-1 py-0.5 rounded truncate font-medium border ${styleClass} flex justify-between items-center`} title={`${t.type} - ${driver?.name}`}>
+                                        <div className="truncate">
+                                            {icon} <strong>{driver?.name?.split(' ')[0] || '...'}</strong> {label}
+                                        </div>
+                                        {canManage && (
+                                            <button 
+                                                onClick={(e) => handleDeleteTimeOff(e, t.id, driver?.name || 'Motorista')}
+                                                className="ml-1 text-red-600 hover:text-red-800 hover:bg-red-200 rounded px-1 font-bold hidden group-hover:block"
+                                                title="Excluir"
+                                            >
+                                                &times;
+                                            </button>
+                                        )}
                                     </div>
                                 );
                             })}
@@ -267,7 +285,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ onEventClick }) => {
                                         }`} 
                                         title={`${b.destination} - ${driver?.name || 'S/ Motorista'}`}
                                     >
-                                        🚌 {canManage ? `${b.destination} (${driver?.name.split(' ')[0] || '?'})` : b.destination}
+                                        🚌 {canManage ? `${b.destination} (${driver?.name?.split(' ')[0] || '?'})` : b.destination}
                                     </div>
                                 );
                             })}
