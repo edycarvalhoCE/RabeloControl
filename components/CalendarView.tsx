@@ -226,7 +226,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ onEventClick }) => {
                     // Check status
                     if (c.status !== 'ACTIVE') return false;
                     
-                    // Privacy Check
+                    // Privacy Check (Manager sees all, Driver sees own)
                     const isOwner = c.driverId === currentUser.id;
                     if (!canManage && !isOwner) return false;
 
@@ -288,13 +288,13 @@ const CalendarView: React.FC<CalendarViewProps> = ({ onEventClick }) => {
                                 );
                             })}
                             
-                            {/* CHARTER EVENTS */}
+                            {/* CHARTER EVENTS - Orange color for visibility */}
                             {dayCharters.map(c => {
                                 const driver = users.find(u => u.id === c.driverId);
                                 const driverName = driver ? driver.name : c.freelanceDriverName ? `${c.freelanceDriverName} (F)` : 'S/ Mot';
                                 return (
-                                    <div key={`charter-${c.id}-${day}`} className="text-[10px] px-2 py-1 rounded truncate font-medium border bg-indigo-100 text-indigo-800 border-indigo-200" title={`Fretamento: ${c.clientName}`}>
-                                        🏭 {canManage ? `${c.route.substring(0,10)}.. (${driverName.split(' ')[0]})` : c.route}
+                                    <div key={`charter-${c.id}-${day}`} className="text-[10px] px-2 py-1 rounded truncate font-medium border bg-orange-100 text-orange-900 border-orange-300" title={`Fretamento: ${c.clientName}`}>
+                                        🏭 {canManage ? `${c.route.substring(0,12)}.. (${driverName.split(' ')[0]})` : c.route}
                                     </div>
                                 )
                             })}

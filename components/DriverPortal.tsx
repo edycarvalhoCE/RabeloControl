@@ -5,7 +5,7 @@ import CalendarView from './CalendarView';
 import { Booking } from '../types';
 
 const DriverPortal: React.FC = () => {
-  const { currentUser, bookings, timeOffs, addTimeOff, documents, buses, addMaintenanceReport, maintenanceReports, addFuelRecord, driverLiabilities } = useStore();
+  const { currentUser, bookings, timeOffs, addTimeOff, documents, buses, addMaintenanceReport, maintenanceReports, addFuelRecord, driverLiabilities, charterContracts } = useStore();
   
   // Request State
   const [requestType, setRequestType] = useState<'FOLGA' | 'FERIAS'>('FOLGA');
@@ -32,9 +32,52 @@ const DriverPortal: React.FC = () => {
       stationName: ''
   });
 
-  const myBookings = bookings
+  // --- LOGIC TO MERGE BOOKINGS AND CHARTER SCHEDULE ---
+  
+  // 1. Regular Bookings
+  const myRegularBookings = bookings
     .filter(b => b.driverId === currentUser.id && b.status !== 'CANCELLED')
-    .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
+    .map(b => ({ ...b, isCharter: false, sortTime: new Date(b.startTime).getTime() }));
+
+  // 2. Generate Charter Occurrences for next 15 days
+  const myCharterOccurrences: any[] = [];
+  const myContracts = charterContracts.filter(c => c.driverId === currentUser.id && c.status === 'ACTIVE');
+  
+  if (myContracts.length > 0) {
+      const today = new Date();
+      today.setHours(0,0,0,0);
+
+      // Look ahead 15 days
+      for (let i = 0; i < 15; i++) {
+          const d = new Date(today);
+          d.setDate(today.getDate() + i);
+          const dStr = d.toISOString().split('T')[0];
+          const dayOfWeek = d.getDay(); // 0=Sun, 1=Mon...
+
+          myContracts.forEach(c => {
+              // Check range and weekday
+              if (dStr >= c.startDate && dStr <= c.endDate && c.weekDays.includes(dayOfWeek)) {
+                  // Create a fake booking object for display
+                  myCharterOccurrences.push({
+                      id: `${c.id}_${dStr}`, // Unique temp ID
+                      destination: `${c.clientName} (Fretamento)`, // Display Route/Client
+                      clientName: c.clientName,
+                      startTime: `${dStr}T${c.morningDeparture}`,
+                      endTime: `${dStr}T${c.afternoonDeparture}`,
+                      busId: c.busId,
+                      driverId: currentUser.id,
+                      status: 'CONFIRMED',
+                      isCharter: true,
+                      observations: `Rota: ${c.route}`,
+                      sortTime: new Date(`${dStr}T${c.morningDeparture}`).getTime()
+                  });
+              }
+          });
+      }
+  }
+
+  // 3. Merge and Sort
+  const combinedSchedule = [...myRegularBookings, ...myCharterOccurrences].sort((a, b) => a.sortTime - b.sortTime);
 
   const myTimeOffs = timeOffs.filter(t => t.driverId === currentUser.id);
   const myDocuments = documents.filter(d => d.driverId === currentUser.id);
@@ -192,25 +235,31 @@ const DriverPortal: React.FC = () => {
                 <div className="space-y-4">
                     <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
                         <span className="bg-blue-100 text-blue-600 p-2 rounded-lg text-sm">🚌</span>
-                        Próximas Viagens
+                        Próximas Viagens e Fretamentos
                     </h2>
-                    <div className="space-y-3">
-                        {myBookings.length === 0 ? (
-                            <p className="text-slate-500 italic">Nenhuma viagem agendada no momento.</p>
+                    <div className="space-y-3 max-h-[600px] overflow-y-auto pr-1">
+                        {combinedSchedule.length === 0 ? (
+                            <p className="text-slate-500 italic">Nenhuma viagem agendada para os próximos 15 dias.</p>
                         ) : (
-                            myBookings.slice(0, 3).map(booking => (
+                            combinedSchedule.slice(0, 10).map((booking: any) => (
                                 <div 
                                     key={booking.id} 
                                     onClick={() => handleBookingClick(booking)}
-                                    className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 border-l-4 border-l-blue-500 cursor-pointer hover:shadow-md transition-shadow"
+                                    className={`p-4 rounded-xl shadow-sm border cursor-pointer hover:shadow-md transition-shadow relative overflow-hidden ${
+                                        booking.isCharter 
+                                        ? 'bg-orange-50 border-orange-200 border-l-4 border-l-orange-500' 
+                                        : 'bg-white border-slate-200 border-l-4 border-l-blue-500'
+                                    }`}
                                 >
                                     <div className="flex justify-between items-start mb-2">
-                                        <h3 className="font-bold text-base">{booking.destination}</h3>
-                                        <span className="text-xs font-semibold bg-blue-50 text-blue-600 px-2 py-1 rounded">Ver Detalhes</span>
+                                        <h3 className="font-bold text-base text-slate-800">{booking.destination}</h3>
+                                        <span className={`text-[10px] font-bold px-2 py-1 rounded ${booking.isCharter ? 'bg-orange-200 text-orange-800' : 'bg-blue-100 text-blue-600'}`}>
+                                            {booking.isCharter ? 'FRETAMENTO' : 'LOCAÇÃO'}
+                                        </span>
                                     </div>
                                     <div className="text-xs text-slate-600 space-y-1">
-                                        <p>📅 {new Date(booking.startTime).toLocaleDateString()} - {new Date(booking.startTime).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</p>
-                                        <p>🏁 Retorno: {new Date(booking.endTime).toLocaleDateString()}</p>
+                                        <p className="font-semibold">📅 {new Date(booking.startTime).toLocaleDateString()} • {new Date(booking.startTime).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</p>
+                                        {!booking.isCharter && <p>🏁 Retorno: {new Date(booking.endTime).toLocaleDateString()}</p>}
                                     </div>
                                 </div>
                             ))
