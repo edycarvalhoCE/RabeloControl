@@ -15,7 +15,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ onEventClick }) => {
   // Manager "Add Time Off" State
   const [newTimeOff, setNewTimeOff] = useState({ 
       driverId: '', 
-      date: '', 
+      date: new Date().toISOString().split('T')[0], // Default to today
       endDate: '',
       type: 'FOLGA',
       startTime: '',
@@ -51,8 +51,8 @@ const CalendarView: React.FC<CalendarViewProps> = ({ onEventClick }) => {
   // HELPER: Format date string YYYY-MM-DD to DD/MM/YYYY manually to avoid timezone bugs
   const formatDateString = (dateStr: string) => {
     if(!dateStr) return '';
-    const [year, month, day] = dateStr.split('-');
-    return `${day}/${month}/${year}`;
+    const [y, m, d] = dateStr.split('-');
+    return `${d}/${m}/${y}`;
   };
 
   // Helper for DateTime display in Modal
@@ -76,7 +76,8 @@ const CalendarView: React.FC<CalendarViewProps> = ({ onEventClick }) => {
             endTime: newTimeOff.type === 'PLANTAO' ? newTimeOff.endTime : undefined,
         });
         setShowModal(false);
-        setNewTimeOff({ driverId: '', date: '', endDate: '', type: 'FOLGA', startTime: '', endTime: '' });
+        // Reset only some fields, keep date for convenience
+        setNewTimeOff(prev => ({ ...prev, driverId: '', type: 'FOLGA', startTime: '', endTime: '', endDate: '' }));
     }
   };
 
@@ -168,10 +169,10 @@ const CalendarView: React.FC<CalendarViewProps> = ({ onEventClick }) => {
             
             {days.map(day => {
                 // IMPORTANT: Create date using local year, month, day to correspond to calendar visual
-                const cellDate = new Date(year, month, day, 12, 0, 0); 
                 // Format string for simple comparisons (YYYY-MM-DD)
                 const cellDateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-                
+                const cellDateObj = new Date(year, month, day, 12, 0, 0);
+
                 // Filter Events
                 const dayBookings = bookings.filter(b => {
                    if (b.status === 'CANCELLED') return false;
@@ -179,34 +180,31 @@ const CalendarView: React.FC<CalendarViewProps> = ({ onEventClick }) => {
                    const end = new Date(b.endTime);
                    start.setHours(0,0,0,0);
                    end.setHours(23,59,59,999);
-                   return cellDate >= start && cellDate <= end;
+                   return cellDateObj >= start && cellDateObj <= end;
                 });
 
                 const dayTimeOffs = timeOffs.filter(t => {
-                    // Show approved events to everyone
-                    // Show pending events only to managers or the driver who requested it
-                    const isVisible = t.status === 'APPROVED' || canManage || t.driverId === currentUser.id;
-                    if (!isVisible) return false;
-                    
-                    // Logic for Vacation Ranges
-                    if (t.type === 'FERIAS' && t.endDate) {
+                    // Visibility Logic: Approved OR (Pending and (Manager OR Owner))
+                    const isOwner = t.driverId === currentUser.id;
+                    const canSeePending = canManage || isOwner;
+                    if (t.status === 'PENDING' && !canSeePending) return false;
+                    if (t.status === 'REJECTED') return false;
+
+                    // 1. Exact Match (Start Date) - Always display
+                    if (t.date === cellDateStr) return true;
+
+                    // 2. Range Match (Only if endDate exists, e.g. Ferias)
+                    if (t.endDate && t.endDate >= t.date) {
                         return cellDateStr >= t.date && cellDateStr <= t.endDate;
                     }
                     
-                    // Logic for Single Day Events (Folga / Plantão)
-                    return t.date === cellDateStr;
+                    return false;
                 });
 
-                // For drivers view filter, only show their own events
-                const visibleBookings = currentUser.role === UserRole.DRIVER 
-                    ? dayBookings.filter(b => b.driverId === currentUser.id) 
-                    : dayBookings;
-
-                // For time offs, we already filtered visibility above, but let's ensure drivers don't see others' time offs unless allowed
-                // Actually, knowing who is OFF is useful for everyone, but let's stick to standard privacy:
-                const visibleTimeOffs = currentUser.role === UserRole.DRIVER 
-                    ? dayTimeOffs.filter(t => t.driverId === currentUser.id) 
-                    : dayTimeOffs;
+                // For drivers view filter, only show their own events (bookings)
+                // We typically show all drivers' availability to avoid conflicts, but for privacy we might limit.
+                // Here we show all bookings if Manager, else only own.
+                const visibleBookings = canManage ? dayBookings : dayBookings.filter(b => b.driverId === currentUser.id);
 
                 const isToday = new Date().getDate() === day && new Date().getMonth() === month && new Date().getFullYear() === year;
 
@@ -217,7 +215,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ onEventClick }) => {
                         </span>
                         
                         <div className="mt-1 space-y-1 overflow-y-auto max-h-[80px]">
-                            {visibleTimeOffs.map(t => {
+                            {dayTimeOffs.map(t => {
                                 const driver = users.find(u => u.id === t.driverId);
                                 const isVacation = t.type === 'FERIAS';
                                 const isStandby = t.type === 'PLANTAO';
@@ -234,17 +232,17 @@ const CalendarView: React.FC<CalendarViewProps> = ({ onEventClick }) => {
                                 } else if (isStandby) {
                                     styleClass = 'bg-purple-100 text-purple-800 border-purple-200';
                                     icon = '🚨';
-                                    label = t.startTime ? `${t.startTime}-${t.endTime}` : 'Plantão';
+                                    label = t.startTime ? `${t.startTime} - ${t.endTime}` : 'Plantão';
                                 }
 
                                 if (isPending) {
-                                    styleClass = 'bg-gray-100 text-gray-500 border-dashed border-gray-300';
+                                    styleClass = 'bg-gray-50 text-gray-500 border-dashed border-gray-300';
                                     label += ' (Pendente)';
                                 }
 
                                 return (
                                     <div key={t.id} className={`text-[10px] px-1 py-0.5 rounded truncate font-medium border ${styleClass}`} title={`${t.type} - ${driver?.name}`}>
-                                        {icon} {canManage ? driver?.name.split(' ')[0] : ''} {label}
+                                        {icon} <strong>{driver?.name.split(' ')[0]}</strong> {label}
                                     </div>
                                 );
                             })}
