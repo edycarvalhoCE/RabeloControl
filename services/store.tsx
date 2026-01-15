@@ -356,8 +356,11 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   const addTimeOff = async (timeOff: Omit<TimeOff, 'id' | 'status'>) => { 
       if (isConfigured) { 
           const isManager = currentUser?.role === UserRole.MANAGER || currentUser?.role === UserRole.DEVELOPER; 
+          // REMOVE UNDEFINED FIELDS
+          const cleanPayload = Object.fromEntries(Object.entries(timeOff).filter(([_, v]) => v !== undefined));
+          
           await addDoc(collection(db, 'timeOffs'), { 
-              ...timeOff, 
+              ...cleanPayload, 
               status: isManager ? 'APPROVED' : 'PENDING' 
           }); 
       } 

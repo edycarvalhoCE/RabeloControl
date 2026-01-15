@@ -66,19 +66,32 @@ const CalendarView: React.FC<CalendarViewProps> = ({ onEventClick }) => {
 
   const handleAddFolga = (e: React.FormEvent) => {
     e.preventDefault();
-    if(newTimeOff.driverId && newTimeOff.date) {
-        addTimeOff({
-            driverId: newTimeOff.driverId,
-            date: newTimeOff.date,
-            endDate: newTimeOff.type === 'FERIAS' ? newTimeOff.endDate : undefined,
-            type: newTimeOff.type as any,
-            startTime: newTimeOff.type === 'PLANTAO' ? newTimeOff.startTime : undefined,
-            endTime: newTimeOff.type === 'PLANTAO' ? newTimeOff.endTime : undefined,
-        });
-        setShowModal(false);
-        // Reset only some fields, keep date for convenience
-        setNewTimeOff(prev => ({ ...prev, driverId: '', type: 'FOLGA', startTime: '', endTime: '', endDate: '' }));
+    
+    if (!newTimeOff.driverId || !newTimeOff.date) {
+        alert("Por favor, selecione um motorista e a data.");
+        return;
     }
+
+    // Build payload dynamically to avoid passing undefined values to Firestore
+    const payload: any = {
+        driverId: newTimeOff.driverId,
+        date: newTimeOff.date,
+        type: newTimeOff.type
+    };
+
+    if (newTimeOff.type === 'FERIAS' && newTimeOff.endDate) {
+        payload.endDate = newTimeOff.endDate;
+    }
+
+    if (newTimeOff.type === 'PLANTAO') {
+        if (newTimeOff.startTime) payload.startTime = newTimeOff.startTime;
+        if (newTimeOff.endTime) payload.endTime = newTimeOff.endTime;
+    }
+
+    addTimeOff(payload);
+    setShowModal(false);
+    // Reset only some fields, keep date for convenience
+    setNewTimeOff(prev => ({ ...prev, driverId: '', type: 'FOLGA', startTime: '', endTime: '', endDate: '' }));
   };
 
   const handleDeleteTimeOff = (e: React.MouseEvent, id: string, name: string) => {
