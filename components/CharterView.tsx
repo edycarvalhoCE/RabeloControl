@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useStore } from '../services/store';
 import { UserRole } from '../types';
@@ -11,6 +12,8 @@ const CharterView: React.FC = () => {
       route: '',
       busId: '',
       driverId: '',
+      freelanceDriverName: '',
+      isFreelance: false,
       weekDays: [] as number[],
       morningDeparture: '05:30',
       afternoonDeparture: '16:30',
@@ -40,11 +43,25 @@ const CharterView: React.FC = () => {
 
   const handleSubmit = (e: React.FormEvent) => {
       e.preventDefault();
-      if (!contract.busId || !contract.driverId || contract.weekDays.length === 0) {
-          alert('Preencha todos os campos e selecione pelo menos um dia da semana.');
+      if (!contract.busId || (!contract.driverId && !contract.freelanceDriverName) || contract.weekDays.length === 0) {
+          alert('Preencha os campos obrigatórios e selecione o motorista e dias da semana.');
           return;
       }
-      addCharterContract(contract);
+      
+      const payload = {
+          clientName: contract.clientName,
+          route: contract.route,
+          busId: contract.busId,
+          driverId: contract.isFreelance ? null : contract.driverId,
+          freelanceDriverName: contract.isFreelance ? contract.freelanceDriverName : null,
+          weekDays: contract.weekDays,
+          morningDeparture: contract.morningDeparture,
+          afternoonDeparture: contract.afternoonDeparture,
+          startDate: contract.startDate,
+          endDate: contract.endDate
+      };
+
+      addCharterContract(payload);
       setShowForm(false);
       alert('Contrato salvo! A escala foi gerada automaticamente para o período selecionado.');
   };
@@ -103,19 +120,42 @@ const CharterView: React.FC = () => {
                                 ))}
                             </select>
                         </div>
-                        <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-1">Motorista Fixo</label>
-                            <select 
-                                value={contract.driverId}
-                                onChange={e => setContract({...contract, driverId: e.target.value})}
-                                className="w-full border p-2 rounded focus:ring-2 focus:ring-indigo-500 outline-none"
-                                required
-                            >
-                                <option value="">Selecione...</option>
-                                {drivers.map(d => (
-                                    <option key={d.id} value={d.id}>{d.name}</option>
-                                ))}
-                            </select>
+                        
+                        <div className="bg-slate-50 p-3 rounded border border-slate-200">
+                            <div className="flex justify-between items-center mb-2">
+                                <label className="block text-sm font-bold text-slate-700">Motorista Fixo</label>
+                                <label className="flex items-center space-x-2 text-sm cursor-pointer">
+                                    <input 
+                                        type="checkbox" 
+                                        checked={contract.isFreelance} 
+                                        onChange={e => setContract({...contract, isFreelance: e.target.checked})}
+                                        className="rounded text-indigo-600 focus:ring-indigo-500"
+                                    />
+                                    <span className="font-bold text-indigo-700">Freelance?</span>
+                                </label>
+                            </div>
+                            
+                            {contract.isFreelance ? (
+                                <input 
+                                    value={contract.freelanceDriverName} 
+                                    onChange={e => setContract({...contract, freelanceDriverName: e.target.value})} 
+                                    placeholder="Digite o nome do Freelance" 
+                                    className="w-full border p-2 rounded border-indigo-300 focus:ring-2 focus:ring-indigo-500 outline-none" 
+                                    required 
+                                />
+                            ) : (
+                                <select 
+                                    value={contract.driverId}
+                                    onChange={e => setContract({...contract, driverId: e.target.value})}
+                                    className="w-full border p-2 rounded focus:ring-2 focus:ring-indigo-500 outline-none bg-white"
+                                    required={!contract.isFreelance}
+                                >
+                                    <option value="">Selecione...</option>
+                                    {drivers.map(d => (
+                                        <option key={d.id} value={d.id}>{d.name}</option>
+                                    ))}
+                                </select>
+                            )}
                         </div>
                     </div>
 
@@ -198,6 +238,8 @@ const CharterView: React.FC = () => {
             {charterContracts.map(c => {
                  const bus = buses.find(b => b.id === c.busId);
                  const driver = users.find(u => u.id === c.driverId);
+                 const driverDisplay = c.driverId ? driver?.name : c.freelanceDriverName ? `${c.freelanceDriverName} (Freelance)` : 'Não atribuído';
+
                  return (
                      <div key={c.id} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden relative">
                          <div className="h-1 bg-indigo-500 w-full top-0 absolute"></div>
@@ -207,7 +249,7 @@ const CharterView: React.FC = () => {
                              
                              <div className="space-y-2 text-sm text-slate-600">
                                  <p>🚌 <span className="font-semibold">{bus?.plate}</span></p>
-                                 <p>👤 <span className="font-semibold">{driver?.name}</span></p>
+                                 <p>👤 <span className="font-semibold">{driverDisplay}</span></p>
                                  <p>🕒 {c.morningDeparture} / {c.afternoonDeparture}</p>
                              </div>
 

@@ -8,7 +8,7 @@ interface CalendarViewProps {
 }
 
 const CalendarView: React.FC<CalendarViewProps> = ({ onEventClick }) => {
-  const { bookings, timeOffs, users, currentUser, addTimeOff, updateTimeOffStatus, deleteTimeOff, buses } = useStore();
+  const { bookings, timeOffs, users, currentUser, addTimeOff, updateTimeOffStatus, deleteTimeOff, buses, charterContracts } = useStore();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [showModal, setShowModal] = useState(false);
   
@@ -192,8 +192,9 @@ const CalendarView: React.FC<CalendarViewProps> = ({ onEventClick }) => {
                 // Format string for simple comparisons (YYYY-MM-DD)
                 const cellDateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
                 const cellDateObj = new Date(year, month, day, 12, 0, 0);
+                const cellDayOfWeek = cellDateObj.getDay();
 
-                // Filter Events
+                // 1. FILTER BOOKINGS
                 const dayBookings = bookings.filter(b => {
                    if (b.status === 'CANCELLED') return false;
                    const start = new Date(b.startTime);
@@ -203,29 +204,36 @@ const CalendarView: React.FC<CalendarViewProps> = ({ onEventClick }) => {
                    return cellDateObj >= start && cellDateObj <= end;
                 });
 
+                // 2. FILTER TIME OFFS
                 const dayTimeOffs = timeOffs.filter(t => {
                     const isOwner = t.driverId === currentUser.id;
-                    
-                    // PRIVACY RULE: If NOT manager AND NOT owner, hide event.
-                    // This ensures drivers only see their own scale/vacation.
                     if (!canManage && !isOwner) return false;
-
                     if (t.status === 'REJECTED') return false;
 
-                    // 1. Exact Match (Start Date) - Always display
                     if (t.date === cellDateStr) return true;
-
-                    // 2. Range Match (Only if endDate exists, e.g. Ferias)
                     if (t.endDate && t.endDate >= t.date) {
                         return cellDateStr >= t.date && cellDateStr <= t.endDate;
                     }
-                    
                     return false;
                 });
 
-                // For drivers view filter, only show their own events (bookings)
-                // We typically show all drivers' availability to avoid conflicts, but for privacy we might limit.
-                // Here we show all bookings if Manager, else only own.
+                // 3. FILTER CHARTERS (NEW)
+                const dayCharters = charterContracts.filter(c => {
+                    // Check date range
+                    if (cellDateStr < c.startDate || cellDateStr > c.endDate) return false;
+                    // Check day of week
+                    if (!c.weekDays.includes(cellDayOfWeek)) return false;
+                    // Check status
+                    if (c.status !== 'ACTIVE') return false;
+                    
+                    // Privacy Check
+                    const isOwner = c.driverId === currentUser.id;
+                    if (!canManage && !isOwner) return false;
+
+                    return true;
+                });
+
+                // Privacy for bookings
                 const visibleBookings = canManage ? dayBookings : dayBookings.filter(b => b.driverId === currentUser.id);
 
                 const isToday = new Date().getDate() === day && new Date().getMonth() === month && new Date().getFullYear() === year;
@@ -279,6 +287,18 @@ const CalendarView: React.FC<CalendarViewProps> = ({ onEventClick }) => {
                                     </div>
                                 );
                             })}
+                            
+                            {/* CHARTER EVENTS */}
+                            {dayCharters.map(c => {
+                                const driver = users.find(u => u.id === c.driverId);
+                                const driverName = driver ? driver.name : c.freelanceDriverName ? `${c.freelanceDriverName} (F)` : 'S/ Mot';
+                                return (
+                                    <div key={`charter-${c.id}-${day}`} className="text-[10px] px-2 py-1 rounded truncate font-medium border bg-indigo-100 text-indigo-800 border-indigo-200" title={`Fretamento: ${c.clientName}`}>
+                                        🏭 {canManage ? `${c.route.substring(0,10)}.. (${driverName.split(' ')[0]})` : c.route}
+                                    </div>
+                                )
+                            })}
+
                             {visibleBookings.map(b => {
                                 const driver = users.find(u => u.id === b.driverId);
                                 return (

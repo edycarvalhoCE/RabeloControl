@@ -125,7 +125,8 @@ export interface CharterContract {
   clientName: string;
   route: string;
   busId: string;
-  driverId: string;
+  driverId: string | null;
+  freelanceDriverName?: string | null; // Added support for freelance
   weekDays: number[];
   morningDeparture: string;
   afternoonDeparture: string;
