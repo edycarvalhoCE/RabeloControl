@@ -26,6 +26,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ onEventClick }) => {
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
 
   const drivers = users.filter(u => u.role === UserRole.DRIVER);
+  const canManage = currentUser.role === UserRole.MANAGER || currentUser.role === UserRole.DEVELOPER;
   
   // Get pending time offs
   const pendingTimeOffs = timeOffs.filter(t => t.status === 'PENDING').sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
@@ -82,8 +83,6 @@ const CalendarView: React.FC<CalendarViewProps> = ({ onEventClick }) => {
   const setShift = (start: string, end: string) => {
       setNewTimeOff({ ...newTimeOff, startTime: start, endTime: end });
   };
-
-  const canManage = currentUser.role === UserRole.MANAGER || currentUser.role === UserRole.DEVELOPER;
 
   return (
     <div className="space-y-6 animate-fade-in relative">
@@ -184,7 +183,10 @@ const CalendarView: React.FC<CalendarViewProps> = ({ onEventClick }) => {
                 });
 
                 const dayTimeOffs = timeOffs.filter(t => {
-                    if (t.status !== 'APPROVED') return false;
+                    // Show approved events to everyone
+                    // Show pending events only to managers or the driver who requested it
+                    const isVisible = t.status === 'APPROVED' || canManage || t.driverId === currentUser.id;
+                    if (!isVisible) return false;
                     
                     // Logic for Vacation Ranges
                     if (t.type === 'FERIAS' && t.endDate) {
@@ -195,11 +197,13 @@ const CalendarView: React.FC<CalendarViewProps> = ({ onEventClick }) => {
                     return t.date === cellDateStr;
                 });
 
-                // For drivers, filter only their own events
+                // For drivers view filter, only show their own events
                 const visibleBookings = currentUser.role === UserRole.DRIVER 
                     ? dayBookings.filter(b => b.driverId === currentUser.id) 
                     : dayBookings;
 
+                // For time offs, we already filtered visibility above, but let's ensure drivers don't see others' time offs unless allowed
+                // Actually, knowing who is OFF is useful for everyone, but let's stick to standard privacy:
                 const visibleTimeOffs = currentUser.role === UserRole.DRIVER 
                     ? dayTimeOffs.filter(t => t.driverId === currentUser.id) 
                     : dayTimeOffs;
@@ -217,6 +221,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ onEventClick }) => {
                                 const driver = users.find(u => u.id === t.driverId);
                                 const isVacation = t.type === 'FERIAS';
                                 const isStandby = t.type === 'PLANTAO';
+                                const isPending = t.status === 'PENDING';
                                 
                                 let styleClass = 'bg-yellow-100 text-yellow-800 border-yellow-200';
                                 let icon = '🚫';
@@ -230,6 +235,11 @@ const CalendarView: React.FC<CalendarViewProps> = ({ onEventClick }) => {
                                     styleClass = 'bg-purple-100 text-purple-800 border-purple-200';
                                     icon = '🚨';
                                     label = t.startTime ? `${t.startTime}-${t.endTime}` : 'Plantão';
+                                }
+
+                                if (isPending) {
+                                    styleClass = 'bg-gray-100 text-gray-500 border-dashed border-gray-300';
+                                    label += ' (Pendente)';
                                 }
 
                                 return (
@@ -417,20 +427,26 @@ const CalendarView: React.FC<CalendarViewProps> = ({ onEventClick }) => {
                         <div className="bg-purple-50 p-3 rounded border border-purple-100">
                             <label className="block text-xs font-bold text-purple-800 uppercase mb-2">Horário do Plantão</label>
                             <div className="flex flex-wrap gap-2 mb-3">
-                                <button type="button" onClick={() => setShift('08:00', '16:20')} className="text-xs bg-white border border-purple-200 text-purple-700 px-2 py-1 rounded hover:bg-purple-200">08:00 - 16:20</button>
-                                <button type="button" onClick={() => setShift('14:00', '22:00')} className="text-xs bg-white border border-purple-200 text-purple-700 px-2 py-1 rounded hover:bg-purple-200">14:00 - 22:00</button>
-                                <button type="button" onClick={() => setShift('22:00', '06:00')} className="text-xs bg-white border border-purple-200 text-purple-700 px-2 py-1 rounded hover:bg-purple-200">22:00 - 06:00</button>
+                                <button type="button" onClick={() => setShift('08:00', '16:20')} className="text-xs bg-white border border-purple-200 text-purple-700 px-2 py-1 rounded hover:bg-purple-200 shadow-sm">08:00 - 16:20</button>
+                                <button type="button" onClick={() => setShift('14:00', '22:00')} className="text-xs bg-white border border-purple-200 text-purple-700 px-2 py-1 rounded hover:bg-purple-200 shadow-sm">14:00 - 22:00</button>
+                                <button type="button" onClick={() => setShift('22:00', '06:00')} className="text-xs bg-white border border-purple-200 text-purple-700 px-2 py-1 rounded hover:bg-purple-200 shadow-sm">22:00 - 06:00</button>
                             </div>
                             <div className="grid grid-cols-2 gap-2">
-                                <input type="time" className="border p-1 rounded text-sm" value={newTimeOff.startTime} onChange={e => setNewTimeOff({...newTimeOff, startTime: e.target.value})} />
-                                <input type="time" className="border p-1 rounded text-sm" value={newTimeOff.endTime} onChange={e => setNewTimeOff({...newTimeOff, endTime: e.target.value})} />
+                                <div>
+                                    <label className="text-[10px] text-purple-700 block mb-1">Início (Personalizado)</label>
+                                    <input type="time" className="w-full border p-1 rounded text-sm" value={newTimeOff.startTime} onChange={e => setNewTimeOff({...newTimeOff, startTime: e.target.value})} />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] text-purple-700 block mb-1">Fim (Personalizado)</label>
+                                    <input type="time" className="w-full border p-1 rounded text-sm" value={newTimeOff.endTime} onChange={e => setNewTimeOff({...newTimeOff, endTime: e.target.value})} />
+                                </div>
                             </div>
                         </div>
                     )}
 
                     <div className="flex gap-2 pt-2">
-                        <button type="button" onClick={() => setShowModal(false)} className="flex-1 bg-gray-200 text-gray-800 py-2 rounded hover:bg-gray-300">Cancelar</button>
-                        <button type="submit" className="flex-1 bg-slate-800 text-white py-2 rounded hover:bg-slate-700">Salvar Evento</button>
+                        <button type="button" onClick={() => setShowModal(false)} className="flex-1 bg-gray-200 text-gray-800 py-2 rounded hover:bg-gray-300 font-medium">Cancelar</button>
+                        <button type="submit" className="flex-1 bg-slate-800 text-white py-2 rounded hover:bg-slate-700 font-bold">Salvar Evento</button>
                     </div>
                 </form>
             </div>
