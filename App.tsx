@@ -17,6 +17,7 @@ import CharterView from './components/CharterView';
 import TravelPackagesView from './components/TravelPackagesView';
 import LoginView from './components/LoginView';
 import SettingsView from './components/SettingsView';
+import QuotesView from './components/QuotesView';
 import { useStore } from './services/store';
 
 const MainContent = () => {
@@ -87,6 +88,7 @@ const MainContent = () => {
   const renderView = () => {
     switch (currentView) {
       case 'dashboard': return <Dashboard />;
+      case 'quotes': return <QuotesView />;
       case 'calendar': return <CalendarView />;
       case 'new-booking': return <NewBookingView />;
       case 'bookings': return <BookingsView />;

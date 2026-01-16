@@ -35,6 +35,23 @@ export interface Bus {
   features: string[];
 }
 
+export interface Quote {
+  id: string;
+  clientName: string;
+  clientPhone: string;
+  clientEmail?: string;
+  destination: string;
+  departureLocation: string;
+  startTime: string; // ISO string
+  endTime: string; // ISO string
+  passengerCount: number;
+  price?: number; // Defined by manager
+  observations?: string;
+  status: 'NEW' | 'PRICED' | 'SENT' | 'APPROVED' | 'REJECTED';
+  createdAt: string;
+  convertedBookingId?: string; // Link if converted
+}
+
 export interface Booking {
   id: string;
   busId: string;

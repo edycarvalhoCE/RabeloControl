@@ -1,6 +1,6 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { User, Bus, Booking, Part, Transaction, TimeOff, UserRole, DriverDocument, MaintenanceRecord, PurchaseRequest, MaintenanceReport, CharterContract, TravelPackage, PackagePassenger, PackagePayment, Client, FuelRecord, FuelSupply, DriverLiability, PackageLead, SystemSettings } from '../types';
+import { User, Bus, Booking, Part, Transaction, TimeOff, UserRole, DriverDocument, MaintenanceRecord, PurchaseRequest, MaintenanceReport, CharterContract, TravelPackage, PackagePassenger, PackagePayment, Client, FuelRecord, FuelSupply, DriverLiability, PackageLead, SystemSettings, Quote } from '../types';
 import { MOCK_USERS, MOCK_BUSES, MOCK_PARTS } from '../constants';
 
 // Firebase Imports
@@ -36,6 +36,7 @@ interface StoreContextType {
   fuelSupplies: FuelSupply[];
   fuelStockLevel: number;
   driverLiabilities: DriverLiability[];
+  quotes: Quote[];
   
   // Actions
   login: (email: string, password: string) => Promise<{success: boolean, message?: string}>;
@@ -80,6 +81,13 @@ interface StoreContextType {
   addFuelSupply: (supply: Omit<FuelSupply, 'id'>) => void;
   addDriverLiability: (liability: Omit<DriverLiability, 'id' | 'status' | 'paidAmount'>, createExpense?: boolean) => void;
   payDriverLiability: (id: string, amount: number) => Promise<void>;
+  
+  // Quote Actions
+  addQuote: (quote: Omit<Quote, 'id' | 'status' | 'createdAt'>) => Promise<void>;
+  updateQuote: (id: string, data: Partial<Quote>) => Promise<void>;
+  convertQuoteToBooking: (quoteId: string, busId: string) => Promise<{success: boolean, message: string}>;
+  deleteQuote: (id: string) => Promise<void>;
+
   seedDatabase: () => Promise<void>; // Setup initial data
 }
 
@@ -118,6 +126,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   const [fuelRecords, setFuelRecords] = useState<FuelRecord[]>([]);
   const [fuelSupplies, setFuelSupplies] = useState<FuelSupply[]>([]);
   const [driverLiabilities, setDriverLiabilities] = useState<DriverLiability[]>([]);
+  const [quotes, setQuotes] = useState<Quote[]>([]);
   
   // Calculated State
   const [fuelStockLevel, setFuelStockLevel] = useState(0);
@@ -162,6 +171,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         { name: 'fuelRecords', setter: setFuelRecords },
         { name: 'fuelSupplies', setter: setFuelSupplies },
         { name: 'driverLiabilities', setter: setDriverLiabilities },
+        { name: 'quotes', setter: setQuotes },
     ];
 
     const unsubscribes = collectionsToSync.map(c => 
@@ -302,9 +312,6 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
             const offStart = new Date(y, m - 1, d, 0, 0, 0).getTime();
             const offEnd = new Date(y, m - 1, d, 23, 59, 59).getTime();
             
-            // Allow booking during Plantão? Usually yes, if it matches time, but simplistic check here flags it.
-            // Let's flag Plantão as "unavailable" for regular bookings unless specifically assigned (which logic isn't here yet)
-            // So essentially, if they are marked as anything, warn.
             return (tripStart <= offEnd && tripEnd >= offStart);
         });
         if (driverConflict) return { success: false, message: `Motorista Indisponível! Ele está de ${driverConflict.type} (${driverConflict.date}).` };
@@ -570,6 +577,76 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       });
   };
 
+  // --- QUOTE ACTIONS ---
+  
+  const addQuote = async (quote: Omit<Quote, 'id' | 'status' | 'createdAt'>) => {
+      if (!isConfigured) return;
+      await addDoc(collection(db, 'quotes'), { 
+          ...quote, 
+          status: 'NEW', 
+          createdAt: new Date().toISOString() 
+      });
+  };
+
+  const updateQuote = async (id: string, data: Partial<Quote>) => {
+      if (!isConfigured) return;
+      await updateDoc(doc(db, 'quotes', id), data);
+  };
+
+  const deleteQuote = async (id: string) => {
+      if (!isConfigured) return;
+      await deleteDoc(doc(db, 'quotes', id));
+  };
+
+  const convertQuoteToBooking = async (quoteId: string, busId: string) => {
+      if (!isConfigured) return { success: false, message: "Erro conexão" };
+      const quote = quotes.find(q => q.id === quoteId);
+      if (!quote) return { success: false, message: "Orçamento não encontrado" };
+
+      // Verify availability
+      const isAvailable = !bookings.some(b => {
+          if (b.busId !== busId || b.status === 'CANCELLED') return false;
+          const start = new Date(quote.startTime).getTime();
+          const end = new Date(quote.endTime).getTime();
+          const bStart = new Date(b.startTime).getTime();
+          const bEnd = new Date(b.endTime).getTime();
+          return (start < bEnd && end > bStart);
+      });
+
+      if (!isAvailable) {
+          return { success: false, message: "Este ônibus já está ocupado nesta data!" };
+      }
+
+      // Create Booking
+      try {
+          const bookingData: Omit<Booking, 'id' | 'status'> = {
+              busId: busId,
+              driverId: null, // User must assign driver later or we can prompt
+              clientName: quote.clientName,
+              clientPhone: quote.clientPhone,
+              destination: quote.destination,
+              departureLocation: quote.departureLocation,
+              startTime: quote.startTime,
+              endTime: quote.endTime,
+              value: quote.price || 0,
+              paymentStatus: 'PENDING',
+              observations: `(Gerado via Orçamento) ${quote.observations || ''}`
+          };
+
+          const docRef = await addDoc(collection(db, 'bookings'), { ...bookingData, status: 'CONFIRMED' });
+          
+          // Mark quote as approved and linked
+          await updateDoc(doc(db, 'quotes', quoteId), { 
+              status: 'APPROVED', 
+              convertedBookingId: docRef.id 
+          });
+
+          return { success: true, message: "Orçamento aprovado e locação gerada com sucesso!" };
+      } catch (e: any) {
+          return { success: false, message: e.message };
+      }
+  };
+
   const seedDatabase = async () => { 
       if (!isConfigured) return; 
       const batch = writeBatch(db); 
@@ -607,9 +684,10 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
   return (
     <StoreContext.Provider value={{
-      currentUser: currentUser!, isAuthenticated, settings, users, buses, bookings, parts, transactions, timeOffs, documents, maintenanceRecords, purchaseRequests, maintenanceReports, charterContracts, travelPackages, packagePassengers, packagePayments, clients, packageLeads, fuelRecords, fuelSupplies, fuelStockLevel, driverLiabilities,
+      currentUser: currentUser!, isAuthenticated, settings, users, buses, bookings, parts, transactions, timeOffs, documents, maintenanceRecords, purchaseRequests, maintenanceReports, charterContracts, travelPackages, packagePassengers, packagePayments, clients, packageLeads, fuelRecords, fuelSupplies, fuelStockLevel, driverLiabilities, quotes,
       switchUser, addUser, updateUser, deleteUser, addBooking, updateBooking, updateBookingStatus, addPart, updateStock, addTransaction, addTimeOff, updateTimeOffStatus, deleteTimeOff, addDocument, deleteDocument, addMaintenanceRecord, addPurchaseRequest, updatePurchaseRequestStatus, addMaintenanceReport, updateMaintenanceReportStatus, addBus, updateBusStatus, addCharterContract, addTravelPackage, registerPackageSale, updatePackagePassenger, deletePackagePassenger, addPackagePayment, addPackageLead, updatePackageLead, deletePackageLead, addFuelRecord, addFuelSupply, addDriverLiability, payDriverLiability,
-      login, logout, register, updateSettings, seedDatabase
+      login, logout, register, updateSettings, seedDatabase,
+      addQuote, updateQuote, convertQuoteToBooking, deleteQuote
     }}>
       {children}
     </StoreContext.Provider>

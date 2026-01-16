@@ -17,6 +17,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setView, isMobileOpen, s
 
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: '📊', roles: [UserRole.MANAGER, UserRole.FINANCE, UserRole.DEVELOPER] },
+    { id: 'quotes', label: 'Orçamentos (CRM)', icon: '💬', roles: [UserRole.MANAGER, UserRole.DEVELOPER] }, // NEW
     { id: 'new-booking', label: 'Nova Locação', icon: '➕', roles: [UserRole.MANAGER, UserRole.DEVELOPER] },
     { id: 'bookings', label: 'Listar Locações', icon: '🚌', roles: [UserRole.MANAGER, UserRole.DEVELOPER] },
     { id: 'calendar', label: 'Calendário (Escala)', icon: '📅', roles: [UserRole.MANAGER, UserRole.DEVELOPER] },
