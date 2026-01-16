@@ -1,6 +1,8 @@
+
 import React, { useState } from 'react';
 import { useStore } from '../services/store';
 import { UserRole } from '../types';
+import { Logo } from './Logo';
 
 interface SidebarProps {
   currentView: string;
@@ -26,6 +28,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setView, isMobileOpen, s
     { id: 'documents', label: 'Documentos', icon: '📂', roles: [UserRole.MANAGER, UserRole.DEVELOPER] },
     { id: 'finance', label: 'Financeiro (Caixa)', icon: '💰', roles: [UserRole.MANAGER, UserRole.FINANCE, UserRole.DEVELOPER] },
     { id: 'users', label: 'Usuários', icon: '👥', roles: [UserRole.MANAGER, UserRole.DEVELOPER] },
+    { id: 'settings', label: 'Configurações', icon: '⚙️', roles: [UserRole.MANAGER, UserRole.DEVELOPER] },
     { id: 'driver-portal', label: 'Minha Escala', icon: 'steering-wheel', roles: [UserRole.DRIVER, UserRole.DEVELOPER] },
   ];
 
@@ -80,13 +83,10 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setView, isMobileOpen, s
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
           </button>
 
-          {/* Company Logo - Text Only */}
-          <div className="mb-3 w-full flex justify-center h-16 items-center">
-              <span className="text-white font-extrabold text-2xl tracking-tighter">
-                  Rabelo<span className="text-blue-500">Tour</span>
-              </span>
+          {/* Company Logo in White Box for Visibility */}
+          <div className="mb-2 w-full flex justify-center py-3 bg-white rounded-lg shadow-sm">
+              <Logo size="md" />
           </div>
-          <p className="text-xs text-slate-400">Sistema Integrado</p>
         </div>
 
         <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
@@ -108,7 +108,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setView, isMobileOpen, s
 
         <div className="p-4 border-t border-slate-700 bg-slate-800">
           <div className="flex items-center space-x-3 mb-4">
-            <img src={currentUser.avatar} alt="User" className="w-10 h-10 rounded-full border-2 border-blue-500" />
+            <img src={currentUser.avatar} alt="User" className="w-10 h-10 rounded-full border-2 border-blue-500 bg-slate-700" />
             <div>
               <p className="text-sm font-semibold truncate w-32">{currentUser.name}</p>
               <p className="text-xs text-blue-300">{getRoleLabel(currentUser.role)}</p>

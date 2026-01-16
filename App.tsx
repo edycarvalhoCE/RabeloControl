@@ -16,6 +16,7 @@ import VehiclesView from './components/VehiclesView';
 import CharterView from './components/CharterView';
 import TravelPackagesView from './components/TravelPackagesView';
 import LoginView from './components/LoginView';
+import SettingsView from './components/SettingsView';
 import { useStore } from './services/store';
 
 const MainContent = () => {
@@ -98,6 +99,7 @@ const MainContent = () => {
       case 'driver-portal': return <DriverPortal />;
       case 'maintenance': return <MaintenanceView />;
       case 'users': return <UsersView />;
+      case 'settings': return <SettingsView />;
       default: return <Dashboard />;
     }
   };

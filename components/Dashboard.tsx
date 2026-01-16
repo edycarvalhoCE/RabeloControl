@@ -1,7 +1,9 @@
+
 import React, { useState } from 'react';
 import { useStore } from '../services/store';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { getFinancialInsight } from '../services/geminiService';
+import { Logo } from './Logo';
 
 const Dashboard: React.FC = () => {
   const { bookings, transactions, buses, parts, currentUser, users, timeOffs, updateTimeOffStatus } = useStore();
@@ -78,24 +80,22 @@ const Dashboard: React.FC = () => {
             <h2 className="text-3xl font-bold text-slate-800">Visão Geral</h2>
             <p className="text-slate-500">Bem-vindo, {currentUser.name}</p>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-6">
             <button 
                 onClick={handleGetInsight}
                 disabled={loadingAi}
-                className="flex items-center gap-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white px-4 py-2 rounded-lg hover:shadow-lg transition-all disabled:opacity-50 h-10"
+                className="flex items-center gap-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white px-4 py-2 rounded-lg hover:shadow-lg transition-all disabled:opacity-50 h-10 text-sm font-medium"
             >
                 {loadingAi ? 'Analisando...' : '✨ Gerar Análise IA'}
             </button>
             <div className="hidden md:block">
-                <span className="text-slate-900 font-extrabold text-2xl tracking-tighter">
-                    Rabelo<span className="text-blue-600">Tour</span>
-                </span>
+                <Logo variant="dark" size="md" />
             </div>
         </div>
       </div>
 
       {insight && (
-          <div className="bg-indigo-50 border border-indigo-200 p-4 rounded-xl text-indigo-900 text-sm whitespace-pre-line">
+          <div className="bg-indigo-50 border border-indigo-200 p-4 rounded-xl text-indigo-900 text-sm whitespace-pre-line animate-fade-in">
               <h4 className="font-semibold mb-2 flex items-center gap-2">
                   <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3zM6 8a2 2 0 11-4 0 2 2 0 014 0zM16 18v-3a5.972 5.972 0 00-.75-2.906A3.005 3.005 0 0119 15v3h-3zM4.75 12.094A5.973 5.973 0 004 15v3H1v-3a3 3 0 013.75-2.906z" /></svg>
                   Consultor Virtual

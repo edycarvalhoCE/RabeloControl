@@ -1,12 +1,12 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { User, Bus, Booking, Part, Transaction, TimeOff, UserRole, DriverDocument, MaintenanceRecord, PurchaseRequest, MaintenanceReport, CharterContract, TravelPackage, PackagePassenger, PackagePayment, Client, FuelRecord, FuelSupply, DriverLiability, PackageLead } from '../types';
+import { User, Bus, Booking, Part, Transaction, TimeOff, UserRole, DriverDocument, MaintenanceRecord, PurchaseRequest, MaintenanceReport, CharterContract, TravelPackage, PackagePassenger, PackagePayment, Client, FuelRecord, FuelSupply, DriverLiability, PackageLead, SystemSettings } from '../types';
 import { MOCK_USERS, MOCK_BUSES, MOCK_PARTS } from '../constants';
 
 // Firebase Imports
 import { db, auth, isConfigured } from './firebase';
 import { 
-  collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, setDoc, query, where, writeBatch, getDocs
+  collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, setDoc, query, where, writeBatch, getDocs, getDoc
 } from 'firebase/firestore';
 import { 
   signInWithEmailAndPassword, signOut, onAuthStateChanged, createUserWithEmailAndPassword, updateProfile 
@@ -15,6 +15,7 @@ import {
 interface StoreContextType {
   currentUser: User;
   isAuthenticated: boolean;
+  settings: SystemSettings;
   users: User[];
   buses: Bus[];
   bookings: Booking[];
@@ -40,6 +41,7 @@ interface StoreContextType {
   login: (email: string, password: string) => Promise<{success: boolean, message?: string}>;
   register: (email: string, password: string, name: string, role: UserRole) => Promise<{success: boolean, message?: string}>;
   logout: () => void;
+  updateSettings: (data: Partial<SystemSettings>) => Promise<void>;
   switchUser: (userId: string) => void;
   addUser: (user: Omit<User, 'id' | 'avatar'>) => void;
   updateUser: (id: string, data: Partial<User>) => Promise<void>;
@@ -86,6 +88,14 @@ const StoreContext = createContext<StoreContextType | undefined>(undefined);
 export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [settings, setSettings] = useState<SystemSettings>({
+      id: 'general',
+      companyName: 'Rabelo Tour',
+      logoUrl: '', // Will default to internal fallback if empty
+      cnpj: '',
+      phone: '',
+      address: ''
+  });
   
   // Data States
   const [users, setUsers] = useState<User[]>([]);
@@ -124,6 +134,13 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         }
     });
 
+    // Listen to Settings
+    const unsubscribeSettings = onSnapshot(doc(db, 'settings', 'general'), (doc) => {
+        if (doc.exists()) {
+            setSettings({ id: 'general', ...doc.data() } as SystemSettings);
+        }
+    });
+
     const collectionsToSync = [
         { name: 'users', setter: setUsers },
         { name: 'buses', setter: setBuses },
@@ -155,6 +172,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
     return () => {
         unsubscribeAuth();
+        unsubscribeSettings();
         unsubscribes.forEach(unsub => unsub());
     };
   }, []);
@@ -234,6 +252,13 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   };
 
   const logout = async () => { if (isConfigured) await signOut(auth); };
+  
+  // Settings Action
+  const updateSettings = async (data: Partial<SystemSettings>) => {
+      if (!isConfigured) return;
+      await setDoc(doc(db, 'settings', 'general'), { ...settings, ...data }, { merge: true });
+  };
+
   const switchUser = (userId: string) => { const user = users.find(u => u.id === userId); if (user) setCurrentUser(user); };
 
   // Data Actions
@@ -581,9 +606,9 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
   return (
     <StoreContext.Provider value={{
-      currentUser: currentUser!, isAuthenticated, users, buses, bookings, parts, transactions, timeOffs, documents, maintenanceRecords, purchaseRequests, maintenanceReports, charterContracts, travelPackages, packagePassengers, packagePayments, clients, packageLeads, fuelRecords, fuelSupplies, fuelStockLevel, driverLiabilities,
+      currentUser: currentUser!, isAuthenticated, settings, users, buses, bookings, parts, transactions, timeOffs, documents, maintenanceRecords, purchaseRequests, maintenanceReports, charterContracts, travelPackages, packagePassengers, packagePayments, clients, packageLeads, fuelRecords, fuelSupplies, fuelStockLevel, driverLiabilities,
       switchUser, addUser, updateUser, deleteUser, addBooking, updateBooking, updateBookingStatus, addPart, updateStock, addTransaction, addTimeOff, updateTimeOffStatus, deleteTimeOff, addDocument, deleteDocument, addMaintenanceRecord, addPurchaseRequest, updatePurchaseRequestStatus, addMaintenanceReport, updateMaintenanceReportStatus, addBus, updateBusStatus, addCharterContract, addTravelPackage, registerPackageSale, updatePackagePassenger, deletePackagePassenger, addPackagePayment, addPackageLead, updatePackageLead, deletePackageLead, addFuelRecord, addFuelSupply, addDriverLiability, payDriverLiability,
-      login, logout, register, seedDatabase
+      login, logout, register, updateSettings, seedDatabase
     }}>
       {children}
     </StoreContext.Provider>

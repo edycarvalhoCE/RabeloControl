@@ -7,6 +7,15 @@ export enum UserRole {
   MECHANIC = 'MECANICO'
 }
 
+export interface SystemSettings {
+  id: string;
+  companyName: string;
+  logoUrl: string; // Base64 or URL
+  cnpj?: string;
+  phone?: string;
+  address?: string;
+}
+
 export interface User {
   id: string;
   name: string;

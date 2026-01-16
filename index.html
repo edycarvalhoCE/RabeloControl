@@ -1,11 +1,15 @@
+
 <!DOCTYPE html>
 <html lang="pt-BR">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <meta name="theme-color" content="#1e293b" />
+    <!-- Cor Azul da Marca Rabelo Tour para a barra do navegador -->
+    <meta name="theme-color" content="#2e2e77" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <!-- Favicon usando a mesma logo -->
+    <link rel="icon" type="image/png" href="./logo.png" />
     <title>RabeloTour - Sistema Integrado</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -15,8 +19,13 @@
           extend: {
             fontFamily: {
               sans: ['Inter', 'sans-serif'],
+              script: ['"Great Vibes"', 'cursive'],
             },
             colors: {
+              brand: {
+                blue: '#2e2e77', // Cor azul exata da logo
+                yellow: '#ffec00', // Cor amarela do globo
+              },
               slate: {
                 850: '#1e293b', 
                 900: '#0f172a',
@@ -26,22 +35,22 @@
         }
       }
     </script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Great+Vibes&display=swap" rel="stylesheet">
     <style>
       :root {
-        color-scheme: light; /* Forces browser to render standard form controls in light mode */
+        color-scheme: light; /* Força modo claro nos controles do navegador */
       }
       body { 
         font-family: 'Inter', sans-serif; 
-        background-color: #f8fafc !important; /* Force light gray bg */
-        color: #0f172a !important; /* Force dark text */
+        background-color: #f8fafc !important; 
+        color: #0f172a !important; 
       }
-      /* Ensure inputs have white background and dark text */
+      /* Inputs com fundo branco para contraste */
       input, select, textarea {
         background-color: #ffffff;
         color: #1e293b;
       }
-      /* Custom scrollbar */
+      /* Scrollbar personalizada */
       ::-webkit-scrollbar { width: 8px; }
       ::-webkit-scrollbar-track { background: #f1f1f1; }
       ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }

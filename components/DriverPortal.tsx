@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { useStore } from '../services/store';
 import CalendarView from './CalendarView';
 import { Booking } from '../types';
+import { Logo } from './Logo';
 
 const DriverPortal: React.FC = () => {
   const { currentUser, bookings, timeOffs, addTimeOff, documents, buses, addMaintenanceReport, maintenanceReports, addFuelRecord, driverLiabilities, charterContracts } = useStore();
@@ -176,9 +177,7 @@ const DriverPortal: React.FC = () => {
           <p className="opacity-80">Bem-vindo, {currentUser.name}. Gerencie sua escala e documentos.</p>
         </div>
         <div className="hidden md:block bg-white/10 p-2 rounded-lg z-10 relative backdrop-blur-sm">
-             <span className="text-white font-extrabold text-2xl tracking-tighter">
-                Rabelo<span className="text-blue-300">Tour</span>
-            </span>
+             <Logo variant="light" size="sm" showGlobe={false} />
         </div>
         {/* Abstract shapes */}
         <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-5 rounded-full -mr-16 -mt-16"></div>

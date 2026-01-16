@@ -1,6 +1,8 @@
+
 import React, { useState } from 'react';
 import { useStore } from '../services/store';
 import { UserRole } from '../types';
+import { Logo } from './Logo';
 
 const MaintenanceView: React.FC = () => {
   const { buses, parts, currentUser, addMaintenanceRecord, addPurchaseRequest, maintenanceRecords, users, maintenanceReports, updateMaintenanceReportStatus } = useStore();
@@ -58,10 +60,8 @@ const MaintenanceView: React.FC = () => {
                 </h2>
                 <p className="text-slate-400">Logado como: {currentUser.name}</p>
             </div>
-            <div className="bg-white p-2 rounded-lg hidden md:block">
-                 <span className="text-slate-900 font-extrabold text-xl tracking-tighter">
-                    Rabelo<span className="text-blue-600">Tour</span>
-                </span>
+            <div className="bg-white/10 p-2 rounded-lg hidden md:block">
+                 <Logo variant="light" size="sm" showGlobe={false} />
             </div>
         </div>
 
