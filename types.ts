@@ -14,6 +14,7 @@ export interface SystemSettings {
   cnpj?: string;
   phone?: string;
   address?: string;
+  aiApiKey?: string; // Nova chave para IA
 }
 
 export interface User {

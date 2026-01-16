@@ -10,7 +10,8 @@ const SettingsView: React.FC = () => {
       cnpj: '',
       phone: '',
       address: '',
-      logoUrl: ''
+      logoUrl: '',
+      aiApiKey: ''
   });
   const [uploading, setUploading] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
@@ -22,7 +23,8 @@ const SettingsView: React.FC = () => {
               cnpj: settings.cnpj || '',
               phone: settings.phone || '',
               address: settings.address || '',
-              logoUrl: settings.logoUrl || ''
+              logoUrl: settings.logoUrl || '',
+              aiApiKey: settings.aiApiKey || ''
           });
       }
   }, [settings]);
@@ -96,53 +98,79 @@ const SettingsView: React.FC = () => {
             </div>
 
             {/* COMPANY DATA FORM */}
-            <div className="md:col-span-2 bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-                <h3 className="font-bold text-slate-700 mb-4">Dados da Empresa (Para Contratos/Recibos)</h3>
-                <form onSubmit={handleSave} className="space-y-4">
-                    <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">Nome Fantasia / Razão Social</label>
-                        <input 
-                            value={form.companyName} onChange={e => setForm({...form, companyName: e.target.value})}
-                            className="w-full border p-2 rounded focus:ring-2 focus:ring-blue-500 outline-none"
-                        />
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
+            <div className="md:col-span-2 space-y-6">
+                <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                    <h3 className="font-bold text-slate-700 mb-4">Dados da Empresa (Para Contratos/Recibos)</h3>
+                    <form onSubmit={handleSave} className="space-y-4">
                         <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-1">CNPJ</label>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Nome Fantasia / Razão Social</label>
                             <input 
-                                value={form.cnpj} onChange={e => setForm({...form, cnpj: e.target.value})}
+                                value={form.companyName} onChange={e => setForm({...form, companyName: e.target.value})}
                                 className="w-full border p-2 rounded focus:ring-2 focus:ring-blue-500 outline-none"
-                                placeholder="00.000.000/0000-00"
                             />
                         </div>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-1">CNPJ</label>
+                                <input 
+                                    value={form.cnpj} onChange={e => setForm({...form, cnpj: e.target.value})}
+                                    className="w-full border p-2 rounded focus:ring-2 focus:ring-blue-500 outline-none"
+                                    placeholder="00.000.000/0000-00"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-1">Telefone / WhatsApp</label>
+                                <input 
+                                    value={form.phone} onChange={e => setForm({...form, phone: e.target.value})}
+                                    className="w-full border p-2 rounded focus:ring-2 focus:ring-blue-500 outline-none"
+                                    placeholder="(00) 00000-0000"
+                                />
+                            </div>
+                        </div>
                         <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-1">Telefone / WhatsApp</label>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Endereço Completo</label>
                             <input 
-                                value={form.phone} onChange={e => setForm({...form, phone: e.target.value})}
+                                value={form.address} onChange={e => setForm({...form, address: e.target.value})}
                                 className="w-full border p-2 rounded focus:ring-2 focus:ring-blue-500 outline-none"
-                                placeholder="(00) 00000-0000"
+                                placeholder="Rua, Número, Bairro, Cidade - UF"
                             />
                         </div>
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">Endereço Completo</label>
-                        <input 
-                            value={form.address} onChange={e => setForm({...form, address: e.target.value})}
-                            className="w-full border p-2 rounded focus:ring-2 focus:ring-blue-500 outline-none"
-                            placeholder="Rua, Número, Bairro, Cidade - UF"
-                        />
-                    </div>
+                    </form>
+                </div>
 
-                    <div className="pt-4 border-t border-slate-100 flex justify-end">
-                        <button 
-                            type="submit" 
-                            disabled={uploading}
-                            className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-6 rounded shadow-sm transition-colors"
-                        >
-                            Salvar Configurações
-                        </button>
+                {/* AI SETTINGS */}
+                <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                    <h3 className="font-bold text-slate-700 mb-2 flex items-center gap-2">
+                        <span>✨</span> Configuração Inteligência Artificial
+                    </h3>
+                    <p className="text-xs text-slate-500 mb-4">Insira sua chave de API do Google Gemini para habilitar as análises financeiras.</p>
+                    
+                    <div className="space-y-3">
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Chave de API (Google Gemini)</label>
+                            <input 
+                                type="password"
+                                value={form.aiApiKey} 
+                                onChange={e => setForm({...form, aiApiKey: e.target.value})}
+                                className="w-full border p-2 rounded focus:ring-2 focus:ring-blue-500 outline-none font-mono text-sm"
+                                placeholder="AIzaSy..."
+                            />
+                        </div>
+                        <div className="text-xs text-slate-500 bg-slate-50 p-3 rounded border border-slate-100">
+                            <strong>Nota:</strong> Chaves da OpenAI (sk-proj...) não funcionam aqui. Use apenas chaves do Google AI Studio.
+                        </div>
                     </div>
-                </form>
+                </div>
+
+                <div className="flex justify-end">
+                    <button 
+                        onClick={handleSave}
+                        disabled={uploading}
+                        className="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-8 rounded shadow-sm transition-colors w-full md:w-auto"
+                    >
+                        Salvar Todas as Configurações
+                    </button>
+                </div>
             </div>
         </div>
     </div>

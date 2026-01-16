@@ -94,7 +94,8 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       logoUrl: '', // Will default to internal fallback if empty
       cnpj: '',
       phone: '',
-      address: ''
+      address: '',
+      aiApiKey: ''
   });
   
   // Data States

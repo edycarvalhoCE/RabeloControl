@@ -6,7 +6,7 @@ import { getFinancialInsight } from '../services/geminiService';
 import { Logo } from './Logo';
 
 const Dashboard: React.FC = () => {
-  const { bookings, transactions, buses, parts, currentUser, users, timeOffs, updateTimeOffStatus } = useStore();
+  const { bookings, transactions, buses, parts, currentUser, users, timeOffs, updateTimeOffStatus, settings } = useStore();
   const [insight, setInsight] = useState<string>('');
   const [loadingAi, setLoadingAi] = useState(false);
 
@@ -45,7 +45,10 @@ const Dashboard: React.FC = () => {
   const handleGetInsight = async () => {
     setLoadingAi(true);
     const summary = `Receita Total: R$${totalRevenue}, Despesas Totais: R$${totalExpenses}, Lucro Líquido: R$${profit}. Tamanho da Frota: ${buses.length} ônibus, ${maintenanceBuses} em manutenção. Locações ativas hoje: ${activeBookings}. Peças com estoque baixo: ${lowStockParts} itens.`;
-    const result = await getFinancialInsight(summary);
+    
+    // Pass key from settings
+    const result = await getFinancialInsight(summary, settings?.aiApiKey);
+    
     setInsight(result);
     setLoadingAi(false);
   };
