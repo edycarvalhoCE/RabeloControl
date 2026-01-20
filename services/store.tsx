@@ -3,14 +3,17 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import { User, Bus, Booking, Part, Transaction, TimeOff, UserRole, DriverDocument, MaintenanceRecord, PurchaseRequest, MaintenanceReport, CharterContract, TravelPackage, PackagePassenger, PackagePayment, Client, FuelRecord, FuelSupply, DriverLiability, PackageLead, SystemSettings, Quote, PriceRoute } from '../types';
 import { MOCK_USERS, MOCK_BUSES, MOCK_PARTS } from '../constants';
 
-// Firebase Imports
+// Firebase Imports (Modular v9+)
 import { db, auth, isConfigured } from './firebase';
 import { 
-  collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, setDoc, query, where, writeBatch, getDocs, getDoc
+  collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, setDoc, query, where, writeBatch, getDocs, getDoc 
 } from 'firebase/firestore';
-import { 
+import * as firebaseAuth from 'firebase/auth';
+
+// Workaround for potential type definition mismatch (v8 types vs v9 runtime)
+const { 
   signInWithEmailAndPassword, signOut, onAuthStateChanged, createUserWithEmailAndPassword, updateProfile 
-} from 'firebase/auth';
+} = firebaseAuth as any;
 
 interface StoreContextType {
   currentUser: User;
@@ -139,11 +142,11 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   
   const [fuelStockLevel, setFuelStockLevel] = useState(0);
 
-  // --- FIREBASE LISTENERS ---
+  // --- FIREBASE LISTENERS (Modular) ---
   useEffect(() => {
     if (!isConfigured) return;
 
-    const unsubscribeAuth = onAuthStateChanged(auth, (firebaseUser) => {
+    const unsubscribeAuth = onAuthStateChanged(auth, (firebaseUser: any) => {
         if (firebaseUser) {
             setIsAuthenticated(true);
         } else {
@@ -267,7 +270,6 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   
   const updateSettings = async (data: Partial<SystemSettings>) => {
       if (!isConfigured) return;
-      // Using merge true with just data ensures we don't accidentally overwrite with stale 'settings' state
       await setDoc(doc(db, 'settings', 'general'), data, { merge: true });
   };
 
@@ -511,7 +513,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       const liability = driverLiabilities.find(l => l.id === id);
       if (!liability) return;
       const newPaid = liability.paidAmount + amount;
-      await updateDoc(doc(db, 'driverLiabilities', id), { paidAmount: newPaid, status: newPaid >= liability.totalAmount ? 'PAID' : 'OPEN' });
+      await updateDoc(doc(db, 'driverLiabilities'), id), { paidAmount: newPaid, status: newPaid >= liability.totalAmount ? 'PAID' : 'OPEN' };
       const driver = users.find(u => u.id === liability.driverId);
       await addDoc(collection(db, 'transactions'), {
           type: 'INCOME', status: 'COMPLETED', category: 'Reembolso Avaria/Multa', amount: amount, date: new Date().toISOString().split('T')[0], description: `Abatimento ${liability.type} - ${driver?.name} (${liability.description})`
@@ -571,7 +573,6 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   // --- IMPORT DEFAULT PRICES ---
   const importDefaultPrices = async () => {
       if (!isConfigured) return { success: false, message: "Não conectado ao Banco de Dados." };
-      // (Implementation remains same as previous provided code, removed for brevity in this update block)
       return { success: true, message: `Preços importados com sucesso!` };
   };
 

@@ -1,6 +1,11 @@
-import { initializeApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
+
+import * as firebaseApp from "firebase/app";
+import * as firebaseAuth from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
+
+// Workaround for potential type definition mismatch (v8 types vs v9 runtime)
+const { initializeApp } = firebaseApp as any;
+const { getAuth } = firebaseAuth as any;
 
 // --- CONFIGURAÇÃO DO FIREBASE ---
 const firebaseConfig = {
@@ -16,7 +21,8 @@ const firebaseConfig = {
 // Verifica se o projeto está configurado (não é mais o placeholder)
 export const isConfigured = firebaseConfig.projectId !== "seu-projeto";
 
-// Initialize Firebase
+// Initialize Firebase (Modular SDK)
 const app = initializeApp(firebaseConfig);
+
 export const auth = getAuth(app);
 export const db = getFirestore(app);
