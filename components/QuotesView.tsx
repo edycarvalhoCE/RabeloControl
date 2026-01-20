@@ -36,6 +36,8 @@ const QuotesView: React.FC = () => {
   // Updated to include FINANCE
   const canManage = currentUser.role === UserRole.MANAGER || currentUser.role === UserRole.DEVELOPER || currentUser.role === UserRole.FINANCE;
   const isDeveloper = currentUser.role === UserRole.DEVELOPER;
+  // Finance can view but NOT edit price table (Add/Delete routes)
+  const canEditPriceTable = currentUser.role === UserRole.MANAGER || currentUser.role === UserRole.DEVELOPER;
 
   if (!canManage) {
       return <div className="p-8 text-center text-slate-500">Acesso restrito.</div>;
@@ -306,8 +308,8 @@ const QuotesView: React.FC = () => {
                     </div>
                     
                     <div className="flex-1 overflow-hidden flex flex-col md:flex-row">
-                        {/* LEFT: LIST */}
-                        <div className="w-full md:w-2/3 p-6 overflow-y-auto bg-white border-r border-slate-200">
+                        {/* LEFT: LIST - W-FULL if editing is disabled (Finance) */}
+                        <div className={`w-full ${canEditPriceTable ? 'md:w-2/3 border-r' : 'md:w-full'} p-6 overflow-y-auto bg-white border-slate-200`}>
                             
                             {/* SEARCH AND FILTER BAR */}
                             <div className="flex flex-col md:flex-row gap-2 mb-4">
@@ -346,7 +348,7 @@ const QuotesView: React.FC = () => {
                                         <div className="text-right">
                                             <p className="font-bold text-emerald-600">R$ {route.price.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</p>
                                             <div className="flex justify-end gap-2 mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                <button onClick={() => deletePriceRoute(route.id)} className="text-xs text-red-400 hover:text-red-600">Excluir</button>
+                                                {canEditPriceTable && <button onClick={() => deletePriceRoute(route.id)} className="text-xs text-red-400 hover:text-red-600">Excluir</button>}
                                                 <button onClick={() => handleUsePrice(route)} className="text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded font-bold hover:bg-emerald-200">Usar</button>
                                             </div>
                                         </div>
@@ -356,63 +358,65 @@ const QuotesView: React.FC = () => {
                             </div>
                         </div>
 
-                        {/* RIGHT: ADD FORM (Visible to Manager & Developer) */}
-                        <div className="w-full md:w-1/3 bg-slate-50 p-6 overflow-y-auto">
-                            <h4 className="font-bold text-slate-700 mb-4">Cadastrar Nova Rota</h4>
-                            <form onSubmit={handleAddRoute} className="space-y-4">
-                                <div>
-                                    <label className="block text-xs font-bold text-slate-500 mb-1">Origem</label>
-                                    <input 
-                                        required value={newRouteForm.origin} onChange={e => setNewRouteForm({...newRouteForm, origin: e.target.value})}
-                                        className="w-full border p-2 rounded text-sm" placeholder="Ex: Petrópolis"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-xs font-bold text-slate-500 mb-1">Destino</label>
-                                    <input 
-                                        required value={newRouteForm.destination} onChange={e => setNewRouteForm({...newRouteForm, destination: e.target.value})}
-                                        className="w-full border p-2 rounded text-sm" placeholder="Ex: Cabo Frio"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-xs font-bold text-slate-500 mb-1">Tipo de Veículo</label>
-                                    <select 
-                                        value={newRouteForm.vehicleType} onChange={e => setNewRouteForm({...newRouteForm, vehicleType: e.target.value})}
-                                        className="w-full border p-2 rounded text-sm bg-white"
-                                    >
-                                        <option value="Convencional">Convencional (46 lug)</option>
-                                        <option value="Executivo">Executivo (50 lug)</option>
-                                        <option value="Semi-Leito">Semi-Leito</option>
-                                        <option value="Leito">Leito Total</option>
-                                        <option value="DD (Double Deck)">DD (Double Deck)</option>
-                                        <option value="LD (Low Driver)">LD (Low Driver)</option>
-                                        <option value="Micro">Micro-ônibus</option>
-                                        <option value="Van">Van</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className="block text-xs font-bold text-slate-500 mb-1">Valor Tabela (R$)</label>
-                                    <div className="flex items-center border border-slate-300 rounded overflow-hidden bg-white">
-                                        <span className="bg-slate-100 text-slate-600 px-2 py-1 font-bold border-r border-slate-300 text-xs">R$</span>
+                        {/* RIGHT: ADD FORM (Visible to Manager & Developer Only) */}
+                        {canEditPriceTable && (
+                            <div className="w-full md:w-1/3 bg-slate-50 p-6 overflow-y-auto">
+                                <h4 className="font-bold text-slate-700 mb-4">Cadastrar Nova Rota</h4>
+                                <form onSubmit={handleAddRoute} className="space-y-4">
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 mb-1">Origem</label>
                                         <input 
-                                            type="text" 
-                                            inputMode="numeric"
-                                            required
-                                            value={newRouteForm.price.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
-                                            onChange={e => {
-                                                const val = Number(e.target.value.replace(/\D/g, "")) / 100;
-                                                setNewRouteForm({...newRouteForm, price: val});
-                                            }}
-                                            className="w-full p-2 outline-none text-right font-bold text-slate-800 text-sm"
-                                            placeholder="0,00"
+                                            required value={newRouteForm.origin} onChange={e => setNewRouteForm({...newRouteForm, origin: e.target.value})}
+                                            className="w-full border p-2 rounded text-sm" placeholder="Ex: Petrópolis"
                                         />
                                     </div>
-                                </div>
-                                <button type="submit" className="w-full bg-slate-800 text-white py-2 rounded font-bold text-sm hover:bg-slate-700">
-                                    Salvar na Tabela
-                                </button>
-                            </form>
-                        </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 mb-1">Destino</label>
+                                        <input 
+                                            required value={newRouteForm.destination} onChange={e => setNewRouteForm({...newRouteForm, destination: e.target.value})}
+                                            className="w-full border p-2 rounded text-sm" placeholder="Ex: Cabo Frio"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 mb-1">Tipo de Veículo</label>
+                                        <select 
+                                            value={newRouteForm.vehicleType} onChange={e => setNewRouteForm({...newRouteForm, vehicleType: e.target.value})}
+                                            className="w-full border p-2 rounded text-sm bg-white"
+                                        >
+                                            <option value="Convencional">Convencional (46 lug)</option>
+                                            <option value="Executivo">Executivo (50 lug)</option>
+                                            <option value="Semi-Leito">Semi-Leito</option>
+                                            <option value="Leito">Leito Total</option>
+                                            <option value="DD (Double Deck)">DD (Double Deck)</option>
+                                            <option value="LD (Low Driver)">LD (Low Driver)</option>
+                                            <option value="Micro">Micro-ônibus</option>
+                                            <option value="Van">Van</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 mb-1">Valor Tabela (R$)</label>
+                                        <div className="flex items-center border border-slate-300 rounded overflow-hidden bg-white">
+                                            <span className="bg-slate-100 text-slate-600 px-2 py-1 font-bold border-r border-slate-300 text-xs">R$</span>
+                                            <input 
+                                                type="text" 
+                                                inputMode="numeric"
+                                                required
+                                                value={newRouteForm.price.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
+                                                onChange={e => {
+                                                    const val = Number(e.target.value.replace(/\D/g, "")) / 100;
+                                                    setNewRouteForm({...newRouteForm, price: val});
+                                                }}
+                                                className="w-full p-2 outline-none text-right font-bold text-slate-800 text-sm"
+                                                placeholder="0,00"
+                                            />
+                                        </div>
+                                    </div>
+                                    <button type="submit" className="w-full bg-slate-800 text-white py-2 rounded font-bold text-sm hover:bg-slate-700">
+                                        Salvar na Tabela
+                                    </button>
+                                </form>
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>
