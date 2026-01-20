@@ -34,6 +34,7 @@ const QuotesView: React.FC = () => {
   });
 
   const canManage = currentUser.role === UserRole.MANAGER || currentUser.role === UserRole.DEVELOPER;
+  const isDeveloper = currentUser.role === UserRole.DEVELOPER;
 
   if (!canManage) {
       return <div className="p-8 text-center text-slate-500">Acesso restrito.</div>;
@@ -275,7 +276,8 @@ const QuotesView: React.FC = () => {
                     <div className="bg-emerald-800 p-4 text-white flex justify-between items-center">
                         <h3 className="font-bold text-lg flex items-center gap-2">💰 Tabela de Preços de Locação</h3>
                         <div className="flex items-center gap-2">
-                            {priceRoutes.length > 0 && (
+                            {/* RESTRICTED: Only Developer can see Clear Table */}
+                            {isDeveloper && priceRoutes.length > 0 && (
                                 <button 
                                     type="button"
                                     onClick={handleClearTable}
@@ -285,14 +287,19 @@ const QuotesView: React.FC = () => {
                                     🗑️ Limpar Tabela
                                 </button>
                             )}
-                            <button 
-                                type="button"
-                                onClick={handleImportPrices} 
-                                disabled={loadingImport}
-                                className="text-xs bg-emerald-700 hover:bg-emerald-600 text-white px-3 py-1.5 rounded font-bold border border-emerald-600 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                                {loadingImport ? 'Importando...' : '📥 Importar Tabela Padrão'}
-                            </button>
+                            
+                            {/* RESTRICTED: Only Developer can see Import Table */}
+                            {isDeveloper && (
+                                <button 
+                                    type="button"
+                                    onClick={handleImportPrices} 
+                                    disabled={loadingImport}
+                                    className="text-xs bg-emerald-700 hover:bg-emerald-600 text-white px-3 py-1.5 rounded font-bold border border-emerald-600 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    {loadingImport ? 'Importando...' : '📥 Importar Tabela Padrão'}
+                                </button>
+                            )}
+                            
                             <button onClick={() => setShowPriceTable(false)} className="text-emerald-200 hover:text-white text-xl ml-2">&times;</button>
                         </div>
                     </div>
@@ -348,7 +355,7 @@ const QuotesView: React.FC = () => {
                             </div>
                         </div>
 
-                        {/* RIGHT: ADD FORM */}
+                        {/* RIGHT: ADD FORM (Visible to Manager & Developer) */}
                         <div className="w-full md:w-1/3 bg-slate-50 p-6 overflow-y-auto">
                             <h4 className="font-bold text-slate-700 mb-4">Cadastrar Nova Rota</h4>
                             <form onSubmit={handleAddRoute} className="space-y-4">
