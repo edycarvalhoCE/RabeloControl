@@ -203,7 +203,7 @@ export interface PackagePassenger {
   qtdAdult: number;
   qtdChild: number;
   qtdSenior: number;
-  discount: number;
+  discount: number; // Valor em R$
   agreedPrice: number;
   paidAmount: number;
   status: 'PENDING' | 'PARTIAL' | 'PAID';
@@ -223,6 +223,10 @@ export interface PackagePassenger {
   installments?: number; // Numero de parcelas
   cardFeeRate?: number; // % applied
   cardFeeValue?: number; // $ value deducted
+
+  // Discount Details
+  discountType?: 'FIXED' | 'PERCENTAGE';
+  discountPercent?: number; 
 }
 
 export interface PackageLead {

@@ -35,11 +35,13 @@ const TravelPackagesView: React.FC = () => {
       qtdAdult: 0,
       qtdChild: 0,
       qtdSenior: 0,
-      discount: 0,
+      discount: 0, // Current Calculated Discount Amount (R$)
       paymentMethod: 'VISTA' as 'VISTA' | 'CARTAO_CREDITO' | 'CARTAO_DEBITO',
       transactionSource: 'MACHINE' as 'MACHINE' | 'LINK',
       installments: 1, // Number of installments
-      cardFeeRate: 0 // % auto-calculated
+      cardFeeRate: 0, // % auto-calculated
+      discountType: 'FIXED' as 'FIXED' | 'PERCENTAGE', // NEW
+      discountPercent: 0 // NEW
   });
 
   // Client History Modal
@@ -73,6 +75,20 @@ const TravelPackagesView: React.FC = () => {
 
       setSaleForm(prev => ({ ...prev, cardFeeRate: rate }));
   }, [saleForm.paymentMethod, saleForm.installments]);
+
+  // --- AUTOMATIC DISCOUNT CALCULATION EFFECT ---
+  useEffect(() => {
+      if (selectedPackage && saleForm.discountType === 'PERCENTAGE' && saleForm.paymentMethod === 'VISTA') {
+          const total = (saleForm.qtdAdult * selectedPackage.adultPrice) + 
+                        (saleForm.qtdChild * selectedPackage.childPrice) + 
+                        (saleForm.qtdSenior * selectedPackage.seniorPrice);
+          
+          if (total > 0) {
+              const calcDiscount = total * (saleForm.discountPercent / 100);
+              setSaleForm(prev => ({ ...prev, discount: calcDiscount }));
+          }
+      }
+  }, [saleForm.discountType, saleForm.discountPercent, saleForm.qtdAdult, saleForm.qtdChild, saleForm.qtdSenior, selectedPackage, saleForm.paymentMethod]);
 
 
   // --- Handlers ---
@@ -148,7 +164,9 @@ const TravelPackagesView: React.FC = () => {
           paymentMethod: p.paymentMethod || 'VISTA',
           transactionSource: p.transactionSource || 'MACHINE',
           installments: p.installments || 1,
-          cardFeeRate: p.cardFeeRate || 0
+          cardFeeRate: p.cardFeeRate || 0,
+          discountType: p.discountType || 'FIXED',
+          discountPercent: p.discountPercent || 0
       });
       // Try to find client data to fill remaining fields
       const client = clients.find(c => c.id === p.clientId);
@@ -171,7 +189,7 @@ const TravelPackagesView: React.FC = () => {
       setSaleForm({ 
           saleType: 'DIRECT', agencyName: '', agencyPhone: '', paxList: '',
           cpf: '', name: '', rg: '', birthDate: '', phone: '', address: '', qtdAdult: 0, qtdChild: 0, qtdSenior: 0, discount: 0, 
-          paymentMethod: 'VISTA', transactionSource: 'MACHINE', installments: 1, cardFeeRate: 0 
+          paymentMethod: 'VISTA', transactionSource: 'MACHINE', installments: 1, cardFeeRate: 0, discountType: 'FIXED', discountPercent: 0
       });
   };
 
@@ -248,7 +266,9 @@ const TravelPackagesView: React.FC = () => {
                   transactionSource: saleForm.transactionSource,
                   installments: saleForm.installments,
                   cardFeeRate: saleForm.cardFeeRate,
-                  cardFeeValue: cardFeeValue
+                  cardFeeValue: cardFeeValue,
+                  discountType: saleForm.discountType,
+                  discountPercent: saleForm.discountPercent
               });
               alert("Venda atualizada com sucesso!");
               setEditingPassenger(null);
@@ -288,7 +308,9 @@ const TravelPackagesView: React.FC = () => {
                       transactionSource: saleForm.transactionSource,
                       installments: saleForm.installments,
                       cardFeeRate: saleForm.cardFeeRate,
-                      cardFeeValue: cardFeeValue
+                      cardFeeValue: cardFeeValue,
+                      discountType: saleForm.discountType,
+                      discountPercent: saleForm.discountPercent
                   }
               );
               alert("Venda registrada com sucesso!");
@@ -298,7 +320,7 @@ const TravelPackagesView: React.FC = () => {
           setSaleForm({ 
               saleType: 'DIRECT', agencyName: '', agencyPhone: '', paxList: '',
               cpf: '', name: '', rg: '', birthDate: '', phone: '', address: '', qtdAdult: 0, qtdChild: 0, qtdSenior: 0, discount: 0, 
-              paymentMethod: 'VISTA', transactionSource: 'MACHINE', installments: 1, cardFeeRate: 0 
+              paymentMethod: 'VISTA', transactionSource: 'MACHINE', installments: 1, cardFeeRate: 0, discountType: 'FIXED', discountPercent: 0
           });
       }
   };
@@ -423,7 +445,7 @@ const TravelPackagesView: React.FC = () => {
                                                     type="radio" name="paymentMethod" value="VISTA"
                                                     checked={saleForm.paymentMethod === 'VISTA'}
                                                     onChange={() => {
-                                                        setSaleForm({...saleForm, paymentMethod: 'VISTA', cardFeeRate: 0, installments: 1});
+                                                        setSaleForm({...saleForm, paymentMethod: 'VISTA', cardFeeRate: 0, installments: 1, discountType: 'FIXED', discountPercent: 0});
                                                     }}
                                                     className="text-emerald-600 focus:ring-emerald-500"
                                                   />
@@ -592,18 +614,56 @@ const TravelPackagesView: React.FC = () => {
                                           <div className="flex-1">
                                               {saleForm.paymentMethod === 'VISTA' ? (
                                                   <div className="flex flex-col">
-                                                      <label className="text-xs font-bold text-green-600 mr-2">Desconto à Vista (R$)</label>
-                                                      <div className="flex items-center border border-green-300 rounded overflow-hidden bg-white focus-within:ring-2 focus-within:ring-green-500">
-                                                          <span className="bg-green-100 text-green-600 px-2 py-1 font-bold border-r border-green-300 text-xs">R$</span>
-                                                          <input 
-                                                            type="text" 
-                                                            inputMode="numeric"
-                                                            className="p-1 outline-none text-right font-medium text-green-700 w-full" 
-                                                            value={saleForm.discount.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
-                                                            onChange={e => handleDiscountChange(e.target.value)}
-                                                            placeholder="0,00"
-                                                          />
+                                                      <div className="flex justify-between items-center mb-1">
+                                                          <label className="text-xs font-bold text-green-600">Desconto à Vista</label>
+                                                          {/* Toggle Type */}
+                                                          <div className="flex bg-slate-100 rounded p-0.5">
+                                                              <button
+                                                                type="button"
+                                                                onClick={() => setSaleForm({...saleForm, discountType: 'FIXED', discount: 0, discountPercent: 0})}
+                                                                className={`text-[10px] px-2 py-0.5 rounded font-bold ${saleForm.discountType === 'FIXED' ? 'bg-white shadow text-slate-800' : 'text-slate-500'}`}
+                                                              >
+                                                                  R$
+                                                              </button>
+                                                              <button
+                                                                type="button"
+                                                                onClick={() => setSaleForm({...saleForm, discountType: 'PERCENTAGE', discount: 0, discountPercent: 0})}
+                                                                className={`text-[10px] px-2 py-0.5 rounded font-bold ${saleForm.discountType === 'PERCENTAGE' ? 'bg-white shadow text-slate-800' : 'text-slate-500'}`}
+                                                              >
+                                                                  %
+                                                              </button>
+                                                          </div>
                                                       </div>
+                                                      
+                                                      {saleForm.discountType === 'FIXED' ? (
+                                                          <div className="flex items-center border border-green-300 rounded overflow-hidden bg-white focus-within:ring-2 focus-within:ring-green-500">
+                                                              <span className="bg-green-100 text-green-600 px-2 py-1 font-bold border-r border-green-300 text-xs">R$</span>
+                                                              <input 
+                                                                type="text" 
+                                                                inputMode="numeric"
+                                                                className="p-1 outline-none text-right font-medium text-green-700 w-full" 
+                                                                value={saleForm.discount.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
+                                                                onChange={e => handleDiscountChange(e.target.value)}
+                                                                placeholder="0,00"
+                                                              />
+                                                          </div>
+                                                      ) : (
+                                                          <div className="flex items-center border border-green-300 rounded overflow-hidden bg-white focus-within:ring-2 focus-within:ring-green-500">
+                                                              <input 
+                                                                type="number" min="0" max="100"
+                                                                className="p-1 outline-none text-right font-medium text-green-700 w-full" 
+                                                                value={saleForm.discountPercent}
+                                                                onChange={e => setSaleForm({...saleForm, discountPercent: parseFloat(e.target.value) || 0})}
+                                                                placeholder="0"
+                                                              />
+                                                              <span className="bg-green-100 text-green-600 px-2 py-1 font-bold border-l border-green-300 text-xs">%</span>
+                                                          </div>
+                                                      )}
+                                                      {saleForm.discountType === 'PERCENTAGE' && saleForm.discount > 0 && (
+                                                          <p className="text-[10px] text-green-600 mt-1 font-bold text-right">
+                                                              - R$ {saleForm.discount.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
+                                                          </p>
+                                                      )}
                                                   </div>
                                               ) : (
                                                   <div className="flex flex-col bg-red-50 p-2 rounded border border-red-100">
@@ -688,7 +748,12 @@ const TravelPackagesView: React.FC = () => {
                                                       {p.status === 'PAID' ? 'QUITADO' : p.status === 'PARTIAL' ? 'PARCIAL' : 'PENDENTE'}
                                                   </span>
                                                   <p className="font-bold text-slate-800">R$ {p.agreedPrice.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</p>
-                                                  {p.discount > 0 && <p className="text-xs text-green-600 font-bold">- Desc: R$ {p.discount.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</p>}
+                                                  {p.discount > 0 && (
+                                                      <p className="text-xs text-green-600 font-bold">
+                                                          - Desc: R$ {p.discount.toLocaleString('pt-BR', {minimumFractionDigits: 2})} 
+                                                          {p.discountType === 'PERCENTAGE' && ` (${p.discountPercent}%)`}
+                                                      </p>
+                                                  )}
                                                   {p.cardFeeValue && p.cardFeeValue > 0 && (
                                                       <p className="text-[10px] text-red-500 font-bold mt-1">
                                                           Taxa ({p.cardFeeRate}%): R$ {p.cardFeeValue.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
