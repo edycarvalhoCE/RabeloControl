@@ -421,7 +421,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       if (saleData.saleType === 'AGENCY') {
           commissionRate = 0.12; // 12%
       } else if (saleData.saleType === 'PROMOTER') {
-          commissionRate = 0.10; // 10%
+          commissionRate = 0.10; // 10% - NOVA REGRA DE COMISSÃO
       }
 
       let commissionValue = (saleData.agreedPrice || 0) * commissionRate;
