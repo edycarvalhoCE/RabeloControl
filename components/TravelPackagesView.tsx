@@ -467,7 +467,7 @@ const TravelPackagesView: React.FC = () => {
                                                         onChange={() => setSaleForm({...saleForm, saleType: 'DIRECT'})}
                                                         className="text-emerald-600 focus:ring-emerald-500"
                                                       />
-                                                      <span className="text-sm font-medium">Direta</span>
+                                                      <span className="text-sm font-medium">👤 Direta (1%)</span>
                                                   </label>
                                                   <label className="flex items-center gap-2 cursor-pointer">
                                                       <input 
@@ -476,7 +476,7 @@ const TravelPackagesView: React.FC = () => {
                                                         onChange={() => setSaleForm({...saleForm, saleType: 'AGENCY'})}
                                                         className="text-emerald-600 focus:ring-emerald-500"
                                                       />
-                                                      <span className="text-sm font-medium">Agência (12%)</span>
+                                                      <span className="text-sm font-medium">🏢 Agência (12%)</span>
                                                   </label>
                                               </div>
                                               <label className="flex items-center gap-2 cursor-pointer mt-1">
@@ -486,7 +486,7 @@ const TravelPackagesView: React.FC = () => {
                                                     onChange={() => setSaleForm({...saleForm, saleType: 'PROMOTER'})}
                                                     className="text-emerald-600 focus:ring-emerald-500"
                                                   />
-                                                  <span className="text-sm font-medium">Promotor (10%)</span>
+                                                  <span className="text-sm font-medium text-indigo-700 font-bold">📢 Promotor (10%)</span>
                                               </label>
                                           </div>
                                       </div>
