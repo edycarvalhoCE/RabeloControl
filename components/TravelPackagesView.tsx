@@ -117,8 +117,6 @@ const TravelPackagesView: React.FC = () => {
           }));
       } else {
           // Convert % to Fixed R$
-          // Formula is handled by the state 'discount' already holding the value, 
-          // but we just need to ensure the mode is switched. 
           // The current discount value is already correct in R$, just switch mode.
           setSaleForm(prev => ({ ...prev, discountType: 'FIXED', discountPercent: 0 }));
       }
