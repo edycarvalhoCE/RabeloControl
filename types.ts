@@ -249,6 +249,8 @@ export interface FuelRecord {
   cost: number;
   stationName?: string;
   loggedBy: string;
+  kmStart: number;
+  kmEnd: number;
 }
 
 export interface FuelSupply {

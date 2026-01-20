@@ -30,7 +30,9 @@ const DriverPortal: React.FC = () => {
       arlaLiters: 0,
       location: 'STREET' as 'GARAGE' | 'STREET',
       cost: 0,
-      stationName: ''
+      stationName: '',
+      kmStart: 0,
+      kmEnd: 0
   });
 
   // --- LOGIC TO MERGE BOOKINGS AND CHARTER SCHEDULE ---
@@ -115,7 +117,19 @@ const DriverPortal: React.FC = () => {
   const handleFuelSubmit = (e: React.FormEvent) => {
       e.preventDefault();
       if (!fuelForm.busId || fuelForm.dieselLiters <= 0) {
-          alert('Preencha os dados corretamente.');
+          alert('Preencha os dados de veículo e diesel corretamente.');
+          return;
+      }
+      if (fuelForm.kmStart <= 0 || fuelForm.kmEnd <= 0) {
+          alert("É obrigatório informar a KM Inicial e Final.");
+          return;
+      }
+      if (fuelForm.kmEnd <= fuelForm.kmStart) {
+          alert("KM Final deve ser maior que KM Inicial.");
+          return;
+      }
+      if (fuelForm.hasArla && fuelForm.arlaLiters <= 0) {
+          alert("Informe a quantidade de litros de Arla.");
           return;
       }
       
@@ -123,7 +137,9 @@ const DriverPortal: React.FC = () => {
           ...fuelForm,
           cost: fuelForm.location === 'STREET' ? fuelForm.cost : 0,
           stationName: fuelForm.location === 'STREET' ? fuelForm.stationName : '',
-          loggedBy: currentUser.id
+          loggedBy: currentUser.id,
+          kmStart: fuelForm.kmStart,
+          kmEnd: fuelForm.kmEnd
       });
       
       alert('Abastecimento registrado!');
@@ -135,7 +151,9 @@ const DriverPortal: React.FC = () => {
         arlaLiters: 0,
         location: 'STREET',
         cost: 0,
-        stationName: ''
+        stationName: '',
+        kmStart: 0,
+        kmEnd: 0
       });
   };
 
@@ -319,6 +337,30 @@ const DriverPortal: React.FC = () => {
                         </div>
                     </div>
 
+                    {/* KM Fields */}
+                    <div className="grid grid-cols-2 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200">
+                        <div>
+                            <label className="block text-sm font-bold text-slate-800 mb-1">KM Inicial *</label>
+                            <input 
+                                type="number" min="0" required
+                                value={fuelForm.kmStart || ''} 
+                                onChange={e => setFuelForm({...fuelForm, kmStart: parseInt(e.target.value)})}
+                                className="w-full border p-2 rounded-lg outline-none text-lg font-semibold"
+                                placeholder="0"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-bold text-slate-800 mb-1">KM Final *</label>
+                            <input 
+                                type="number" min="0" required
+                                value={fuelForm.kmEnd || ''} 
+                                onChange={e => setFuelForm({...fuelForm, kmEnd: parseInt(e.target.value)})}
+                                className="w-full border p-2 rounded-lg outline-none text-lg font-semibold"
+                                placeholder="0"
+                            />
+                        </div>
+                    </div>
+
                     <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
                         <label className="block text-sm font-bold text-slate-800 mb-2">Quantidade Diesel (Litros)</label>
                         <input 
@@ -364,9 +406,9 @@ const DriverPortal: React.FC = () => {
 
                     {fuelForm.hasArla && (
                         <div className="animate-fade-in pl-8">
-                             <label className="block text-xs font-bold text-slate-600 mb-1">Qtd. Arla (Litros)</label>
+                             <label className="block text-xs font-bold text-slate-600 mb-1">Qtd. Arla (Litros) *</label>
                              <input 
-                                type="number" step="0.1" min="0"
+                                type="number" step="0.1" min="0" required={fuelForm.hasArla}
                                 value={fuelForm.arlaLiters || ''} 
                                 onChange={e => setFuelForm({...fuelForm, arlaLiters: parseFloat(e.target.value)})}
                                 className="w-full border p-2 rounded outline-none"
