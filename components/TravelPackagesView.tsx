@@ -85,7 +85,13 @@ const TravelPackagesView: React.FC = () => {
           
           if (total > 0) {
               const calcDiscount = total * (saleForm.discountPercent / 100);
-              setSaleForm(prev => ({ ...prev, discount: calcDiscount }));
+              // Update discount R$ without triggering infinite loop (only if value changed significantly)
+              setSaleForm(prev => {
+                  if (Math.abs(prev.discount - calcDiscount) > 0.01) {
+                      return { ...prev, discount: calcDiscount };
+                  }
+                  return prev;
+              });
           }
       }
   }, [saleForm.discountType, saleForm.discountPercent, saleForm.qtdAdult, saleForm.qtdChild, saleForm.qtdSenior, selectedPackage, saleForm.paymentMethod]);
@@ -118,6 +124,7 @@ const TravelPackagesView: React.FC = () => {
       } else {
           // Convert % to Fixed R$
           // The current discount value is already correct in R$, just switch mode.
+          // Reset percent to avoid confusion, keep R$ value
           setSaleForm(prev => ({ ...prev, discountType: 'FIXED', discountPercent: 0 }));
       }
   };
