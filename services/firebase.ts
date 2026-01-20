@@ -1,11 +1,9 @@
 
-import * as firebaseApp from "firebase/app";
-import * as firebaseAuth from "firebase/auth";
+// @ts-ignore
+import { initializeApp } from "firebase/app";
+// @ts-ignore
+import { getAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
-
-// Workaround for potential type definition mismatch (v8 types vs v9 runtime)
-const { initializeApp } = firebaseApp as any;
-const { getAuth } = firebaseAuth as any;
 
 // --- CONFIGURAÇÃO DO FIREBASE ---
 const firebaseConfig = {

@@ -8,12 +8,10 @@ import { db, auth, isConfigured } from './firebase';
 import { 
   collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, setDoc, query, where, writeBatch, getDocs, getDoc 
 } from 'firebase/firestore';
-import * as firebaseAuth from 'firebase/auth';
-
-// Workaround for potential type definition mismatch (v8 types vs v9 runtime)
-const { 
+// @ts-ignore
+import { 
   signInWithEmailAndPassword, signOut, onAuthStateChanged, createUserWithEmailAndPassword, updateProfile 
-} = firebaseAuth as any;
+} from 'firebase/auth';
 
 interface StoreContextType {
   currentUser: User;
@@ -146,7 +144,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   useEffect(() => {
     if (!isConfigured) return;
 
-    const unsubscribeAuth = onAuthStateChanged(auth, (firebaseUser: any) => {
+    const unsubscribeAuth = onAuthStateChanged(auth, (firebaseUser) => {
         if (firebaseUser) {
             setIsAuthenticated(true);
         } else {
@@ -513,7 +511,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       const liability = driverLiabilities.find(l => l.id === id);
       if (!liability) return;
       const newPaid = liability.paidAmount + amount;
-      await updateDoc(doc(db, 'driverLiabilities'), id), { paidAmount: newPaid, status: newPaid >= liability.totalAmount ? 'PAID' : 'OPEN' };
+      await updateDoc(doc(db, 'driverLiabilities', id), { paidAmount: newPaid, status: newPaid >= liability.totalAmount ? 'PAID' : 'OPEN' });
       const driver = users.find(u => u.id === liability.driverId);
       await addDoc(collection(db, 'transactions'), {
           type: 'INCOME', status: 'COMPLETED', category: 'Reembolso Avaria/Multa', amount: amount, date: new Date().toISOString().split('T')[0], description: `Abatimento ${liability.type} - ${driver?.name} (${liability.description})`
