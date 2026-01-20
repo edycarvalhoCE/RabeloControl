@@ -1,16 +1,23 @@
 
 import React, { useState } from 'react';
 import { useStore } from '../services/store';
-import { UserRole, Quote, Bus } from '../types';
+import { UserRole, Quote, Bus, PriceRoute } from '../types';
 
 const QuotesView: React.FC = () => {
-  const { quotes, addQuote, updateQuote, convertQuoteToBooking, deleteQuote, currentUser, buses } = useStore();
+  const { quotes, addQuote, updateQuote, convertQuoteToBooking, deleteQuote, currentUser, buses, priceRoutes, addPriceRoute, deletePriceRoute, importDefaultPrices, clearPriceTable } = useStore();
   const [showNewForm, setShowNewForm] = useState(false);
   const [editingQuote, setEditingQuote] = useState<Quote | null>(null);
+  const [showPriceTable, setShowPriceTable] = useState(false);
+  const [loadingImport, setLoadingImport] = useState(false);
   
   // State for Conversion (Approval)
   const [approvingQuote, setApprovingQuote] = useState<Quote | null>(null);
   const [selectedBusForApproval, setSelectedBusForApproval] = useState('');
+
+  // Price Table State
+  const [priceSearch, setPriceSearch] = useState('');
+  const [priceVehicleFilter, setPriceVehicleFilter] = useState(''); // NEW FILTER STATE
+  const [newRouteForm, setNewRouteForm] = useState({ origin: 'Petrópolis', destination: '', vehicleType: 'Convencional', price: 0 });
 
   // New Quote Form State
   const [form, setForm] = useState({
@@ -32,30 +39,44 @@ const QuotesView: React.FC = () => {
       return <div className="p-8 text-center text-slate-500">Acesso restrito.</div>;
   }
 
-  // --- HELPERS ---
-  const getStatusColor = (status: string) => {
-      switch(status) {
-          case 'NEW': return 'bg-yellow-100 border-yellow-200 text-yellow-800';
-          case 'PRICED': return 'bg-blue-100 border-blue-200 text-blue-800';
-          case 'SENT': return 'bg-purple-100 border-purple-200 text-purple-800';
-          case 'APPROVED': return 'bg-green-100 border-green-200 text-green-800';
-          case 'REJECTED': return 'bg-red-100 border-red-200 text-red-800';
-          default: return 'bg-gray-100';
-      }
-  };
-
-  const getStatusLabel = (status: string) => {
-      switch(status) {
-          case 'NEW': return 'Novo';
-          case 'PRICED': return 'Precificado';
-          case 'SENT': return 'Enviado';
-          case 'APPROVED': return 'Fechado';
-          case 'REJECTED': return 'Perdido';
-          default: return status;
-      }
-  };
-
   // --- HANDLERS ---
+
+  const handleImportPrices = async (e: React.MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      
+      console.log("Iniciando processo de importação...");
+
+      if (priceRoutes.length > 0) {
+          if (!confirm(`Já existem ${priceRoutes.length} rotas cadastradas. Importar novamente pode gerar duplicatas.\nDeseja continuar mesmo assim?`)) {
+              return;
+          }
+      } 
+      // Se tabela vazia, roda direto sem perguntar para facilitar
+
+      setLoadingImport(true);
+      try {
+          const result = await importDefaultPrices();
+          if (result.success) {
+              alert(result.message);
+          } else {
+              alert("Falha na importação: " + result.message);
+          }
+      } catch (err: any) {
+          alert("Erro crítico: " + err.message);
+      } finally {
+          setLoadingImport(false);
+      }
+  };
+
+  const handleClearTable = async () => {
+      if (confirm("⚠️ Tem certeza que deseja APAGAR TODAS as rotas da tabela de preços? Esta ação não pode ser desfeita.")) {
+          setLoadingImport(true);
+          const result = await clearPriceTable();
+          setLoadingImport(false);
+          alert(result.message);
+      }
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
       e.preventDefault();
@@ -67,9 +88,6 @@ const QuotesView: React.FC = () => {
           } else {
               addQuote({
                   ...form,
-                  // If adding new, status defaults to NEW in store, but if price is added immediately?
-                  // Let's keep simpler, store handles status NEW. 
-                  // If manager adds price right away, we might want to update it to PRICED, but let's stick to flow.
               });
               alert("Solicitação de orçamento criada!");
           }
@@ -123,6 +141,28 @@ const QuotesView: React.FC = () => {
       }
   };
 
+  // --- PRICE TABLE HANDLERS ---
+  const handleAddRoute = (e: React.FormEvent) => {
+      e.preventDefault();
+      if (newRouteForm.destination && newRouteForm.price > 0) {
+          addPriceRoute(newRouteForm);
+          setNewRouteForm({ origin: 'Petrópolis', destination: '', vehicleType: 'Convencional', price: 0 });
+          alert("Rota adicionada à tabela!");
+      }
+  };
+
+  const handleUsePrice = (route: PriceRoute) => {
+      setForm(prev => ({
+          ...prev,
+          destination: route.destination,
+          departureLocation: route.origin,
+          price: route.price,
+          observations: `${prev.observations ? prev.observations + '\n' : ''}Preço baseado na tabela: ${route.vehicleType}`
+      }));
+      setShowPriceTable(false);
+      setShowNewForm(true); // Open form if closed
+  };
+
   // --- KANBAN COLUMNS ---
   const columns: {id: Quote['status'], title: string}[] = [
       { id: 'NEW', title: '🆕 Novos Pedidos' },
@@ -132,6 +172,17 @@ const QuotesView: React.FC = () => {
       { id: 'REJECTED', title: '❌ Perdidos' },
   ];
 
+  // Get unique vehicle types for the filter dropdown
+  const uniqueVehicleTypes = Array.from(new Set(priceRoutes.map(r => r.vehicleType))).sort();
+
+  const filteredRoutes = priceRoutes.filter(r => {
+      const matchText = r.destination.toLowerCase().includes(priceSearch.toLowerCase()) || 
+                        r.origin.toLowerCase().includes(priceSearch.toLowerCase());
+      const matchVehicle = priceVehicleFilter ? r.vehicleType === priceVehicleFilter : true;
+      
+      return matchText && matchVehicle;
+  });
+
   return (
     <div className="space-y-6 animate-fade-in h-[calc(100vh-140px)] flex flex-col">
         <div className="flex justify-between items-center shrink-0">
@@ -139,16 +190,24 @@ const QuotesView: React.FC = () => {
                 <h2 className="text-2xl font-bold text-slate-800">Orçamentos & CRM</h2>
                 <p className="text-sm text-slate-500">Gerencie solicitações e feche mais viagens.</p>
             </div>
-            <button 
-                onClick={() => {
-                    setEditingQuote(null);
-                    setForm({ clientName: '', clientPhone: '', clientEmail: '', destination: '', departureLocation: '', startTime: '', endTime: '', passengerCount: 46, observations: '', price: 0 });
-                    setShowNewForm(true);
-                }}
-                className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-medium shadow-sm transition-colors"
-            >
-                + Novo Orçamento
-            </button>
+            <div className="flex gap-2">
+                <button 
+                    onClick={() => setShowPriceTable(true)}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg font-medium shadow-sm transition-colors flex items-center gap-2"
+                >
+                    <span>💰</span> Tabela de Preços
+                </button>
+                <button 
+                    onClick={() => {
+                        setEditingQuote(null);
+                        setForm({ clientName: '', clientPhone: '', clientEmail: '', destination: '', departureLocation: '', startTime: '', endTime: '', passengerCount: 46, observations: '', price: 0 });
+                        setShowNewForm(true);
+                    }}
+                    className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-medium shadow-sm transition-colors"
+                >
+                    + Novo Orçamento
+                </button>
+            </div>
         </div>
 
         {/* KANBAN BOARD */}
@@ -209,10 +268,152 @@ const QuotesView: React.FC = () => {
             ))}
         </div>
 
+        {/* PRICE TABLE MODAL */}
+        {showPriceTable && (
+            <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[60] p-4">
+                <div className="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col overflow-hidden animate-fade-in">
+                    <div className="bg-emerald-800 p-4 text-white flex justify-between items-center">
+                        <h3 className="font-bold text-lg flex items-center gap-2">💰 Tabela de Preços de Locação</h3>
+                        <div className="flex items-center gap-2">
+                            {priceRoutes.length > 0 && (
+                                <button 
+                                    type="button"
+                                    onClick={handleClearTable}
+                                    disabled={loadingImport}
+                                    className="text-xs bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded font-bold border border-red-500 shadow-sm mr-2"
+                                >
+                                    🗑️ Limpar Tabela
+                                </button>
+                            )}
+                            <button 
+                                type="button"
+                                onClick={handleImportPrices} 
+                                disabled={loadingImport}
+                                className="text-xs bg-emerald-700 hover:bg-emerald-600 text-white px-3 py-1.5 rounded font-bold border border-emerald-600 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                {loadingImport ? 'Importando...' : '📥 Importar Tabela Padrão'}
+                            </button>
+                            <button onClick={() => setShowPriceTable(false)} className="text-emerald-200 hover:text-white text-xl ml-2">&times;</button>
+                        </div>
+                    </div>
+                    
+                    <div className="flex-1 overflow-hidden flex flex-col md:flex-row">
+                        {/* LEFT: LIST */}
+                        <div className="w-full md:w-2/3 p-6 overflow-y-auto bg-white border-r border-slate-200">
+                            
+                            {/* SEARCH AND FILTER BAR */}
+                            <div className="flex flex-col md:flex-row gap-2 mb-4">
+                                <input 
+                                    type="text" 
+                                    placeholder="🔍 Buscar Destino ou Origem..." 
+                                    value={priceSearch}
+                                    onChange={(e) => setPriceSearch(e.target.value)}
+                                    className="flex-1 border p-2 rounded bg-slate-50 text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
+                                />
+                                <select 
+                                    value={priceVehicleFilter}
+                                    onChange={(e) => setPriceVehicleFilter(e.target.value)}
+                                    className="md:w-1/3 border p-2 rounded bg-slate-50 text-sm font-medium text-slate-700 focus:ring-2 focus:ring-emerald-500 outline-none"
+                                >
+                                    <option value="">Todos os Veículos</option>
+                                    {uniqueVehicleTypes.map(type => (
+                                        <option key={type} value={type}>{type}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            
+                            <div className="space-y-2">
+                                <div className="grid grid-cols-4 font-bold text-xs text-slate-500 uppercase pb-2 border-b">
+                                    <div className="col-span-2">Rota</div>
+                                    <div>Veículo</div>
+                                    <div className="text-right">Valor</div>
+                                </div>
+                                {filteredRoutes.map(route => (
+                                    <div key={route.id} className="grid grid-cols-4 items-center p-3 hover:bg-slate-50 border-b border-slate-100 group">
+                                        <div className="col-span-2 pr-2">
+                                            <p className="font-bold text-slate-800 text-sm">{route.destination}</p>
+                                            <p className="text-xs text-slate-500">Saída: {route.origin}</p>
+                                        </div>
+                                        <div className="text-sm text-slate-600">{route.vehicleType}</div>
+                                        <div className="text-right">
+                                            <p className="font-bold text-emerald-600">R$ {route.price.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</p>
+                                            <div className="flex justify-end gap-2 mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <button onClick={() => deletePriceRoute(route.id)} className="text-xs text-red-400 hover:text-red-600">Excluir</button>
+                                                <button onClick={() => handleUsePrice(route)} className="text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded font-bold hover:bg-emerald-200">Usar</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                                {filteredRoutes.length === 0 && <p className="text-center text-slate-400 py-4">Nenhuma rota encontrada para os filtros.</p>}
+                            </div>
+                        </div>
+
+                        {/* RIGHT: ADD FORM */}
+                        <div className="w-full md:w-1/3 bg-slate-50 p-6 overflow-y-auto">
+                            <h4 className="font-bold text-slate-700 mb-4">Cadastrar Nova Rota</h4>
+                            <form onSubmit={handleAddRoute} className="space-y-4">
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 mb-1">Origem</label>
+                                    <input 
+                                        required value={newRouteForm.origin} onChange={e => setNewRouteForm({...newRouteForm, origin: e.target.value})}
+                                        className="w-full border p-2 rounded text-sm" placeholder="Ex: Petrópolis"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 mb-1">Destino</label>
+                                    <input 
+                                        required value={newRouteForm.destination} onChange={e => setNewRouteForm({...newRouteForm, destination: e.target.value})}
+                                        className="w-full border p-2 rounded text-sm" placeholder="Ex: Cabo Frio"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 mb-1">Tipo de Veículo</label>
+                                    <select 
+                                        value={newRouteForm.vehicleType} onChange={e => setNewRouteForm({...newRouteForm, vehicleType: e.target.value})}
+                                        className="w-full border p-2 rounded text-sm bg-white"
+                                    >
+                                        <option value="Convencional">Convencional (46 lug)</option>
+                                        <option value="Executivo">Executivo (50 lug)</option>
+                                        <option value="Semi-Leito">Semi-Leito</option>
+                                        <option value="Leito">Leito Total</option>
+                                        <option value="DD (Double Deck)">DD (Double Deck)</option>
+                                        <option value="LD (Low Driver)">LD (Low Driver)</option>
+                                        <option value="Micro">Micro-ônibus</option>
+                                        <option value="Van">Van</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 mb-1">Valor Tabela (R$)</label>
+                                    <div className="flex items-center border border-slate-300 rounded overflow-hidden bg-white">
+                                        <span className="bg-slate-100 text-slate-600 px-2 py-1 font-bold border-r border-slate-300 text-xs">R$</span>
+                                        <input 
+                                            type="text" 
+                                            inputMode="numeric"
+                                            required
+                                            value={newRouteForm.price.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
+                                            onChange={e => {
+                                                const val = Number(e.target.value.replace(/\D/g, "")) / 100;
+                                                setNewRouteForm({...newRouteForm, price: val});
+                                            }}
+                                            className="w-full p-2 outline-none text-right font-bold text-slate-800 text-sm"
+                                            placeholder="0,00"
+                                        />
+                                    </div>
+                                </div>
+                                <button type="submit" className="w-full bg-slate-800 text-white py-2 rounded font-bold text-sm hover:bg-slate-700">
+                                    Salvar na Tabela
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        )}
+
         {/* NEW/EDIT MODAL */}
         {showNewForm && (
             <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-                <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full p-6 max-h-[90vh] overflow-y-auto">
+                <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full p-6 max-h-[90vh] overflow-y-auto animate-fade-in">
                     <h3 className="font-bold text-xl mb-4 text-slate-800">{editingQuote ? 'Editar Orçamento' : 'Novo Pedido de Orçamento'}</h3>
                     <form onSubmit={handleSubmit} className="space-y-4">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -231,6 +432,12 @@ const QuotesView: React.FC = () => {
                         </div>
                         
                         <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
+                            <div className="flex justify-between items-center mb-2">
+                                <h4 className="text-sm font-bold text-slate-700 uppercase">Dados da Viagem</h4>
+                                <button type="button" onClick={() => {setShowNewForm(false); setShowPriceTable(true)}} className="text-xs text-emerald-600 font-bold hover:underline">
+                                    🔍 Consultar Tabela
+                                </button>
+                            </div>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                                 <div>
                                     <label className="block text-sm font-medium text-slate-700 mb-1">Destino</label>

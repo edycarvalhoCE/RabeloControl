@@ -52,6 +52,15 @@ export interface Quote {
   convertedBookingId?: string; // Link if converted
 }
 
+export interface PriceRoute {
+  id: string;
+  origin: string;
+  destination: string;
+  vehicleType: string; // e.g. "Micro", "Convencional 46", "LD"
+  price: number;
+  description?: string; // e.g. "Ida e Volta", "Apenas Ida"
+}
+
 export interface Booking {
   id: string;
   busId: string;

@@ -1,6 +1,6 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { User, Bus, Booking, Part, Transaction, TimeOff, UserRole, DriverDocument, MaintenanceRecord, PurchaseRequest, MaintenanceReport, CharterContract, TravelPackage, PackagePassenger, PackagePayment, Client, FuelRecord, FuelSupply, DriverLiability, PackageLead, SystemSettings, Quote } from '../types';
+import { User, Bus, Booking, Part, Transaction, TimeOff, UserRole, DriverDocument, MaintenanceRecord, PurchaseRequest, MaintenanceReport, CharterContract, TravelPackage, PackagePassenger, PackagePayment, Client, FuelRecord, FuelSupply, DriverLiability, PackageLead, SystemSettings, Quote, PriceRoute } from '../types';
 import { MOCK_USERS, MOCK_BUSES, MOCK_PARTS } from '../constants';
 
 // Firebase Imports
@@ -37,6 +37,7 @@ interface StoreContextType {
   fuelStockLevel: number;
   driverLiabilities: DriverLiability[];
   quotes: Quote[];
+  priceRoutes: PriceRoute[];
   
   // Actions
   login: (email: string, password: string) => Promise<{success: boolean, message?: string}>;
@@ -82,13 +83,18 @@ interface StoreContextType {
   addDriverLiability: (liability: Omit<DriverLiability, 'id' | 'status' | 'paidAmount'>, createExpense?: boolean) => void;
   payDriverLiability: (id: string, amount: number) => Promise<void>;
   
-  // Quote Actions
+  // Quote & Price Actions
   addQuote: (quote: Omit<Quote, 'id' | 'status' | 'createdAt'>) => Promise<void>;
   updateQuote: (id: string, data: Partial<Quote>) => Promise<void>;
   convertQuoteToBooking: (quoteId: string, busId: string) => Promise<{success: boolean, message: string}>;
   deleteQuote: (id: string) => Promise<void>;
+  addPriceRoute: (route: Omit<PriceRoute, 'id'>) => Promise<void>;
+  updatePriceRoute: (id: string, data: Partial<PriceRoute>) => Promise<void>;
+  deletePriceRoute: (id: string) => Promise<void>;
+  importDefaultPrices: () => Promise<{ success: boolean; message: string }>;
+  clearPriceTable: () => Promise<{ success: boolean; message: string }>;
 
-  seedDatabase: () => Promise<void>; // Setup initial data
+  seedDatabase: () => Promise<void>;
 }
 
 const StoreContext = createContext<StoreContextType | undefined>(undefined);
@@ -99,7 +105,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   const [settings, setSettings] = useState<SystemSettings>({
       id: 'general',
       companyName: 'Rabelo Tour',
-      logoUrl: '', // Will default to internal fallback if empty
+      logoUrl: '', 
       cnpj: '',
       phone: '',
       address: '',
@@ -127,11 +133,11 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   const [fuelSupplies, setFuelSupplies] = useState<FuelSupply[]>([]);
   const [driverLiabilities, setDriverLiabilities] = useState<DriverLiability[]>([]);
   const [quotes, setQuotes] = useState<Quote[]>([]);
+  const [priceRoutes, setPriceRoutes] = useState<PriceRoute[]>([]);
   
-  // Calculated State
   const [fuelStockLevel, setFuelStockLevel] = useState(0);
 
-  // --- FIREBASE LISTENERS (REAL-TIME SYNC) ---
+  // --- FIREBASE LISTENERS ---
   useEffect(() => {
     if (!isConfigured) return;
 
@@ -144,7 +150,6 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         }
     });
 
-    // Listen to Settings
     const unsubscribeSettings = onSnapshot(doc(db, 'settings', 'general'), (doc) => {
         if (doc.exists()) {
             setSettings({ id: 'general', ...doc.data() } as SystemSettings);
@@ -172,6 +177,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         { name: 'fuelSupplies', setter: setFuelSupplies },
         { name: 'driverLiabilities', setter: setDriverLiabilities },
         { name: 'quotes', setter: setQuotes },
+        { name: 'priceRoutes', setter: setPriceRoutes },
     ];
 
     const unsubscribes = collectionsToSync.map(c => 
@@ -188,10 +194,9 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     };
   }, []);
 
-  // Update Fuel Stock Level whenever records change
+  // Update Fuel Stock Level
   useEffect(() => {
     const totalSupplied = fuelSupplies.reduce((acc, curr) => acc + curr.liters, 0);
-    // Only subtract if location is GARAGE
     const totalConsumed = fuelRecords
         .filter(r => r.location === 'GARAGE')
         .reduce((acc, curr) => acc + curr.dieselLiters, 0);
@@ -199,17 +204,12 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     setFuelStockLevel(Math.max(0, totalSupplied - totalConsumed));
   }, [fuelSupplies, fuelRecords]);
 
-  // Sync CurrentUser with Users list
+  // Sync CurrentUser
   useEffect(() => {
       if (auth.currentUser && users.length > 0) {
           const dbUser = users.find(u => u.email === auth.currentUser?.email);
           if (dbUser) {
-              // Ensure legacy users have APPROVED status by default if missing
-              const safeUser = {
-                  ...dbUser,
-                  status: dbUser.status || 'APPROVED'
-              };
-
+              const safeUser = { ...dbUser, status: dbUser.status || 'APPROVED' };
               if (safeUser.email === 'pixelcriativo2026@gmail.com' && safeUser.role !== UserRole.DEVELOPER) {
                   updateDoc(doc(db, 'users', safeUser.id), { role: UserRole.DEVELOPER, status: 'APPROVED' });
                   setCurrentUser({ ...safeUser, role: UserRole.DEVELOPER, status: 'APPROVED' });
@@ -217,7 +217,6 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                   setCurrentUser(safeUser);
               }
           } else {
-              // Fallback for new creation latency
               setCurrentUser({
                   id: auth.currentUser.uid,
                   name: auth.currentUser.displayName || 'Usuário',
@@ -230,7 +229,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       }
   }, [users, isAuthenticated]);
 
-  // Auth Actions
+  // Actions
   const login = async (email: string, password: string) => {
       if (!isConfigured) return { success: false, message: "Firebase não configurado." };
       try {
@@ -246,15 +245,9 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       try {
           const res = await createUserWithEmailAndPassword(auth, email, password);
           await updateProfile(res.user, { displayName: name });
-          
-          // New users are PENDING by default
           await setDoc(doc(db, 'users', res.user.uid), {
               id: res.user.uid,
-              name,
-              email,
-              role,
-              avatar: `https://ui-avatars.com/api/?name=${name}&background=random`,
-              status: 'PENDING' 
+              name, email, role, avatar: `https://ui-avatars.com/api/?name=${name}&background=random`, status: 'PENDING' 
           });
           return { success: true };
       } catch (error: any) {
@@ -264,7 +257,6 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
   const logout = async () => { if (isConfigured) await signOut(auth); };
   
-  // Settings Action
   const updateSettings = async (data: Partial<SystemSettings>) => {
       if (!isConfigured) return;
       await setDoc(doc(db, 'settings', 'general'), { ...settings, ...data }, { merge: true });
@@ -272,7 +264,6 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
   const switchUser = (userId: string) => { const user = users.find(u => u.id === userId); if (user) setCurrentUser(user); };
 
-  // Data Actions
   const addUser = async (userData: Omit<User, 'id' | 'avatar'>) => { if (!isConfigured) return; await addDoc(collection(db, 'users'), { ...userData, status: 'APPROVED', avatar: `https://ui-avatars.com/api/?name=${userData.name}&background=random` }); };
   const updateUser = async (id: string, data: Partial<User>) => { if (!isConfigured) return; await updateDoc(doc(db, 'users', id), data); };
   const deleteUser = async (id: string) => { if (!isConfigured) return; await deleteDoc(doc(db, 'users', id)); };
@@ -291,27 +282,21 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
   const addBooking = async (bookingData: Omit<Booking, 'id' | 'status'>) => {
     if (!isConfigured) return { success: false, message: "Banco de dados desconectado." };
-    
-    if (!checkAvailability(bookingData.busId, bookingData.startTime, bookingData.endTime)) {
-      return { success: false, message: 'Conflito: Este ônibus já está alugado neste período!' };
-    }
+    if (!checkAvailability(bookingData.busId, bookingData.startTime, bookingData.endTime)) return { success: false, message: 'Conflito: Este ônibus já está alugado neste período!' };
 
     if (bookingData.driverId) {
         const tripStart = new Date(bookingData.startTime).getTime();
         const tripEnd = new Date(bookingData.endTime).getTime();
         const driverConflict = timeOffs.find(t => {
             if (t.driverId !== bookingData.driverId || t.status !== 'APPROVED') return false;
-            // Check ranges for Vacation
             if (t.type === 'FERIAS' && t.endDate) {
                 const offStart = new Date(t.date).setHours(0,0,0,0);
                 const offEnd = new Date(t.endDate).setHours(23,59,59,999);
                 return (tripStart <= offEnd && tripEnd >= offStart);
             }
-            // Check single days for Folga/Plantão
             const [y, m, d] = t.date.split('-').map(Number);
             const offStart = new Date(y, m - 1, d, 0, 0, 0).getTime();
             const offEnd = new Date(y, m - 1, d, 23, 59, 59).getTime();
-            
             return (tripStart <= offEnd && tripEnd >= offStart);
         });
         if (driverConflict) return { success: false, message: `Motorista Indisponível! Ele está de ${driverConflict.type} (${driverConflict.date}).` };
@@ -319,16 +304,13 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
     try {
         const newBooking = { ...bookingData, status: 'CONFIRMED' };
-        // Ensure values are clean (no undefined)
         if (newBooking.freelanceDriverName === undefined) delete newBooking.freelanceDriverName;
-
         const docRef = await addDoc(collection(db, 'bookings'), newBooking);
         
         if (newBooking.value > 0 && newBooking.paymentStatus !== 'PENDING') {
             let transStatus = newBooking.paymentStatus === 'PAID' ? 'COMPLETED' : 'PENDING';
             let transDesc = `Locação: ${newBooking.clientName} - ${newBooking.destination}`;
             if (newBooking.paymentStatus === 'SCHEDULED') transDesc += " (Agendado)";
-            
             await addDoc(collection(db, 'transactions'), {
                 type: 'INCOME', status: transStatus, category: 'Locação', amount: newBooking.value,
                 date: newBooking.paymentDate || new Date().toISOString(), description: transDesc, relatedBookingId: docRef.id
@@ -336,7 +318,6 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         }
         return { success: true, message: 'Agendamento salvo com sucesso!' };
     } catch (e: any) {
-        console.error("Erro ao salvar locação:", e);
         return { success: false, message: 'Erro ao salvar no banco: ' + (e.message || 'Erro desconhecido') };
     }
   };
@@ -346,14 +327,10 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     try {
         const currentBooking = bookings.find(b => b.id === id);
         if (!currentBooking) return { success: false, message: "Viagem não encontrada." };
-
         const busIdToCheck = data.busId || currentBooking.busId;
         const startToCheck = data.startTime || currentBooking.startTime;
         const endToCheck = data.endTime || currentBooking.endTime;
-
-        if (!checkAvailability(busIdToCheck, startToCheck, endToCheck, id)) {
-            return { success: false, message: 'Conflito: Este ônibus já está alugado no novo horário!' };
-        }
+        if (!checkAvailability(busIdToCheck, startToCheck, endToCheck, id)) return { success: false, message: 'Conflito: Este ônibus já está alugado no novo horário!' };
 
         await updateDoc(doc(db, 'bookings', id), data);
 
@@ -376,7 +353,6 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         }
         return { success: true, message: 'Viagem atualizada com sucesso!' };
     } catch (e: any) {
-         console.error("Erro ao atualizar locação:", e);
          return { success: false, message: 'Erro ao atualizar: ' + (e.message || 'Erro desconhecido') };
     }
   };
@@ -389,19 +365,13 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   const addTimeOff = async (timeOff: Omit<TimeOff, 'id' | 'status'>) => { 
       if (isConfigured) { 
           const isManager = currentUser?.role === UserRole.MANAGER || currentUser?.role === UserRole.DEVELOPER; 
-          // REMOVE UNDEFINED FIELDS
           const cleanPayload = Object.fromEntries(Object.entries(timeOff).filter(([_, v]) => v !== undefined));
-          
-          await addDoc(collection(db, 'timeOffs'), { 
-              ...cleanPayload, 
-              status: isManager ? 'APPROVED' : 'PENDING' 
-          }); 
+          await addDoc(collection(db, 'timeOffs'), { ...cleanPayload, status: isManager ? 'APPROVED' : 'PENDING' }); 
       } 
   };
   
   const updateTimeOffStatus = async (id: string, status: 'APPROVED' | 'REJECTED') => { if (isConfigured) await updateDoc(doc(db, 'timeOffs', id), { status }); };
   const deleteTimeOff = async (id: string) => { if (isConfigured) await deleteDoc(doc(db, 'timeOffs', id)); };
-
   const addDocument = async (docData: Omit<DriverDocument, 'id' | 'uploadDate'>) => { if (isConfigured) await addDoc(collection(db, 'documents'), { ...docData, uploadDate: new Date().toISOString() }); };
   const deleteDocument = async (id: string) => { if (isConfigured) await deleteDoc(doc(db, 'documents', id)); };
   
@@ -423,13 +393,12 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   const updateMaintenanceReportStatus = async (id: string, status: MaintenanceReport['status']) => { if (isConfigured) await updateDoc(doc(db, 'maintenanceReports', id), { status }); };
   const addBus = async (bus: Omit<Bus, 'id' | 'status'>) => { if (isConfigured) await addDoc(collection(db, 'buses'), { ...bus, status: 'AVAILABLE' }); };
   const updateBusStatus = async (id: string, status: Bus['status']) => { if (isConfigured) await updateDoc(doc(db, 'buses', id), { status }); };
-  const addCharterContract = async (contract: Omit<CharterContract, 'id' | 'status'>) => { if (!isConfigured) return; await addDoc(collection(db, 'charterContracts'), { ...contract, status: 'ACTIVE' }); }; // Simplified for space
+  const addCharterContract = async (contract: Omit<CharterContract, 'id' | 'status'>) => { if (!isConfigured) return; await addDoc(collection(db, 'charterContracts'), { ...contract, status: 'ACTIVE' }); }; 
   const addTravelPackage = async (pkg: Omit<TravelPackage, 'id' | 'status'>) => { if (isConfigured) await addDoc(collection(db, 'travelPackages'), { ...pkg, status: 'OPEN' }); };
   
   const registerPackageSale = async (clientData: any, saleData: any) => { 
       if (!isConfigured) return; 
       let clientId = '';
-      
       const existingClient = clients.find(c => c.cpf === clientData.cpf);
       if (existingClient) { 
           clientId = existingClient.id; 
@@ -438,33 +407,15 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
           const ref = await addDoc(collection(db, 'clients'), clientData); 
           clientId = ref.id; 
       }
-
       let commissionRate = saleData.saleType === 'AGENCY' ? 0.12 : 0.01;
       let commissionValue = (saleData.agreedPrice || 0) * commissionRate;
-
       await addDoc(collection(db, 'packagePassengers'), { 
-          ...saleData, 
-          clientId, 
-          titularName: clientData.name, 
-          titularCpf: clientData.cpf, 
-          paidAmount: 0, 
-          status: 'PENDING',
-          commissionRate,
-          commissionValue,
-          sellerId: currentUser.id
+          ...saleData, clientId, titularName: clientData.name, titularCpf: clientData.cpf, paidAmount: 0, status: 'PENDING', commissionRate, commissionValue, sellerId: currentUser.id
       });
   };
 
-  const updatePackagePassenger = async (id: string, data: Partial<PackagePassenger>) => {
-      if (!isConfigured) return;
-      await updateDoc(doc(db, 'packagePassengers', id), data);
-  };
-
-  const deletePackagePassenger = async (id: string) => {
-      if (!isConfigured) return;
-      await deleteDoc(doc(db, 'packagePassengers', id));
-  };
-
+  const updatePackagePassenger = async (id: string, data: Partial<PackagePassenger>) => { if (!isConfigured) return; await updateDoc(doc(db, 'packagePassengers', id), data); };
+  const deletePackagePassenger = async (id: string) => { if (!isConfigured) return; await deleteDoc(doc(db, 'packagePassengers', id)); };
   const addPackagePayment = async (payment: Omit<PackagePayment, 'id'>) => {
       if (!isConfigured) return;
       await addDoc(collection(db, 'packagePayments'), payment);
@@ -480,40 +431,18 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       }
   };
 
-  const addPackageLead = async (lead: Omit<PackageLead, 'id' | 'status' | 'createdAt'>) => {
-      if (!isConfigured) return;
-      await addDoc(collection(db, 'packageLeads'), {
-          ...lead,
-          status: 'PENDING',
-          createdAt: new Date().toISOString()
-      });
-  };
-
-  const updatePackageLead = async (id: string, data: Partial<PackageLead>) => {
-      if (!isConfigured) return;
-      await updateDoc(doc(db, 'packageLeads', id), data);
-  };
-
-  const deletePackageLead = async (id: string) => {
-      if (!isConfigured) return;
-      await deleteDoc(doc(db, 'packageLeads', id));
-  };
+  const addPackageLead = async (lead: Omit<PackageLead, 'id' | 'status' | 'createdAt'>) => { if (!isConfigured) return; await addDoc(collection(db, 'packageLeads'), { ...lead, status: 'PENDING', createdAt: new Date().toISOString() }); };
+  const updatePackageLead = async (id: string, data: Partial<PackageLead>) => { if (!isConfigured) return; await updateDoc(doc(db, 'packageLeads', id), data); };
+  const deletePackageLead = async (id: string) => { if (!isConfigured) return; await deleteDoc(doc(db, 'packageLeads', id)); };
   
   const addFuelRecord = async (record: Omit<FuelRecord, 'id'>) => {
       if (!isConfigured) return;
       await addDoc(collection(db, 'fuelRecords'), record);
-      
-      // If refueled on STREET, it costs money immediately
       if (record.location === 'STREET' && record.cost && record.cost > 0) {
           const bus = buses.find(b => b.id === record.busId);
           const user = users.find(u => u.id === record.loggedBy);
           await addDoc(collection(db, 'transactions'), {
-              type: 'EXPENSE',
-              status: 'COMPLETED',
-              category: 'Combustível',
-              amount: record.cost,
-              date: record.date,
-              description: `Abastecimento Externo (${user?.name}): ${bus?.plate} - ${record.dieselLiters}L @ ${record.stationName || 'Posto'}`
+              type: 'EXPENSE', status: 'COMPLETED', category: 'Combustível', amount: record.cost, date: record.date, description: `Abastecimento Externo (${user?.name}): ${bus?.plate} - ${record.dieselLiters}L @ ${record.stationName || 'Posto'}`
           });
       }
   };
@@ -521,15 +450,9 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   const addFuelSupply = async (supply: Omit<FuelSupply, 'id'>) => {
       if (!isConfigured) return;
       await addDoc(collection(db, 'fuelSupplies'), supply);
-
       if (supply.registeredInFinance && supply.cost > 0) {
           await addDoc(collection(db, 'transactions'), {
-              type: 'EXPENSE',
-              status: 'COMPLETED',
-              category: 'Compra Combustível',
-              amount: supply.cost,
-              date: supply.date,
-              description: `Abastecimento Tanque Garagem: ${supply.liters}L (Recebido por: ${supply.receiverName})`
+              type: 'EXPENSE', status: 'COMPLETED', category: 'Compra Combustível', amount: supply.cost, date: supply.date, description: `Abastecimento Tanque Garagem: ${supply.liters}L (Recebido por: ${supply.receiverName})`
           });
       }
   };
@@ -537,17 +460,10 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   const addDriverLiability = async (liability: Omit<DriverLiability, 'id' | 'status' | 'paidAmount'>, createExpense = false) => {
       if (!isConfigured) return;
       await addDoc(collection(db, 'driverLiabilities'), { ...liability, paidAmount: 0, status: 'OPEN' });
-
-      // If the company paid for the damage/fine immediately, record it as expense
       if (createExpense) {
           const driver = users.find(u => u.id === liability.driverId);
           await addDoc(collection(db, 'transactions'), {
-              type: 'EXPENSE',
-              status: 'COMPLETED',
-              category: liability.type === 'AVARIA' ? 'Manutenção (Avaria)' : 'Multas',
-              amount: liability.totalAmount,
-              date: liability.date,
-              description: `Pagamento de ${liability.type} - Motorista: ${driver?.name} (${liability.description})`
+              type: 'EXPENSE', status: 'COMPLETED', category: liability.type === 'AVARIA' ? 'Manutenção (Avaria)' : 'Multas', amount: liability.totalAmount, date: liability.date, description: `Pagamento de ${liability.type} - Motorista: ${driver?.name} (${liability.description})`
           });
       }
   };
@@ -556,54 +472,22 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       if (!isConfigured) return;
       const liability = driverLiabilities.find(l => l.id === id);
       if (!liability) return;
-
       const newPaid = liability.paidAmount + amount;
-      const newStatus = newPaid >= liability.totalAmount ? 'PAID' : 'OPEN';
-
-      await updateDoc(doc(db, 'driverLiabilities', id), {
-          paidAmount: newPaid,
-          status: newStatus
-      });
-
-      // Income record (reimbursement)
+      await updateDoc(doc(db, 'driverLiabilities', id), { paidAmount: newPaid, status: newPaid >= liability.totalAmount ? 'PAID' : 'OPEN' });
       const driver = users.find(u => u.id === liability.driverId);
       await addDoc(collection(db, 'transactions'), {
-          type: 'INCOME',
-          status: 'COMPLETED',
-          category: 'Reembolso Avaria/Multa',
-          amount: amount,
-          date: new Date().toISOString().split('T')[0],
-          description: `Abatimento ${liability.type} - ${driver?.name} (${liability.description})`
+          type: 'INCOME', status: 'COMPLETED', category: 'Reembolso Avaria/Multa', amount: amount, date: new Date().toISOString().split('T')[0], description: `Abatimento ${liability.type} - ${driver?.name} (${liability.description})`
       });
   };
 
-  // --- QUOTE ACTIONS ---
-  
-  const addQuote = async (quote: Omit<Quote, 'id' | 'status' | 'createdAt'>) => {
-      if (!isConfigured) return;
-      await addDoc(collection(db, 'quotes'), { 
-          ...quote, 
-          status: 'NEW', 
-          createdAt: new Date().toISOString() 
-      });
-  };
-
-  const updateQuote = async (id: string, data: Partial<Quote>) => {
-      if (!isConfigured) return;
-      await updateDoc(doc(db, 'quotes', id), data);
-  };
-
-  const deleteQuote = async (id: string) => {
-      if (!isConfigured) return;
-      await deleteDoc(doc(db, 'quotes', id));
-  };
+  const addQuote = async (quote: Omit<Quote, 'id' | 'status' | 'createdAt'>) => { if (!isConfigured) return; await addDoc(collection(db, 'quotes'), { ...quote, status: 'NEW', createdAt: new Date().toISOString() }); };
+  const updateQuote = async (id: string, data: Partial<Quote>) => { if (!isConfigured) return; await updateDoc(doc(db, 'quotes', id), data); };
+  const deleteQuote = async (id: string) => { if (!isConfigured) return; await deleteDoc(doc(db, 'quotes', id)); };
 
   const convertQuoteToBooking = async (quoteId: string, busId: string) => {
       if (!isConfigured) return { success: false, message: "Erro conexão" };
       const quote = quotes.find(q => q.id === quoteId);
       if (!quote) return { success: false, message: "Orçamento não encontrado" };
-
-      // Verify availability
       const isAvailable = !bookings.some(b => {
           if (b.busId !== busId || b.status === 'CANCELLED') return false;
           const start = new Date(quote.startTime).getTime();
@@ -612,82 +496,180 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
           const bEnd = new Date(b.endTime).getTime();
           return (start < bEnd && end > bStart);
       });
-
-      if (!isAvailable) {
-          return { success: false, message: "Este ônibus já está ocupado nesta data!" };
-      }
-
-      // Create Booking
+      if (!isAvailable) return { success: false, message: "Este ônibus já está ocupado nesta data!" };
       try {
           const bookingData: Omit<Booking, 'id' | 'status'> = {
-              busId: busId,
-              driverId: null, // User must assign driver later or we can prompt
-              clientName: quote.clientName,
-              clientPhone: quote.clientPhone,
-              destination: quote.destination,
-              departureLocation: quote.departureLocation,
-              startTime: quote.startTime,
-              endTime: quote.endTime,
-              value: quote.price || 0,
-              paymentStatus: 'PENDING',
-              observations: `(Gerado via Orçamento) ${quote.observations || ''}`
+              busId: busId, driverId: null, clientName: quote.clientName, clientPhone: quote.clientPhone, destination: quote.destination, departureLocation: quote.departureLocation, startTime: quote.startTime, endTime: quote.endTime, value: quote.price || 0, paymentStatus: 'PENDING', observations: `(Gerado via Orçamento) ${quote.observations || ''}`
           };
-
           const docRef = await addDoc(collection(db, 'bookings'), { ...bookingData, status: 'CONFIRMED' });
-          
-          // Mark quote as approved and linked
-          await updateDoc(doc(db, 'quotes', quoteId), { 
-              status: 'APPROVED', 
-              convertedBookingId: docRef.id 
-          });
-
+          await updateDoc(doc(db, 'quotes', quoteId), { status: 'APPROVED', convertedBookingId: docRef.id });
           return { success: true, message: "Orçamento aprovado e locação gerada com sucesso!" };
+      } catch (e: any) { return { success: false, message: e.message }; }
+  };
+
+  const addPriceRoute = async (route: Omit<PriceRoute, 'id'>) => { if (!isConfigured) return; await addDoc(collection(db, 'priceRoutes'), route); };
+  const updatePriceRoute = async (id: string, data: Partial<PriceRoute>) => { if (!isConfigured) return; await updateDoc(doc(db, 'priceRoutes', id), data); };
+  const deletePriceRoute = async (id: string) => { if (!isConfigured) return; await deleteDoc(doc(db, 'priceRoutes', id)); };
+
+  // --- CLEAR PRICE TABLE ---
+  const clearPriceTable = async () => {
+      if (!isConfigured) return { success: false, message: "Não conectado" };
+      try {
+          const q = query(collection(db, 'priceRoutes'));
+          const snapshot = await getDocs(q);
+          const batch = writeBatch(db);
+          let count = 0;
+          snapshot.docs.forEach(d => {
+              batch.delete(d.ref);
+              count++;
+          });
+          if (count > 0) await batch.commit();
+          return { success: true, message: `${count} rotas removidas.` };
       } catch (e: any) {
           return { success: false, message: e.message };
+      }
+  };
+
+  // --- IMPORT DEFAULT PRICES ---
+  const importDefaultPrices = async () => {
+      if (!isConfigured) return { success: false, message: "Não conectado ao Banco de Dados." };
+      
+      try {
+          const rawRoutes = [
+            { d: 'ALEM PARAIBA', e: 2900, m: 2320, v: 1450 },
+            { d: 'ANGRA DOS REIS', e: 4300, m: 3440, v: 2150 },
+            { d: 'APARECIDA DO NORTE SAB/ DOM', e: 5900, m: 4720, v: 2900 },
+            { d: 'ARRAIAL DO CABO', e: 4500, m: 3800, v: 2250 },
+            { d: 'AREAL', e: 1800, m: 1440, v: 900 },
+            { d: 'BARBACENA', e: 4500, m: 3800, v: 2250 },
+            { d: 'BARRA DO PIRAI', e: 3200, m: 2560, v: 1600 },
+            { d: 'BARRA DO PIRAI (ALDEIA DAS AGUAS)', e: 3200, m: 2560, v: 1600 },
+            { d: 'BELO HORIZONTE - ATE 2 DIAS', e: 7900, m: 6320, v: 3950 },
+            { d: 'BETO CARRERO 5 DIAS', e: 22800, m: 18240, v: 11400 },
+            { d: 'BUZIOS 1 DIA', e: 4500, m: 3800, v: 2250 },
+            { d: 'CAPITOLIO - 3 DIAS', e: 11400, m: 9120, v: 5700 },
+            { d: 'CABO FRIO 1 DIA', e: 4500, m: 3800, v: 2250 },
+            { d: 'CABO FRIO PRAIA 1 DIA', e: 4900, m: 3920, v: 2450 },
+            { d: 'CALDAS NOVAS (GO) 8 DIAS', e: 22800, m: 18240, v: 11400 },
+            { d: 'CAMPOS DO JORDÃO 3 DIAS', e: 7900, m: 6320, v: 3950 },
+            { d: 'CAMPOS DOS GOYTACAZES 1 DIA', e: 5700, m: 4560, v: 2850 },
+            { d: 'CITY TOUR RIO COM SAIDAS DO RIO', e: 2100, m: 1680, v: 1050, origin: 'Rio de Janeiro' },
+            { d: 'CONSERVATORIA 1 DIA', e: 3200, m: 2560, v: 1600 },
+            { d: 'GRUSSAI 3 DIAS', e: 6900, m: 5520, v: 3450 },
+            { d: 'GUAPIMIRIM', e: 2100, m: 1680, v: 1050 },
+            { d: 'GUARAPARI 3 DIAS', e: 9500, m: 7600, v: 4750 },
+            { d: 'GUARAPARI VITORIA E VILA VELHA 3 DIAS', e: 10450, m: 8360, v: 5225 },
+            { d: 'ITABORAI', e: 2800, m: 2240, v: 1400 },
+            { d: 'ITAGUAI (SITIOS)', e: 2600, m: 2080, v: 1300 },
+            { d: 'JUIZ DE FORA', e: 2900, m: 2320, v: 1450 },
+            { d: 'LEOPOLDINA', e: 3800, m: 3040, v: 1900 },
+            { d: 'MAGE', e: 2100, m: 1680, v: 1050 },
+            { d: 'MURIAE', e: 5900, m: 4720, v: 2950 },
+            { d: 'NITEROI', e: 2400, m: 1920, v: 1200 },
+            { d: 'NITEROI PRAIA', e: 2900, m: 2320, v: 1450 },
+            { d: 'NOVA FRIBURGO 1 DIA', e: 2600, m: 2080, v: 1300 },
+            { d: 'PARAIBA DO SUL', e: 2100, m: 1680, v: 1050 },
+            { d: 'PARAIBUNA (FAZENDA SANTA HELENA)', e: 2100, m: 1680, v: 1050 },
+            { d: 'PARATY - 3 DIAS', e: 6900, m: 5520, v: 3450 },
+            { d: 'PASSA QUATRO (MG) - 3 DIAS', e: 6900, m: 5520, v: 3450 },
+            { d: 'PENEDO', e: 3900, m: 3120, v: 1950 },
+            { d: 'PETROPOLIS TRANSFER', e: 1400, m: 1120, v: 700, origin: 'Rio/Aeroporto' },
+            { d: 'POÇOS DE CALDAS (MG) - 3 DIAS', e: 11900, m: 9520, v: 5950 },
+            { d: 'POSSE', e: 1700, m: 1360, v: 850 },
+            { d: 'RAPOSO - 3 DIAS', e: 7500, m: 6000, v: 3750 },
+            { d: 'RECREIO DOS BANDEIRANTES - PRAIA', e: 2800, m: 2240, v: 1400 },
+            { d: 'RESENDE', e: 3500, m: 2800, v: 1750 },
+            { d: 'RIO DAS OSTRAS', e: 4500, m: 3600, v: 2250 },
+            { d: 'RIO DAS OSTRAS - PRAIA', e: 4900, m: 3920, v: 2450 },
+            { d: 'RIO DE JANEIRO - BARRA', e: 2200, m: 1760, v: 1100 },
+            { d: 'RIO DE JANEIRO - CENTRO', e: 2100, m: 1680, v: 1050 },
+            { d: 'RIO DE JANEIRO - ZONA SUL', e: 2100, m: 1680, v: 1050 },
+            { d: 'RIO DE JANEIRO - ZONA SUL PRAIA', e: 2800, m: 2240, v: 1400 },
+            { d: 'S. J. VALE RIO PRETO', e: 1800, m: 1440, v: 900 },
+            { d: 'SANTA CRUZ DA SERRA', e: 1700, m: 1360, v: 850 },
+            { d: 'SÃO LOURENÇO E CAXAMBU - 3 DIAS', e: 7500, m: 6000, v: 3750 },
+            { d: 'SÃO PAULO - BRAS', e: 8500, m: 6800, v: 4250 },
+            { d: 'SÃO PAULO - CAPITAL 3 DIAS', e: 9500, m: 7600, v: 4750 },
+            { d: 'SAPUCAIA', e: 2100, m: 1680, v: 1050 },
+            { d: 'TERESOPOLIS CENTRO DA CIDADE', e: 2100, m: 1680, v: 1050 },
+            { d: 'TRES RIOS', e: 2100, m: 1680, v: 1050 },
+            { d: 'TRINDADE (GO) 6 DIAS', e: 22800, m: 18240, v: 11400 },
+            { d: 'VIRGINIA (VALE DA MANTIQUEIRA) 3 DIAS', e: 7500, m: 6000, v: 3750 },
+            { d: 'VASSOURAS', e: 2700, m: 2160, v: 1350 },
+            { d: 'VITORIA - 2 DIAS', e: 9500, m: 7600, v: 4750 },
+            { d: 'VOLTA REDONDA', e: 3500, m: 2800, v: 1750 },
+            { d: 'XEREM', e: 1700, m: 1360, v: 950 },
+            { d: 'DIÁRIA (Até 100km)', e: 900, m: 720, v: 450, desc: 'Diária do Carro' },
+          ];
+
+          // Prepare all operations
+          const operations: any[] = [];
+          
+          rawRoutes.forEach((r: any) => {
+              const origin = r.origin || 'Petrópolis';
+              const types = [
+                  { type: 'Convencional', price: r.e },
+                  { type: 'Micro', price: r.m },
+                  { type: 'Van', price: r.v },
+                  { type: 'LD (Low Driver)', price: r.e * 1.10, desc: '+10% sobre Executivo' },
+                  { type: 'DD (Double Deck)', price: r.e * 1.30, desc: '+30% sobre Executivo' }
+              ];
+
+              types.forEach(t => {
+                  if (t.price > 0) {
+                      const newDocRef = doc(collection(db, 'priceRoutes'));
+                      operations.push({
+                          ref: newDocRef,
+                          data: {
+                              origin,
+                              destination: r.d,
+                              vehicleType: t.type,
+                              price: Math.round(t.price),
+                              description: t.desc || r.desc || ''
+                          }
+                      });
+                  }
+              });
+          });
+
+          console.log(`Iniciando importação de ${operations.length} rotas em lotes...`);
+
+          // Execute in chunks of 400 (Firebase Limit is 500)
+          const chunkSize = 400;
+          for (let i = 0; i < operations.length; i += chunkSize) {
+              const batch = writeBatch(db);
+              const chunk = operations.slice(i, i + chunkSize);
+              chunk.forEach(op => {
+                  batch.set(op.ref, op.data);
+              });
+              await batch.commit();
+              console.log(`Lote ${i / chunkSize + 1} commitado.`);
+          }
+          
+          return { success: true, message: `${operations.length} preços importados com sucesso!` };
+      } catch(e: any) {
+          console.error("Erro na importação:", e);
+          return { success: false, message: `Erro ao importar: ${e.message}` };
       }
   };
 
   const seedDatabase = async () => { 
       if (!isConfigured) return; 
       const batch = writeBatch(db); 
-      
       // Basic Mocks
       MOCK_BUSES.forEach(b => batch.set(doc(collection(db, 'buses')), { ...b, id: doc(collection(db, 'buses')).id })); 
       MOCK_PARTS.forEach(p => batch.set(doc(collection(db, 'parts')), { ...p, id: doc(collection(db, 'parts')).id })); 
-      
-      // New Travel Packages
-      const packages = [
-          { title: "Carnaval em Guarapari", date: "2026-02-13", price: 2890 },
-          { title: "Encantos de Vassouras", date: "2026-03-01", price: 399 },
-          { title: "Hotel Vilarejo Praia All Inclusive", date: "2026-03-13", price: 2990 },
-          { title: "Hotel Fazenda Estalagem", date: "2026-04-10", price: 1390 },
-          { title: "Hotel Fazenda Raposo", date: "2026-05-01", price: 1590 },
-          { title: "Caldas Novas Junho", date: "2026-06-06", price: 2690 },
-          { title: "Caldas Novas Férias de Julho", date: "2026-07-18", price: 2990 },
-          { title: "Festa Julina em Passa Quatro", date: "2026-07-20", price: 2390 },
-          { title: "Caldas Novas Agosto 2026", date: "2026-08-22", price: 2690 },
-      ];
-
-      packages.forEach(p => {
-          batch.set(doc(collection(db, 'travelPackages')), { 
-              title: p.title, 
-              date: p.date, 
-              adultPrice: p.price,
-              childPrice: p.price * 0.7, // Assume 70% for child as example
-              seniorPrice: p.price, // Same as adult usually
-              status: 'OPEN'
-          });
-      });
-
+      // Call default prices logic? No, keep separate for button trigger.
       await batch.commit(); 
   };
 
   return (
     <StoreContext.Provider value={{
-      currentUser: currentUser!, isAuthenticated, settings, users, buses, bookings, parts, transactions, timeOffs, documents, maintenanceRecords, purchaseRequests, maintenanceReports, charterContracts, travelPackages, packagePassengers, packagePayments, clients, packageLeads, fuelRecords, fuelSupplies, fuelStockLevel, driverLiabilities, quotes,
+      currentUser: currentUser!, isAuthenticated, settings, users, buses, bookings, parts, transactions, timeOffs, documents, maintenanceRecords, purchaseRequests, maintenanceReports, charterContracts, travelPackages, packagePassengers, packagePayments, clients, packageLeads, fuelRecords, fuelSupplies, fuelStockLevel, driverLiabilities, quotes, priceRoutes,
       switchUser, addUser, updateUser, deleteUser, addBooking, updateBooking, updateBookingStatus, addPart, updateStock, addTransaction, addTimeOff, updateTimeOffStatus, deleteTimeOff, addDocument, deleteDocument, addMaintenanceRecord, addPurchaseRequest, updatePurchaseRequestStatus, addMaintenanceReport, updateMaintenanceReportStatus, addBus, updateBusStatus, addCharterContract, addTravelPackage, registerPackageSale, updatePackagePassenger, deletePackagePassenger, addPackagePayment, addPackageLead, updatePackageLead, deletePackageLead, addFuelRecord, addFuelSupply, addDriverLiability, payDriverLiability,
       login, logout, register, updateSettings, seedDatabase,
-      addQuote, updateQuote, convertQuoteToBooking, deleteQuote
+      addQuote, updateQuote, convertQuoteToBooking, deleteQuote,
+      addPriceRoute, updatePriceRoute, deletePriceRoute, importDefaultPrices, clearPriceTable
     }}>
       {children}
     </StoreContext.Provider>
