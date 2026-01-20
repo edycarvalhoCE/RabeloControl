@@ -4,9 +4,9 @@ import { useStore } from '../services/store';
 import { UserRole, DriverLiability } from '../types';
 
 const FinanceView: React.FC = () => {
-  const { transactions, addTransaction, users, addDriverLiability, driverLiabilities, payDriverLiability } = useStore();
+  const { transactions, addTransaction, users, addDriverLiability, driverLiabilities, payDriverLiability, bookings } = useStore();
   const [filter, setFilter] = useState<'ALL' | 'INCOME' | 'EXPENSE'>('ALL');
-  const [activeTab, setActiveTab] = useState<'CASHBOOK' | 'LIABILITIES'>('CASHBOOK');
+  const [activeTab, setActiveTab] = useState<'CASHBOOK' | 'LIABILITIES' | 'PAYROLL'>('CASHBOOK');
 
   // --- MANUAL TRANSACTION STATE ---
   const [newTrans, setNewTrans] = useState({ 
@@ -56,7 +56,58 @@ const FinanceView: React.FC = () => {
     .filter(t => filter === 'ALL' ? true : t.type === filter)
     .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
+  // --- PAYROLL CALCULATION ---
+  const getDriverPayroll = () => {
+      return drivers.map(driver => {
+          const driverTrips = bookings.filter(b => b.driverId === driver.id && b.status === 'COMPLETED');
+          
+          const tripsDetails = driverTrips.map(trip => {
+              const start = new Date(trip.startTime);
+              const end = new Date(trip.endTime);
+              // Calculate days duration (minimum 1 day)
+              const diffTime = Math.abs(end.getTime() - start.getTime());
+              const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
+              const days = diffDays || 1; 
+              
+              return {
+                  destination: trip.destination,
+                  date: trip.startTime,
+                  days,
+                  amount: days * (driver.dailyRate || 0)
+              };
+          });
+
+          const totalDays = tripsDetails.reduce((acc, t) => acc + t.days, 0);
+          const totalAmount = tripsDetails.reduce((acc, t) => acc + t.amount, 0);
+
+          return {
+              driver,
+              tripsDetails,
+              totalDays,
+              totalAmount
+          };
+      });
+  };
+
+  const payrollData = getDriverPayroll();
+
   // --- HANDLERS ---
+
+  const handlePayDriver = (driverName: string, amount: number) => {
+      if (amount <= 0) return;
+      if (window.confirm(`Confirma o pagamento de R$ ${amount.toLocaleString('pt-BR', {minimumFractionDigits: 2})} para ${driverName}? Isso lançará uma despesa no caixa.`)) {
+          addTransaction({
+              type: 'EXPENSE',
+              status: 'COMPLETED',
+              category: 'Pagamento Diárias',
+              amount: amount,
+              date: new Date().toISOString().split('T')[0],
+              description: `Pagamento de Diárias - Motorista: ${driverName}`,
+              paymentMethod: 'PIX'
+          });
+          alert('Pagamento registrado no caixa!');
+      }
+  };
 
   const handleAddTransaction = (e: React.FormEvent) => {
     e.preventDefault();
@@ -145,16 +196,6 @@ const FinanceView: React.FC = () => {
   const currentBalance = realizedTransactions.reduce((acc, t) => t.type === 'INCOME' ? acc + t.amount : acc - t.amount, 0);
   const projectedIncome = pendingTransactions.filter(t => t.type === 'INCOME').reduce((acc, t) => acc + t.amount, 0);
 
-  const getMethodLabel = (method?: string) => {
-      switch(method) {
-          case 'BOLETO': return 'Boleto';
-          case 'CARTAO_CREDITO': return 'C. Crédito';
-          case 'PIX': return 'Pix';
-          case 'DINHEIRO': return 'Dinheiro';
-          default: return method || '-';
-      }
-  };
-
   return (
     <div className="space-y-6 animate-fade-in relative">
         
@@ -193,18 +234,24 @@ const FinanceView: React.FC = () => {
         )}
 
         {/* TABS */}
-        <div className="flex border-b border-slate-300">
+        <div className="flex border-b border-slate-300 overflow-x-auto">
             <button 
                 onClick={() => setActiveTab('CASHBOOK')}
-                className={`px-6 py-3 font-bold text-sm ${activeTab === 'CASHBOOK' ? 'border-b-2 border-slate-800 text-slate-800' : 'text-slate-500 hover:text-slate-700'}`}
+                className={`px-6 py-3 font-bold text-sm whitespace-nowrap ${activeTab === 'CASHBOOK' ? 'border-b-2 border-slate-800 text-slate-800' : 'text-slate-500 hover:text-slate-700'}`}
             >
                 📚 Livro Caixa
             </button>
             <button 
-                onClick={() => setActiveTab('LIABILITIES')}
-                className={`px-6 py-3 font-bold text-sm ${activeTab === 'LIABILITIES' ? 'border-b-2 border-red-600 text-red-600' : 'text-slate-500 hover:text-slate-700'}`}
+                onClick={() => setActiveTab('PAYROLL')}
+                className={`px-6 py-3 font-bold text-sm whitespace-nowrap ${activeTab === 'PAYROLL' ? 'border-b-2 border-emerald-600 text-emerald-600' : 'text-slate-500 hover:text-slate-700'}`}
             >
-                💥 Avarias e Multas (Motoristas)
+                💵 Diárias Motoristas
+            </button>
+            <button 
+                onClick={() => setActiveTab('LIABILITIES')}
+                className={`px-6 py-3 font-bold text-sm whitespace-nowrap ${activeTab === 'LIABILITIES' ? 'border-b-2 border-red-600 text-red-600' : 'text-slate-500 hover:text-slate-700'}`}
+            >
+                💥 Avarias e Multas
             </button>
         </div>
 
@@ -479,6 +526,68 @@ const FinanceView: React.FC = () => {
                     </form>
                 </div>
             </div>
+            </div>
+        )}
+
+        {/* PAYROLL TAB */}
+        {activeTab === 'PAYROLL' && (
+            <div className="space-y-6">
+                <div className="bg-emerald-50 border border-emerald-200 p-4 rounded-xl mb-4">
+                    <h3 className="text-emerald-800 font-bold flex items-center gap-2">
+                        <span className="text-xl">💰</span> Controle de Diárias de Motoristas
+                    </h3>
+                    <p className="text-sm text-emerald-600 mt-1">
+                        Os valores são calculados automaticamente com base nas viagens concluídas (status 'CONFIRMADO' -> data passada ou manualmente completadas).
+                    </p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {payrollData.map(({ driver, totalAmount, totalDays, tripsDetails }) => (
+                        <div key={driver.id} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
+                            <div className="p-4 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
+                                <div>
+                                    <h4 className="font-bold text-slate-800">{driver.name}</h4>
+                                    <p className="text-xs text-slate-500">Diária Base: R$ {driver.dailyRate?.toLocaleString('pt-BR', {minimumFractionDigits: 2}) || '0,00'}</p>
+                                </div>
+                                <div className="text-right">
+                                    <span className="block text-xs font-bold text-slate-400">Total a Pagar</span>
+                                    <span className="text-xl font-bold text-emerald-600">R$ {totalAmount.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                                </div>
+                            </div>
+                            
+                            <div className="p-4 flex-1 overflow-y-auto max-h-60">
+                                {tripsDetails.length === 0 ? (
+                                    <p className="text-center text-slate-400 text-sm py-4">Nenhuma viagem realizada.</p>
+                                ) : (
+                                    <ul className="space-y-2">
+                                        {tripsDetails.map((trip, idx) => (
+                                            <li key={idx} className="text-sm border-b border-slate-50 pb-2 last:border-0 last:pb-0">
+                                                <div className="flex justify-between">
+                                                    <span className="font-medium text-slate-700">{trip.destination}</span>
+                                                    <span className="text-slate-500 font-bold">R$ {trip.amount.toLocaleString('pt-BR')}</span>
+                                                </div>
+                                                <div className="flex justify-between text-xs text-slate-400 mt-1">
+                                                    <span>{new Date(trip.date).toLocaleDateString()}</span>
+                                                    <span>{trip.days} dia(s)</span>
+                                                </div>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                )}
+                            </div>
+
+                            <div className="p-4 border-t border-slate-100 bg-slate-50">
+                                <button 
+                                    onClick={() => handlePayDriver(driver.name, totalAmount)}
+                                    disabled={totalAmount <= 0}
+                                    className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-2 rounded text-sm shadow-sm transition-colors"
+                                >
+                                    Registrar Pagamento Total
+                                </button>
+                            </div>
+                        </div>
+                    ))}
+                </div>
             </div>
         )}
 

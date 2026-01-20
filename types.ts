@@ -26,6 +26,7 @@ export interface User {
   role: UserRole | string; // Allow string for legacy data compatibility
   avatar: string;
   status?: 'APPROVED' | 'PENDING' | 'REJECTED'; // New field for access control
+  dailyRate?: number; // Valor da diária do motorista
 }
 
 export interface Bus {

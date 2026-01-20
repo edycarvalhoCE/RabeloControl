@@ -9,7 +9,7 @@ const UsersView: React.FC = () => {
   const [editingUser, setEditingUser] = useState<User | null>(null);
 
   // Form State
-  const [formData, setFormData] = useState({ name: '', email: '', role: UserRole.DRIVER as UserRole });
+  const [formData, setFormData] = useState({ name: '', email: '', role: UserRole.DRIVER as UserRole, dailyRate: 0 });
 
   const isManager = currentUser.role === UserRole.DEVELOPER || currentUser.role === UserRole.MANAGER;
   const isDeveloper = currentUser.role === UserRole.DEVELOPER;
@@ -20,7 +20,7 @@ const UsersView: React.FC = () => {
 
   const handleEdit = (user: User) => {
       setEditingUser(user);
-      setFormData({ name: user.name, email: user.email, role: user.role as UserRole });
+      setFormData({ name: user.name, email: user.email, role: user.role as UserRole, dailyRate: user.dailyRate || 0 });
       setShowForm(true);
   };
 
@@ -58,7 +58,7 @@ const UsersView: React.FC = () => {
             addUser(formData);
             alert("Usuário criado com sucesso!");
         }
-        setFormData({ name: '', email: '', role: UserRole.DRIVER });
+        setFormData({ name: '', email: '', role: UserRole.DRIVER, dailyRate: 0 });
         setEditingUser(null);
         setShowForm(false);
     }
@@ -67,7 +67,13 @@ const UsersView: React.FC = () => {
   const handleCancel = () => {
       setShowForm(false);
       setEditingUser(null);
-      setFormData({ name: '', email: '', role: UserRole.DRIVER });
+      setFormData({ name: '', email: '', role: UserRole.DRIVER, dailyRate: 0 });
+  };
+
+  // Currency handler
+  const handleRateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const value = e.target.value.replace(/\D/g, "");
+      setFormData(prev => ({ ...prev, dailyRate: Number(value) / 100 }));
   };
 
   return (
@@ -75,7 +81,7 @@ const UsersView: React.FC = () => {
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold text-slate-800">Gestão de Usuários</h2>
         <button 
-          onClick={() => { setShowForm(!showForm); setEditingUser(null); setFormData({ name: '', email: '', role: UserRole.DRIVER }); }}
+          onClick={() => { setShowForm(!showForm); setEditingUser(null); setFormData({ name: '', email: '', role: UserRole.DRIVER, dailyRate: 0 }); }}
           className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium shadow-sm transition-colors"
         >
           {showForm ? 'Cancelar' : '+ Novo Usuário'}
@@ -166,6 +172,27 @@ const UsersView: React.FC = () => {
                           )}
                       </select>
                   </div>
+
+                  {formData.role === UserRole.DRIVER && (
+                      <div className="bg-emerald-50 p-4 rounded-lg border border-emerald-100">
+                          <label className="block text-sm font-bold text-emerald-800 mb-1">Valor da Diária (R$)</label>
+                          <div className="flex items-center border border-emerald-300 rounded overflow-hidden bg-white">
+                              <span className="bg-emerald-100 text-emerald-800 px-3 py-2 font-bold border-r border-emerald-300 text-sm">R$</span>
+                              <input 
+                                  type="text" 
+                                  inputMode="numeric"
+                                  value={formData.dailyRate.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} 
+                                  onChange={handleRateChange}
+                                  className="w-full p-2 outline-none text-right font-bold text-slate-800"
+                                  placeholder="0,00"
+                              />
+                          </div>
+                          <p className="text-[10px] text-emerald-600 mt-1">
+                              Este valor será usado para calcular o pagamento automaticamente ao final das viagens.
+                          </p>
+                      </div>
+                  )}
+
                   <div className="flex gap-2 pt-2">
                       <button type="button" onClick={handleCancel} className="flex-1 bg-slate-200 text-slate-800 py-2 rounded font-bold hover:bg-slate-300">
                           Cancelar
@@ -189,6 +216,9 @@ const UsersView: React.FC = () => {
                               {user.role}
                           </span>
                           <p className="text-xs text-slate-400 mt-1">{user.email}</p>
+                          {user.role === UserRole.DRIVER && user.dailyRate && (
+                              <p className="text-[10px] font-bold text-emerald-600 mt-1">Diária: R$ {user.dailyRate.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</p>
+                          )}
                       </div>
                   </div>
                   <div className="flex flex-col gap-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
