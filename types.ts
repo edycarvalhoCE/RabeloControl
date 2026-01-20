@@ -209,11 +209,11 @@ export interface PackagePassenger {
   status: 'PENDING' | 'PARTIAL' | 'PAID';
   
   // Commission Fields
-  saleType?: 'DIRECT' | 'AGENCY';
-  agencyName?: string;
-  agencyPhone?: string;
+  saleType?: 'DIRECT' | 'AGENCY' | 'PROMOTER';
+  agencyName?: string; // Used for Promoter Name as well
+  agencyPhone?: string; // Used for Promoter Phone as well
   paxList?: string; // Text field for PAX names in agency sale
-  commissionRate?: number; // 0.01 or 0.12
+  commissionRate?: number; // 0.01, 0.10 or 0.12
   commissionValue?: number;
   sellerId?: string;
 

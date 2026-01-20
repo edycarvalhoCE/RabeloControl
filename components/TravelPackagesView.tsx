@@ -22,7 +22,7 @@ const TravelPackagesView: React.FC = () => {
 
   // Sale/Passenger Form State
   const [saleForm, setSaleForm] = useState({
-      saleType: 'DIRECT' as 'DIRECT' | 'AGENCY',
+      saleType: 'DIRECT' as 'DIRECT' | 'AGENCY' | 'PROMOTER',
       agencyName: '',
       agencyPhone: '',
       paxList: '', // Text area for Agency PAX names
@@ -189,10 +189,10 @@ const TravelPackagesView: React.FC = () => {
           paxList: p.paxList || '',
           cpf: p.titularCpf,
           name: p.titularName,
-          rg: '', // RG not stored in sale usually, client lookup required if needed, or leave blank
-          birthDate: '', // Same for birthdate
-          phone: '', // Same
-          address: '', // Same
+          rg: '', 
+          birthDate: '', 
+          phone: '', 
+          address: '',
           qtdAdult: p.qtdAdult,
           qtdChild: p.qtdChild,
           qtdSenior: p.qtdSenior,
@@ -273,7 +273,10 @@ const TravelPackagesView: React.FC = () => {
           const finalPrice = Math.max(0, total - saleForm.discount);
 
           // Calculate Commission
-          let commissionRate = saleForm.saleType === 'AGENCY' ? 0.12 : 0.01;
+          let commissionRate = 0.01; // Direct
+          if (saleForm.saleType === 'AGENCY') commissionRate = 0.12;
+          if (saleForm.saleType === 'PROMOTER') commissionRate = 0.10;
+
           let commissionValue = finalPrice * commissionRate;
           
           // Calculate Fee Value
@@ -293,9 +296,9 @@ const TravelPackagesView: React.FC = () => {
                   discount: saleForm.discount,
                   agreedPrice: finalPrice,
                   saleType: saleForm.saleType,
-                  agencyName: saleForm.saleType === 'AGENCY' ? saleForm.agencyName : '',
-                  agencyPhone: saleForm.saleType === 'AGENCY' ? saleForm.agencyPhone : '',
-                  paxList: saleForm.saleType === 'AGENCY' ? saleForm.paxList : '',
+                  agencyName: saleForm.saleType !== 'DIRECT' ? saleForm.agencyName : '',
+                  agencyPhone: saleForm.saleType !== 'DIRECT' ? saleForm.agencyPhone : '',
+                  paxList: saleForm.saleType !== 'DIRECT' ? saleForm.paxList : '',
                   commissionRate,
                   commissionValue,
                   paymentMethod: saleForm.paymentMethod,
@@ -337,9 +340,9 @@ const TravelPackagesView: React.FC = () => {
                       discount: saleForm.discount,
                       agreedPrice: finalPrice,
                       saleType: saleForm.saleType,
-                      agencyName: saleForm.saleType === 'AGENCY' ? saleForm.agencyName : undefined,
-                      agencyPhone: saleForm.saleType === 'AGENCY' ? saleForm.agencyPhone : undefined,
-                      paxList: saleForm.saleType === 'AGENCY' ? saleForm.paxList : undefined,
+                      agencyName: saleForm.saleType !== 'DIRECT' ? saleForm.agencyName : undefined,
+                      agencyPhone: saleForm.saleType !== 'DIRECT' ? saleForm.agencyPhone : undefined,
+                      paxList: saleForm.saleType !== 'DIRECT' ? saleForm.paxList : undefined,
                       paymentMethod: saleForm.paymentMethod,
                       transactionSource: saleForm.transactionSource,
                       installments: saleForm.installments,
@@ -399,7 +402,11 @@ const TravelPackagesView: React.FC = () => {
                            (saleForm.qtdChild * selectedPackage.childPrice) + 
                            (saleForm.qtdSenior * selectedPackage.seniorPrice);
       const currentFinal = Math.max(0, currentTotal - saleForm.discount);
-      const estimatedCommission = currentFinal * (saleForm.saleType === 'AGENCY' ? 0.12 : 0.01);
+      
+      let estimatedCommission = 0;
+      if (saleForm.saleType === 'AGENCY') estimatedCommission = currentFinal * 0.12;
+      else if (saleForm.saleType === 'PROMOTER') estimatedCommission = currentFinal * 0.10;
+      else estimatedCommission = currentFinal * 0.01;
       
       const estimatedCardFee = (saleForm.paymentMethod !== 'VISTA') 
           ? currentFinal * (saleForm.cardFeeRate / 100)
@@ -451,24 +458,35 @@ const TravelPackagesView: React.FC = () => {
                                   <div className="mb-4 grid grid-cols-1 md:grid-cols-2 gap-4">
                                       <div className="bg-white p-3 rounded border border-slate-200">
                                           <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Canal de Venda</label>
-                                          <div className="flex gap-4">
-                                              <label className="flex items-center gap-2 cursor-pointer">
+                                          <div className="flex flex-col gap-2">
+                                              <div className="flex gap-4">
+                                                  <label className="flex items-center gap-2 cursor-pointer">
+                                                      <input 
+                                                        type="radio" name="saleType" value="DIRECT"
+                                                        checked={saleForm.saleType === 'DIRECT'}
+                                                        onChange={() => setSaleForm({...saleForm, saleType: 'DIRECT'})}
+                                                        className="text-emerald-600 focus:ring-emerald-500"
+                                                      />
+                                                      <span className="text-sm font-medium">Direta</span>
+                                                  </label>
+                                                  <label className="flex items-center gap-2 cursor-pointer">
+                                                      <input 
+                                                        type="radio" name="saleType" value="AGENCY"
+                                                        checked={saleForm.saleType === 'AGENCY'}
+                                                        onChange={() => setSaleForm({...saleForm, saleType: 'AGENCY'})}
+                                                        className="text-emerald-600 focus:ring-emerald-500"
+                                                      />
+                                                      <span className="text-sm font-medium">Agência (12%)</span>
+                                                  </label>
+                                              </div>
+                                              <label className="flex items-center gap-2 cursor-pointer mt-1">
                                                   <input 
-                                                    type="radio" name="saleType" value="DIRECT"
-                                                    checked={saleForm.saleType === 'DIRECT'}
-                                                    onChange={() => setSaleForm({...saleForm, saleType: 'DIRECT'})}
+                                                    type="radio" name="saleType" value="PROMOTER"
+                                                    checked={saleForm.saleType === 'PROMOTER'}
+                                                    onChange={() => setSaleForm({...saleForm, saleType: 'PROMOTER'})}
                                                     className="text-emerald-600 focus:ring-emerald-500"
                                                   />
-                                                  <span className="text-sm font-medium">Venda Direta</span>
-                                              </label>
-                                              <label className="flex items-center gap-2 cursor-pointer">
-                                                  <input 
-                                                    type="radio" name="saleType" value="AGENCY"
-                                                    checked={saleForm.saleType === 'AGENCY'}
-                                                    onChange={() => setSaleForm({...saleForm, saleType: 'AGENCY'})}
-                                                    className="text-emerald-600 focus:ring-emerald-500"
-                                                  />
-                                                  <span className="text-sm font-medium">Agência</span>
+                                                  <span className="text-sm font-medium">Promotor (10%)</span>
                                               </label>
                                           </div>
                                       </div>
@@ -556,25 +574,31 @@ const TravelPackagesView: React.FC = () => {
                                           />
                                       </div>
                                       <div className="md:col-span-2">
-                                          <label className="text-xs font-bold text-slate-500">{saleForm.saleType === 'AGENCY' ? 'Nome do Contato na Agência' : 'Nome Completo Cliente'}</label>
+                                          <label className="text-xs font-bold text-slate-500">
+                                              {saleForm.saleType === 'AGENCY' ? 'Nome do Contato na Agência' : saleForm.saleType === 'PROMOTER' ? 'Nome do Cliente' : 'Nome Completo Cliente'}
+                                          </label>
                                           <input 
                                             value={saleForm.name} onChange={e => setSaleForm({...saleForm, name: e.target.value})}
                                             className="w-full border p-2 rounded text-sm" required
                                           />
                                       </div>
                                       
-                                      {/* AGENCY SPECIFIC FIELDS */}
-                                      {saleForm.saleType === 'AGENCY' && (
+                                      {/* AGENCY OR PROMOTER SPECIFIC FIELDS */}
+                                      {saleForm.saleType !== 'DIRECT' && (
                                           <>
                                               <div className="md:col-span-2">
-                                                  <label className="text-xs font-bold text-slate-500">Nome da Agência</label>
+                                                  <label className="text-xs font-bold text-slate-500">
+                                                      {saleForm.saleType === 'AGENCY' ? 'Nome da Agência' : 'Nome do Promotor'}
+                                                  </label>
                                                   <input 
                                                     value={saleForm.agencyName} onChange={e => setSaleForm({...saleForm, agencyName: e.target.value})}
                                                     className="w-full border p-2 rounded text-sm" required
                                                   />
                                               </div>
                                               <div>
-                                                  <label className="text-xs font-bold text-slate-500">Telefone Agência</label>
+                                                  <label className="text-xs font-bold text-slate-500">
+                                                      {saleForm.saleType === 'AGENCY' ? 'Telefone Agência' : 'Telefone Promotor'}
+                                                  </label>
                                                   <input 
                                                     value={saleForm.agencyPhone} onChange={e => setSaleForm({...saleForm, agencyPhone: e.target.value})}
                                                     className="w-full border p-2 rounded text-sm"
@@ -743,6 +767,11 @@ const TravelPackagesView: React.FC = () => {
                                                       Agência
                                                   </span>
                                               )}
+                                              {p.saleType === 'PROMOTER' && (
+                                                  <span className="text-[10px] bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded font-bold uppercase border border-indigo-200">
+                                                      Promotor
+                                                  </span>
+                                              )}
                                               {p.paymentMethod === 'CARTAO_CREDITO' || p.paymentMethod === 'CARTAO_DEBITO' ? (
                                                   <span className="text-[10px] bg-orange-100 text-orange-700 px-2 py-0.5 rounded font-bold uppercase border border-orange-200">
                                                       {p.paymentMethod === 'CARTAO_CREDITO' ? `Crédito ${p.installments}x` : 'Débito'}
@@ -774,9 +803,14 @@ const TravelPackagesView: React.FC = () => {
                                                   </div>
                                                   {p.paxList && (
                                                       <div className="mt-2 p-2 bg-slate-50 rounded text-xs text-slate-600 border border-slate-100">
-                                                          <strong>PAX Agência:</strong><br/>
+                                                          <strong>PAX Lista:</strong><br/>
                                                           {p.paxList}
                                                       </div>
+                                                  )}
+                                                  {p.agencyName && (
+                                                      <p className="mt-1 text-xs text-indigo-600 font-bold">
+                                                          Venda por: {p.agencyName}
+                                                      </p>
                                                   )}
                                               </div>
                                               <div className="text-right mt-6">
@@ -1206,6 +1240,8 @@ const TravelPackagesView: React.FC = () => {
                                                 <td className="p-3">
                                                     {p.saleType === 'AGENCY' ? 
                                                         <span className="bg-purple-100 text-purple-700 px-2 py-0.5 rounded text-xs font-bold">Agência</span> : 
+                                                        p.saleType === 'PROMOTER' ? 
+                                                        <span className="bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded text-xs font-bold">Promotor</span> :
                                                         <span className="bg-slate-100 text-slate-600 px-2 py-0.5 rounded text-xs font-bold">Direta</span>
                                                     }
                                                 </td>

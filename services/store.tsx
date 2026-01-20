@@ -416,7 +416,14 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
           const ref = await addDoc(collection(db, 'clients'), clientData); 
           clientId = ref.id; 
       }
-      let commissionRate = saleData.saleType === 'AGENCY' ? 0.12 : 0.01;
+      
+      let commissionRate = 0.01; // Default Direct Sale (1%)
+      if (saleData.saleType === 'AGENCY') {
+          commissionRate = 0.12; // 12%
+      } else if (saleData.saleType === 'PROMOTER') {
+          commissionRate = 0.10; // 10%
+      }
+
       let commissionValue = (saleData.agreedPrice || 0) * commissionRate;
       
       // Calculate Card Fee Logic (using passed values)
