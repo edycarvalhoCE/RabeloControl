@@ -1,7 +1,4 @@
-
-// @ts-ignore
 import { initializeApp } from "firebase/app";
-// @ts-ignore
 import { getAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 
@@ -19,8 +16,7 @@ const firebaseConfig = {
 // Verifica se o projeto está configurado (não é mais o placeholder)
 export const isConfigured = firebaseConfig.projectId !== "seu-projeto";
 
-// Initialize Firebase (Modular SDK)
+// Initialize Firebase
 const app = initializeApp(firebaseConfig);
-
 export const auth = getAuth(app);
 export const db = getFirestore(app);
