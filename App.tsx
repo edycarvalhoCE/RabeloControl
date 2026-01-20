@@ -19,9 +19,10 @@ import LoginView from './components/LoginView';
 import SettingsView from './components/SettingsView';
 import QuotesView from './components/QuotesView';
 import { useStore } from './services/store';
+import { UserRole } from './types';
 
 const MainContent = () => {
-  const { currentUser, isAuthenticated, logout } = useStore();
+  const { currentUser, isAuthenticated, logout, settings } = useStore();
   
   // Default view logic
   const getDefaultView = () => {
@@ -53,6 +54,35 @@ const MainContent = () => {
                   <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
                   <p className="text-slate-400 font-medium">Carregando perfil...</p>
               </div>
+          </div>
+      );
+  }
+
+  // --- SYSTEM LOCK CHECK ---
+  // Se o status for LOCKED e o usuário NÃO for Desenvolvedor, bloqueia tudo.
+  if (settings.subscriptionStatus === 'LOCKED' && currentUser.role !== UserRole.DEVELOPER) {
+      return (
+          <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-4 text-center">
+              <div className="bg-white p-8 rounded-2xl shadow-2xl max-w-md w-full border-t-8 border-red-600">
+                  <div className="text-red-600 mb-4 flex justify-center">
+                      <svg className="w-20 h-20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
+                  </div>
+                  <h1 className="text-2xl font-bold text-slate-800 mb-2">Sistema Bloqueado</h1>
+                  <p className="text-slate-600 mb-6">
+                      O acesso ao sistema está temporariamente suspenso devido a pendências na assinatura mensal.
+                  </p>
+                  <div className="bg-slate-100 p-4 rounded-lg text-sm text-slate-700 mb-6">
+                      <p className="font-bold mb-1">Para regularizar o acesso:</p>
+                      <p>Entre em contato com o administrador ou suporte técnico.</p>
+                  </div>
+                  <button 
+                    onClick={logout} 
+                    className="w-full bg-slate-800 text-white py-3 rounded-lg font-bold hover:bg-slate-700"
+                  >
+                      Sair do Sistema
+                  </button>
+              </div>
+              <p className="text-slate-500 mt-8 text-xs">Rabelo Controle &copy; 2026</p>
           </div>
       );
   }
@@ -107,7 +137,15 @@ const MainContent = () => {
   };
 
   return (
-    <div className="flex h-screen bg-slate-100 font-sans text-slate-900 overflow-hidden">
+    <div className="flex h-screen bg-slate-100 font-sans text-slate-900 overflow-hidden relative">
+      
+      {/* DEVELOPER LOCK BANNER */}
+      {settings.subscriptionStatus === 'LOCKED' && currentUser.role === UserRole.DEVELOPER && (
+          <div className="absolute top-0 left-0 w-full bg-red-600 text-white text-xs font-bold text-center py-1 z-50 shadow-md">
+              ⚠️ MODO DE BLOQUEIO ATIVO: O sistema está inacessível para usuários comuns. (Você tem acesso pois é Desenvolvedor)
+          </div>
+      )}
+
       <Sidebar 
         currentView={currentView} 
         setView={setCurrentView} 
@@ -117,7 +155,7 @@ const MainContent = () => {
       
       <div className="flex-1 flex flex-col h-full overflow-hidden">
         {/* Mobile Header */}
-        <div className="md:hidden bg-slate-900 text-white p-4 flex justify-between items-center shadow-md shrink-0">
+        <div className="md:hidden bg-slate-900 text-white p-4 flex justify-between items-center shadow-md shrink-0 pt-8"> {/* Added pt-8 to account for banner if present */}
             <div className="font-extrabold text-xl">
                 Rabelo<span className="text-blue-500">Tour</span>
             </div>
@@ -126,7 +164,7 @@ const MainContent = () => {
             </button>
         </div>
 
-        <main className="flex-1 overflow-y-auto p-4 md:p-8">
+        <main className={`flex-1 overflow-y-auto p-4 md:p-8 ${settings.subscriptionStatus === 'LOCKED' && currentUser.role === UserRole.DEVELOPER ? 'pt-8' : ''}`}>
           <div className="max-w-7xl mx-auto">
             {renderView()}
           </div>

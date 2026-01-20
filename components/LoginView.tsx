@@ -6,7 +6,7 @@ import { isConfigured } from '../services/firebase';
 import { Logo } from './Logo';
 
 const LoginView: React.FC = () => {
-  const { login, register, seedDatabase, buses } = useStore();
+  const { login, register, seedDatabase, buses, settings, users } = useStore();
   const [isRegistering, setIsRegistering] = useState(false);
   
   // Login State
@@ -49,6 +49,21 @@ const LoginView: React.FC = () => {
     setLoading(true);
     setError('');
 
+    // --- PRE-LOGIN LOCK CHECK ---
+    // Try to find user in local list if already synced (best effort)
+    const existingUser = users.find(u => u.email.toLowerCase() === email.toLowerCase());
+    
+    if (settings?.subscriptionStatus === 'LOCKED') {
+        // If we know the user and they are NOT developer, block immediately
+        if (existingUser && existingUser.role !== UserRole.DEVELOPER) {
+            setError('Sistema temporariamente bloqueado por falta de pagamento. Contate o suporte.');
+            setLoading(false);
+            return;
+        }
+        // If we don't know the user locally yet (first load), we let them authenticate.
+        // App.tsx will handle the blocking screen immediately after login if they aren't dev.
+    }
+
     let result;
     if (isRegistering) {
         result = await register(email, password, regName, regRole);
@@ -83,6 +98,11 @@ const LoginView: React.FC = () => {
                     <Logo size="lg" /> {/* Reduzido de 'xl' para 'lg' */}
                 </div>
                 <p className="text-slate-500 text-sm font-medium uppercase tracking-wide">Sistema Integrado de Gestão</p>
+                {settings?.subscriptionStatus === 'LOCKED' && (
+                    <div className="mt-2 text-xs bg-red-100 text-red-600 px-2 py-1 rounded font-bold border border-red-200">
+                        🔒 Acesso Restrito (Manutenção/Pagamento)
+                    </div>
+                )}
             </div>
 
             {error && (

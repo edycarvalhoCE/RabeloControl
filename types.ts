@@ -15,6 +15,8 @@ export interface SystemSettings {
   phone?: string;
   address?: string;
   aiApiKey?: string; // Nova chave para IA
+  subscriptionStatus?: 'ACTIVE' | 'LOCKED'; // Controle de Pagamento
+  subscriptionDueDate?: string; // Data de vencimento para aviso
 }
 
 export interface User {

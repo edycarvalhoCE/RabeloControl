@@ -12,6 +12,7 @@ const UsersView: React.FC = () => {
   const [formData, setFormData] = useState({ name: '', email: '', role: UserRole.DRIVER as UserRole });
 
   const isManager = currentUser.role === UserRole.DEVELOPER || currentUser.role === UserRole.MANAGER;
+  const isDeveloper = currentUser.role === UserRole.DEVELOPER;
 
   // Filter pending users (only visible to managers)
   const pendingUsers = users.filter(u => u.status === 'PENDING');
@@ -159,7 +160,8 @@ const UsersView: React.FC = () => {
                           <option value={UserRole.MECHANIC}>Mecânico</option>
                           <option value={UserRole.FINANCE}>Financeiro</option>
                           <option value={UserRole.MANAGER}>Gerente</option>
-                          {currentUser.role === UserRole.DEVELOPER && (
+                          {/* ONLY DEVELOPERS CAN ASSIGN OTHER DEVELOPERS */}
+                          {isDeveloper && (
                               <option value={UserRole.DEVELOPER}>Desenvolvedor (Admin)</option>
                           )}
                       </select>
