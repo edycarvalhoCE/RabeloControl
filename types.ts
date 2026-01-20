@@ -216,6 +216,13 @@ export interface PackagePassenger {
   commissionRate?: number; // 0.01 or 0.12
   commissionValue?: number;
   sellerId?: string;
+
+  // Payment Details for Fee Tracking
+  paymentMethod?: 'VISTA' | 'CARTAO_CREDITO' | 'CARTAO_DEBITO';
+  transactionSource?: 'MACHINE' | 'LINK'; // Maquininha ou Link
+  installments?: number; // Numero de parcelas
+  cardFeeRate?: number; // % applied
+  cardFeeValue?: number; // $ value deducted
 }
 
 export interface PackageLead {

@@ -418,9 +418,31 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       }
       let commissionRate = saleData.saleType === 'AGENCY' ? 0.12 : 0.01;
       let commissionValue = (saleData.agreedPrice || 0) * commissionRate;
+      
+      // Calculate Card Fee Logic (using passed values)
+      let cardFeeValue = saleData.cardFeeValue || 0;
+      let cardFeeRate = saleData.cardFeeRate || 0;
+      const installments = saleData.installments || 1;
+      const source = saleData.transactionSource || 'MACHINE';
+
       await addDoc(collection(db, 'packagePassengers'), { 
           ...saleData, clientId, titularName: clientData.name, titularCpf: clientData.cpf, paidAmount: 0, status: 'PENDING', commissionRate, commissionValue, sellerId: currentUser.id
       });
+
+      // AUTO-LOG EXPENSE FOR CARD FEE
+      if (cardFeeValue > 0) {
+          const pkg = travelPackages.find(p => p.id === saleData.packageId);
+          const sourceLabel = source === 'LINK' ? 'Link de Pagamento' : 'Maquininha';
+          await addDoc(collection(db, 'transactions'), {
+              type: 'EXPENSE',
+              status: 'COMPLETED',
+              category: 'Taxas Cartão',
+              amount: cardFeeValue,
+              date: new Date().toISOString().split('T')[0],
+              description: `Taxa ${sourceLabel} (${installments}x): ${cardFeeRate}% - Venda Pacote ${pkg?.title || ''} - ${clientData.name}`,
+              paymentMethod: 'OUTROS'
+          });
+      }
   };
 
   const updatePackagePassenger = async (id: string, data: Partial<PackagePassenger>) => { if (!isConfigured) return; await updateDoc(doc(db, 'packagePassengers', id), data); };
