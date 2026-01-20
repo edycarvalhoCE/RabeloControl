@@ -56,7 +56,7 @@ const LoginView: React.FC = () => {
     if (settings?.subscriptionStatus === 'LOCKED') {
         // If we know the user and they are NOT developer, block immediately
         if (existingUser && existingUser.role !== UserRole.DEVELOPER) {
-            setError('Sistema temporariamente bloqueado por falta de pagamento. Contate o suporte.');
+            setError('Sistema em processo de verificação administrativa. O acesso retornará em breve.');
             setLoading(false);
             return;
         }
@@ -99,8 +99,8 @@ const LoginView: React.FC = () => {
                 </div>
                 <p className="text-slate-500 text-sm font-medium uppercase tracking-wide">Sistema Integrado de Gestão</p>
                 {settings?.subscriptionStatus === 'LOCKED' && (
-                    <div className="mt-2 text-xs bg-red-100 text-red-600 px-2 py-1 rounded font-bold border border-red-200">
-                        🔒 Acesso Restrito (Manutenção/Pagamento)
+                    <div className="mt-2 text-xs bg-orange-100 text-orange-700 px-2 py-1 rounded font-bold border border-orange-200">
+                        🔒 Em Manutenção Técnica
                     </div>
                 )}
             </div>
