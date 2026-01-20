@@ -93,6 +93,37 @@ const TravelPackagesView: React.FC = () => {
 
   // --- Handlers ---
 
+  const handleToggleDiscountType = (newType: 'FIXED' | 'PERCENTAGE') => {
+      if (!selectedPackage) return;
+
+      const total = (saleForm.qtdAdult * selectedPackage.adultPrice) + 
+                    (saleForm.qtdChild * selectedPackage.childPrice) + 
+                    (saleForm.qtdSenior * selectedPackage.seniorPrice);
+
+      if (total === 0) {
+          setSaleForm(prev => ({ ...prev, discountType: newType, discount: 0, discountPercent: 0 }));
+          return;
+      }
+
+      if (newType === 'PERCENTAGE') {
+          // Convert Fixed R$ to %
+          // Formula: (Current Discount / Total) * 100
+          const currentDiscount = saleForm.discount;
+          const newPercent = (currentDiscount / total) * 100;
+          setSaleForm(prev => ({ 
+              ...prev, 
+              discountType: 'PERCENTAGE', 
+              discountPercent: parseFloat(newPercent.toFixed(2)) 
+          }));
+      } else {
+          // Convert % to Fixed R$
+          // Formula is handled by the state 'discount' already holding the value, 
+          // but we just need to ensure the mode is switched. 
+          // The current discount value is already correct in R$, just switch mode.
+          setSaleForm(prev => ({ ...prev, discountType: 'FIXED', discountPercent: 0 }));
+      }
+  };
+
   const handleCreatePackage = (e: React.FormEvent) => {
     e.preventDefault();
     if(newPkg.title && newPkg.date) {
@@ -617,18 +648,18 @@ const TravelPackagesView: React.FC = () => {
                                                       <div className="flex justify-between items-center mb-1">
                                                           <label className="text-xs font-bold text-green-600">Desconto à Vista</label>
                                                           {/* Toggle Type */}
-                                                          <div className="flex bg-slate-100 rounded p-0.5">
+                                                          <div className="flex bg-slate-100 rounded-lg p-0.5 border border-slate-200">
                                                               <button
                                                                 type="button"
-                                                                onClick={() => setSaleForm({...saleForm, discountType: 'FIXED', discount: 0, discountPercent: 0})}
-                                                                className={`text-[10px] px-2 py-0.5 rounded font-bold ${saleForm.discountType === 'FIXED' ? 'bg-white shadow text-slate-800' : 'text-slate-500'}`}
+                                                                onClick={() => handleToggleDiscountType('FIXED')}
+                                                                className={`text-[10px] px-3 py-1 rounded-md font-bold transition-all ${saleForm.discountType === 'FIXED' ? 'bg-white shadow text-slate-800' : 'text-slate-400 hover:text-slate-600'}`}
                                                               >
                                                                   R$
                                                               </button>
                                                               <button
                                                                 type="button"
-                                                                onClick={() => setSaleForm({...saleForm, discountType: 'PERCENTAGE', discount: 0, discountPercent: 0})}
-                                                                className={`text-[10px] px-2 py-0.5 rounded font-bold ${saleForm.discountType === 'PERCENTAGE' ? 'bg-white shadow text-slate-800' : 'text-slate-500'}`}
+                                                                onClick={() => handleToggleDiscountType('PERCENTAGE')}
+                                                                className={`text-[10px] px-3 py-1 rounded-md font-bold transition-all ${saleForm.discountType === 'PERCENTAGE' ? 'bg-white shadow text-slate-800' : 'text-slate-400 hover:text-slate-600'}`}
                                                               >
                                                                   %
                                                               </button>
