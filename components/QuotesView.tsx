@@ -33,7 +33,8 @@ const QuotesView: React.FC = () => {
       price: 0
   });
 
-  const canManage = currentUser.role === UserRole.MANAGER || currentUser.role === UserRole.DEVELOPER;
+  // Updated to include FINANCE
+  const canManage = currentUser.role === UserRole.MANAGER || currentUser.role === UserRole.DEVELOPER || currentUser.role === UserRole.FINANCE;
   const isDeveloper = currentUser.role === UserRole.DEVELOPER;
 
   if (!canManage) {
