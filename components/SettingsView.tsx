@@ -16,13 +16,6 @@ const SettingsView: React.FC = () => {
   const [uploading, setUploading] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
 
-  // Subscription Control (Developer Only)
-  const [subStatus, setSubStatus] = useState<'ACTIVE' | 'LOCKED'>('ACTIVE');
-  const [subDueDate, setSubDueDate] = useState('');
-  const [updatingLock, setUpdatingLock] = useState(false);
-
-  const isDeveloper = currentUser.role === UserRole.DEVELOPER;
-
   useEffect(() => {
       if (settings) {
           setForm({
@@ -33,8 +26,6 @@ const SettingsView: React.FC = () => {
               logoUrl: settings.logoUrl || '',
               aiApiKey: settings.aiApiKey || ''
           });
-          setSubStatus(settings.subscriptionStatus || 'ACTIVE');
-          setSubDueDate(settings.subscriptionDueDate || '');
       }
   }, [settings]);
 
@@ -68,18 +59,6 @@ const SettingsView: React.FC = () => {
       await updateSettings(form);
       setSuccessMsg('Configurações salvas com sucesso!');
       setTimeout(() => setSuccessMsg(''), 4000);
-  };
-
-  const handleSubscriptionUpdate = async () => {
-      if (window.confirm(`ATENÇÃO: Você está prestes a definir o status do sistema para ${subStatus}.\n\nSe escolher 'LOCKED' (Bloqueado), todos os usuários (exceto Desenvolvedores) serão bloqueados imediatamente.\n\nDeseja continuar?`)) {
-          setUpdatingLock(true);
-          await updateSettings({ 
-              subscriptionStatus: subStatus,
-              subscriptionDueDate: subDueDate
-          });
-          setUpdatingLock(false);
-          alert('Status de assinatura atualizado com sucesso no servidor.');
-      }
   };
 
   return (
@@ -120,50 +99,6 @@ const SettingsView: React.FC = () => {
 
             {/* COMPANY DATA FORM */}
             <div className="md:col-span-2 space-y-6">
-                
-                {/* DEVELOPER ZONE - Only visible to DEVELOPER role */}
-                {isDeveloper && (
-                    <div className="bg-red-50 border-2 border-red-200 p-6 rounded-xl shadow-sm mb-6">
-                        <h3 className="font-bold text-red-800 mb-2 flex items-center gap-2">
-                            <span>🔐</span> Zona do Desenvolvedor (Controle de Assinatura)
-                        </h3>
-                        <p className="text-xs text-red-600 mb-4">Esta área é visível apenas para você. Use para bloquear o acesso do cliente em caso de inadimplência. <br/><strong>Nota:</strong> O bloqueio não afeta sua conta de Desenvolvedor.</p>
-                        
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
-                            <div>
-                                <label className="block text-sm font-bold text-red-700 mb-1">Status do Sistema</label>
-                                <select 
-                                    value={subStatus} 
-                                    onChange={e => setSubStatus(e.target.value as any)}
-                                    className="w-full border border-red-300 p-2 rounded focus:ring-2 focus:ring-red-500 bg-white font-bold"
-                                >
-                                    <option value="ACTIVE">✅ ATIVO (Liberado)</option>
-                                    <option value="LOCKED">⛔ BLOQUEADO (Pagamento Pendente)</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-red-700 mb-1">Vencimento da Mensalidade</label>
-                                <input 
-                                    type="date"
-                                    value={subDueDate}
-                                    onChange={e => setSubDueDate(e.target.value)}
-                                    className="w-full border border-red-300 p-2 rounded"
-                                />
-                            </div>
-                        </div>
-                        <div className="mt-4 text-right">
-                            <button 
-                                type="button"
-                                onClick={handleSubscriptionUpdate} 
-                                disabled={updatingLock}
-                                className="bg-red-700 hover:bg-red-800 text-white px-4 py-2 rounded font-bold text-sm disabled:opacity-50 flex items-center gap-2 ml-auto"
-                            >
-                                {updatingLock ? 'Salvando...' : 'Atualizar Status de Bloqueio'}
-                            </button>
-                        </div>
-                    </div>
-                )}
-
                 <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
                     <h3 className="font-bold text-slate-700 mb-4">Dados da Empresa (Para Contratos/Recibos)</h3>
                     <form onSubmit={handleSave} className="space-y-4">

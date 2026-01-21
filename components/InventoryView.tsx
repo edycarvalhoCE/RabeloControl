@@ -21,9 +21,7 @@ const InventoryView: React.FC = () => {
       arlaLiters: 0,
       location: 'GARAGE' as 'GARAGE' | 'STREET',
       cost: 0,
-      stationName: '',
-      kmStart: 0,
-      kmEnd: 0
+      stationName: ''
   });
 
   // Fuel SUPPLY Form State
@@ -57,22 +55,8 @@ const InventoryView: React.FC = () => {
 
   const handleFuelConsumptionSubmit = (e: React.FormEvent) => {
       e.preventDefault();
-      
-      // Validações
       if (!fuelForm.busId || fuelForm.dieselLiters <= 0) {
           alert("Selecione o ônibus e informe a quantidade de Diesel.");
-          return;
-      }
-      if (fuelForm.kmStart <= 0 || fuelForm.kmEnd <= 0) {
-          alert("É obrigatório informar a Quilometragem Inicial e Final.");
-          return;
-      }
-      if (fuelForm.kmEnd <= fuelForm.kmStart) {
-          alert("A KM Final deve ser maior que a KM Inicial.");
-          return;
-      }
-      if (fuelForm.hasArla && fuelForm.arlaLiters <= 0) {
-          alert("Se marcou 'Sim' para Arla, informe a quantidade de litros.");
           return;
       }
       
@@ -85,9 +69,7 @@ const InventoryView: React.FC = () => {
           location: fuelForm.location,
           cost: fuelForm.location === 'STREET' ? fuelForm.cost : 0,
           stationName: fuelForm.location === 'STREET' ? fuelForm.stationName : '',
-          loggedBy: currentUser.id,
-          kmStart: fuelForm.kmStart,
-          kmEnd: fuelForm.kmEnd
+          loggedBy: currentUser.id
       });
       alert("Consumo registrado com sucesso!");
       setFuelForm({
@@ -98,9 +80,7 @@ const InventoryView: React.FC = () => {
         arlaLiters: 0,
         location: 'GARAGE',
         cost: 0,
-        stationName: '',
-        kmStart: 0,
-        kmEnd: 0
+        stationName: ''
       });
   };
 
@@ -162,7 +142,7 @@ const InventoryView: React.FC = () => {
                     onClick={() => setViewMode('STOCK')}
                     className={`px-3 py-2 rounded-lg font-medium text-xs transition-colors ${viewMode === 'STOCK' ? 'bg-slate-800 text-white' : 'bg-white border text-slate-600'}`}
                 >
-                    Peças (Entrada/Saída)
+                    Peças
                 </button>
                 <button 
                     onClick={() => setViewMode('FUEL_SUPPLY')}
@@ -247,7 +227,7 @@ const InventoryView: React.FC = () => {
                     <th className="p-4">Preço Unit.</th>
                     <th className="p-4 text-center">Quantidade</th>
                     <th className="p-4 text-center">Status</th>
-                    {!isMechanic && <th className="p-4 text-center">Registrar Movimentação</th>}
+                    {!isMechanic && <th className="p-4 text-right">Ações</th>}
                     </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -270,23 +250,21 @@ const InventoryView: React.FC = () => {
                             )}
                             </td>
                             {!isMechanic && (
-                                <td className="p-4 text-center">
-                                    <div className="flex items-center justify-center gap-2">
-                                        <button 
-                                            onClick={() => updateStock(part.id, -1)}
-                                            className="px-3 py-1 text-xs rounded bg-red-50 text-red-600 hover:bg-red-100 border border-red-200 font-bold"
-                                            title="Registrar Saída"
-                                        >
-                                            - Saída
-                                        </button>
-                                        <button 
-                                            onClick={() => updateStock(part.id, 1)}
-                                            className="px-3 py-1 text-xs rounded bg-green-50 text-green-600 hover:bg-green-100 border border-green-200 font-bold"
-                                            title="Registrar Entrada"
-                                        >
-                                            + Entrada
-                                        </button>
-                                    </div>
+                                <td className="p-4 text-right space-x-2">
+                                <button 
+                                    onClick={() => updateStock(part.id, -1)}
+                                    className="w-8 h-8 rounded-full bg-red-50 text-red-600 hover:bg-red-100 border border-red-200"
+                                    title="Registrar Saída"
+                                >
+                                    -
+                                </button>
+                                <button 
+                                    onClick={() => updateStock(part.id, 1)}
+                                    className="w-8 h-8 rounded-full bg-green-50 text-green-600 hover:bg-green-100 border border-green-200"
+                                    title="Registrar Entrada"
+                                >
+                                    +
+                                </button>
                                 </td>
                             )}
                         </tr>
@@ -468,30 +446,6 @@ const InventoryView: React.FC = () => {
                               ))}
                           </select>
                       </div>
-
-                      {/* KM Fields */}
-                      <div className="grid grid-cols-2 gap-4">
-                          <div>
-                              <label className="block text-sm font-bold text-slate-700 mb-1">KM Inicial *</label>
-                              <input 
-                                  type="number" min="0" required
-                                  value={fuelForm.kmStart || ''} 
-                                  onChange={e => setFuelForm({...fuelForm, kmStart: parseInt(e.target.value)})}
-                                  className="w-full border p-2 rounded outline-none text-slate-800"
-                                  placeholder="0"
-                              />
-                          </div>
-                          <div>
-                              <label className="block text-sm font-bold text-slate-700 mb-1">KM Final *</label>
-                              <input 
-                                  type="number" min="0" required
-                                  value={fuelForm.kmEnd || ''} 
-                                  onChange={e => setFuelForm({...fuelForm, kmEnd: parseInt(e.target.value)})}
-                                  className="w-full border p-2 rounded outline-none text-slate-800"
-                                  placeholder="0"
-                              />
-                          </div>
-                      </div>
                       
                       <div className="border-t border-slate-100 pt-3">
                         <label className="block text-sm font-bold text-slate-800 mb-2">Diesel</label>
@@ -546,7 +500,7 @@ const InventoryView: React.FC = () => {
                           
                           {fuelForm.hasArla && (
                               <div className="mt-3 animate-fade-in">
-                                  <label className="block text-xs font-bold text-blue-700 mb-1">Qtd. Arla (Litros) *</label>
+                                  <label className="block text-xs font-bold text-blue-700 mb-1">Qtd. Arla (Litros)</label>
                                   <div className="flex items-center border border-blue-200 rounded overflow-hidden bg-white">
                                       <input 
                                           type="number" step="0.1" min="0" required
@@ -577,7 +531,6 @@ const InventoryView: React.FC = () => {
                                   <th className="p-3">Data</th>
                                   <th className="p-3">Veículo</th>
                                   <th className="p-3">Local</th>
-                                  <th className="p-3">KM (I/F)</th>
                                   <th className="p-3">Diesel</th>
                                   <th className="p-3">Arla</th>
                                   <th className="p-3 text-right">Resp.</th>
@@ -585,7 +538,7 @@ const InventoryView: React.FC = () => {
                           </thead>
                           <tbody className="divide-y divide-slate-100">
                               {fuelRecords.length === 0 ? (
-                                  <tr><td colSpan={7} className="p-8 text-center text-slate-500">Nenhum registro de abastecimento.</td></tr>
+                                  <tr><td colSpan={6} className="p-8 text-center text-slate-500">Nenhum registro de abastecimento.</td></tr>
                               ) : (
                                   fuelRecords.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()).map(record => {
                                       const bus = buses.find(b => b.id === record.busId);
@@ -600,10 +553,6 @@ const InventoryView: React.FC = () => {
                                                   {record.location === 'GARAGE' 
                                                     ? <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded border border-blue-200 font-bold">Garagem</span> 
                                                     : <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded border border-orange-200 font-bold">Rua</span>}
-                                              </td>
-                                              <td className="p-3 text-xs text-slate-600">
-                                                  {record.kmStart || 0} / {record.kmEnd || 0}
-                                                  <span className="block text-[10px] text-gray-400">Total: {(record.kmEnd || 0) - (record.kmStart || 0)} km</span>
                                               </td>
                                               <td className="p-3 text-sm font-bold text-slate-700">{record.dieselLiters} L</td>
                                               <td className="p-3 text-sm">

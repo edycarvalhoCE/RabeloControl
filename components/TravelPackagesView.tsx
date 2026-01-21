@@ -22,7 +22,7 @@ const TravelPackagesView: React.FC = () => {
 
   // Sale/Passenger Form State
   const [saleForm, setSaleForm] = useState({
-      saleType: 'DIRECT' as 'DIRECT' | 'AGENCY' | 'PROMOTER',
+      saleType: 'DIRECT' as 'DIRECT' | 'AGENCY',
       agencyName: '',
       agencyPhone: '',
       paxList: '', // Text area for Agency PAX names
@@ -35,13 +35,7 @@ const TravelPackagesView: React.FC = () => {
       qtdAdult: 0,
       qtdChild: 0,
       qtdSenior: 0,
-      discount: 0, // Current Calculated Discount Amount (R$)
-      paymentMethod: 'VISTA' as 'VISTA' | 'CARTAO_CREDITO' | 'CARTAO_DEBITO',
-      transactionSource: 'MACHINE' as 'MACHINE' | 'LINK',
-      installments: 1, // Number of installments
-      cardFeeRate: 0, // % auto-calculated
-      discountType: 'FIXED' as 'FIXED' | 'PERCENTAGE', // NEW
-      discountPercent: 0 // NEW
+      discount: 0
   });
 
   // Client History Modal
@@ -51,83 +45,7 @@ const TravelPackagesView: React.FC = () => {
   const [selectedPassengerForPayment, setSelectedPassengerForPayment] = useState<PackagePassenger | null>(null);
   const [newPayment, setNewPayment] = useState({ amount: 0, date: new Date().toISOString().split('T')[0], method: 'PIX', installments: 1, notes: '' });
 
-  // --- AUTOMATIC RATE CALCULATION EFFECT ---
-  useEffect(() => {
-      // Rates based on provided table
-      // Debit: 1.47%
-      // Credit 1x: 2.44%
-      // Credit 2x-6x: 2.72%
-      // Credit 7x-12x: 3.13%
-      
-      let rate = 0;
-
-      if (saleForm.paymentMethod === 'CARTAO_DEBITO') {
-          rate = 1.47;
-      } else if (saleForm.paymentMethod === 'CARTAO_CREDITO') {
-          if (saleForm.installments === 1) {
-              rate = 2.44;
-          } else if (saleForm.installments >= 2 && saleForm.installments <= 6) {
-              rate = 2.72;
-          } else if (saleForm.installments >= 7 && saleForm.installments <= 12) {
-              rate = 3.13;
-          }
-      }
-
-      setSaleForm(prev => ({ ...prev, cardFeeRate: rate }));
-  }, [saleForm.paymentMethod, saleForm.installments]);
-
-  // --- AUTOMATIC DISCOUNT CALCULATION EFFECT ---
-  useEffect(() => {
-      if (selectedPackage && saleForm.discountType === 'PERCENTAGE' && saleForm.paymentMethod === 'VISTA') {
-          const total = (saleForm.qtdAdult * selectedPackage.adultPrice) + 
-                        (saleForm.qtdChild * selectedPackage.childPrice) + 
-                        (saleForm.qtdSenior * selectedPackage.seniorPrice);
-          
-          if (total > 0) {
-              const calcDiscount = total * (saleForm.discountPercent / 100);
-              // Update discount R$ without triggering infinite loop (only if value changed significantly)
-              setSaleForm(prev => {
-                  if (Math.abs(prev.discount - calcDiscount) > 0.01) {
-                      return { ...prev, discount: calcDiscount };
-                  }
-                  return prev;
-              });
-          }
-      }
-  }, [saleForm.discountType, saleForm.discountPercent, saleForm.qtdAdult, saleForm.qtdChild, saleForm.qtdSenior, selectedPackage, saleForm.paymentMethod]);
-
-
   // --- Handlers ---
-
-  const handleToggleDiscountType = (newType: 'FIXED' | 'PERCENTAGE') => {
-      if (!selectedPackage) return;
-
-      const total = (saleForm.qtdAdult * selectedPackage.adultPrice) + 
-                    (saleForm.qtdChild * selectedPackage.childPrice) + 
-                    (saleForm.qtdSenior * selectedPackage.seniorPrice);
-
-      if (total === 0) {
-          setSaleForm(prev => ({ ...prev, discountType: newType, discount: 0, discountPercent: 0 }));
-          return;
-      }
-
-      if (newType === 'PERCENTAGE') {
-          // Convert Fixed R$ to %
-          // Formula: (Current Discount / Total) * 100
-          const currentDiscount = saleForm.discount;
-          const newPercent = (currentDiscount / total) * 100;
-          setSaleForm(prev => ({ 
-              ...prev, 
-              discountType: 'PERCENTAGE', 
-              discountPercent: parseFloat(newPercent.toFixed(2)) 
-          }));
-      } else {
-          // Convert % to Fixed R$
-          // The current discount value is already correct in R$, just switch mode.
-          // Reset percent to avoid confusion, keep R$ value
-          setSaleForm(prev => ({ ...prev, discountType: 'FIXED', discountPercent: 0 }));
-      }
-  };
 
   const handleCreatePackage = (e: React.FormEvent) => {
     e.preventDefault();
@@ -189,20 +107,14 @@ const TravelPackagesView: React.FC = () => {
           paxList: p.paxList || '',
           cpf: p.titularCpf,
           name: p.titularName,
-          rg: '', 
-          birthDate: '', 
-          phone: '', 
-          address: '',
+          rg: '', // RG not stored in sale usually, client lookup required if needed, or leave blank
+          birthDate: '', // Same for birthdate
+          phone: '', // Same
+          address: '', // Same
           qtdAdult: p.qtdAdult,
           qtdChild: p.qtdChild,
           qtdSenior: p.qtdSenior,
-          discount: p.discount,
-          paymentMethod: p.paymentMethod || 'VISTA',
-          transactionSource: p.transactionSource || 'MACHINE',
-          installments: p.installments || 1,
-          cardFeeRate: p.cardFeeRate || 0,
-          discountType: p.discountType || 'FIXED',
-          discountPercent: p.discountPercent || 0
+          discount: p.discount
       });
       // Try to find client data to fill remaining fields
       const client = clients.find(c => c.id === p.clientId);
@@ -224,8 +136,7 @@ const TravelPackagesView: React.FC = () => {
       setEditingPassenger(null);
       setSaleForm({ 
           saleType: 'DIRECT', agencyName: '', agencyPhone: '', paxList: '',
-          cpf: '', name: '', rg: '', birthDate: '', phone: '', address: '', qtdAdult: 0, qtdChild: 0, qtdSenior: 0, discount: 0, 
-          paymentMethod: 'VISTA', transactionSource: 'MACHINE', installments: 1, cardFeeRate: 0, discountType: 'FIXED', discountPercent: 0
+          cpf: '', name: '', rg: '', birthDate: '', phone: '', address: '', qtdAdult: 0, qtdChild: 0, qtdSenior: 0, discount: 0 
       });
   };
 
@@ -273,17 +184,8 @@ const TravelPackagesView: React.FC = () => {
           const finalPrice = Math.max(0, total - saleForm.discount);
 
           // Calculate Commission
-          let commissionRate = 0.01; // Direct
-          if (saleForm.saleType === 'AGENCY') commissionRate = 0.12;
-          if (saleForm.saleType === 'PROMOTER') commissionRate = 0.10;
-
+          let commissionRate = saleForm.saleType === 'AGENCY' ? 0.12 : 0.01;
           let commissionValue = finalPrice * commissionRate;
-          
-          // Calculate Fee Value
-          let cardFeeValue = 0;
-          if (saleForm.paymentMethod !== 'VISTA') {
-              cardFeeValue = finalPrice * (saleForm.cardFeeRate / 100);
-          }
 
           if (editingPassenger) {
               // UPDATE EXISTING
@@ -296,18 +198,11 @@ const TravelPackagesView: React.FC = () => {
                   discount: saleForm.discount,
                   agreedPrice: finalPrice,
                   saleType: saleForm.saleType,
-                  agencyName: saleForm.saleType !== 'DIRECT' ? saleForm.agencyName : '',
-                  agencyPhone: saleForm.saleType !== 'DIRECT' ? saleForm.agencyPhone : '',
-                  paxList: saleForm.saleType !== 'DIRECT' ? saleForm.paxList : '',
+                  agencyName: saleForm.saleType === 'AGENCY' ? saleForm.agencyName : '',
+                  agencyPhone: saleForm.saleType === 'AGENCY' ? saleForm.agencyPhone : '',
+                  paxList: saleForm.saleType === 'AGENCY' ? saleForm.paxList : '',
                   commissionRate,
-                  commissionValue,
-                  paymentMethod: saleForm.paymentMethod,
-                  transactionSource: saleForm.transactionSource,
-                  installments: saleForm.installments,
-                  cardFeeRate: saleForm.cardFeeRate,
-                  cardFeeValue: cardFeeValue,
-                  discountType: saleForm.discountType,
-                  discountPercent: saleForm.discountPercent
+                  commissionValue
               });
               alert("Venda atualizada com sucesso!");
               setEditingPassenger(null);
@@ -322,7 +217,7 @@ const TravelPackagesView: React.FC = () => {
                   if (!authorized) return;
               }
 
-              // 3. Register New - Correctly structuring arguments to match store.tsx
+              // 3. Register New
               registerPackageSale(
                   {
                       name: saleForm.name, // Will be Client Name OR Agency Contact Person
@@ -340,16 +235,9 @@ const TravelPackagesView: React.FC = () => {
                       discount: saleForm.discount,
                       agreedPrice: finalPrice,
                       saleType: saleForm.saleType,
-                      agencyName: saleForm.saleType !== 'DIRECT' ? saleForm.agencyName : undefined,
-                      agencyPhone: saleForm.saleType !== 'DIRECT' ? saleForm.agencyPhone : undefined,
-                      paxList: saleForm.saleType !== 'DIRECT' ? saleForm.paxList : undefined,
-                      paymentMethod: saleForm.paymentMethod,
-                      transactionSource: saleForm.transactionSource,
-                      installments: saleForm.installments,
-                      cardFeeRate: saleForm.cardFeeRate,
-                      cardFeeValue: cardFeeValue,
-                      discountType: saleForm.discountType,
-                      discountPercent: saleForm.discountPercent
+                      agencyName: saleForm.saleType === 'AGENCY' ? saleForm.agencyName : undefined,
+                      agencyPhone: saleForm.saleType === 'AGENCY' ? saleForm.agencyPhone : undefined,
+                      paxList: saleForm.saleType === 'AGENCY' ? saleForm.paxList : undefined
                   }
               );
               alert("Venda registrada com sucesso!");
@@ -358,8 +246,7 @@ const TravelPackagesView: React.FC = () => {
           // Reset
           setSaleForm({ 
               saleType: 'DIRECT', agencyName: '', agencyPhone: '', paxList: '',
-              cpf: '', name: '', rg: '', birthDate: '', phone: '', address: '', qtdAdult: 0, qtdChild: 0, qtdSenior: 0, discount: 0, 
-              paymentMethod: 'VISTA', transactionSource: 'MACHINE', installments: 1, cardFeeRate: 0, discountType: 'FIXED', discountPercent: 0
+              cpf: '', name: '', rg: '', birthDate: '', phone: '', address: '', qtdAdult: 0, qtdChild: 0, qtdSenior: 0, discount: 0 
           });
       }
   };
@@ -386,9 +273,209 @@ const TravelPackagesView: React.FC = () => {
       return Math.min(100, (paid / total) * 100);
   };
 
-  // ... [PRINT FUNCTIONS OMITTED FOR BREVITY, SAME AS BEFORE] ...
-  const handlePrintReceipt = (passenger: PackagePassenger) => { /* ... */ };
-  const handlePrintContract = (passenger: PackagePassenger) => { /* ... */ };
+  // --- PRINT FUNCTIONS ---
+
+  const handlePrintReceipt = (passenger: PackagePassenger) => {
+      const client = clients.find(c => c.id === passenger.clientId);
+      const pkg = travelPackages.find(p => p.id === passenger.packageId);
+      if (!client || !pkg) return;
+
+      const remaining = passenger.agreedPrice - passenger.paidAmount;
+      const statusText = remaining <= 0 ? "TOTAL" : "PARCIAL";
+      
+      const printContent = `
+        <html><head><title>Recibo - ${passenger.titularName}</title>
+        <style>
+            body { font-family: 'Arial', sans-serif; padding: 20px; font-size: 12px; }
+            .receipt-box { border: 1px solid #000; padding: 15px; margin-bottom: 20px; max-width: 800px; margin: 0 auto; }
+            .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #ccc; padding-bottom: 10px; margin-bottom: 10px; }
+            .logo { font-size: 24px; font-weight: bold; font-style: italic; color: #1e3a8a; }
+            .logo span { font-size: 10px; background: #1e3a8a; color: white; padding: 2px 5px; margin-left: 5px; font-style: normal; }
+            .receipt-title { font-size: 18px; font-weight: bold; text-align: right; }
+            .receipt-value { border: 1px solid #ccc; padding: 5px 15px; font-size: 16px; font-weight: bold; background: #f9f9f9; }
+            .row { display: flex; margin-bottom: 8px; align-items: baseline; }
+            .label { font-weight: bold; width: 100px; }
+            .value { flex: 1; border-bottom: 1px dotted #999; padding-left: 5px; }
+            .box-info { border: 1px solid #ccc; padding: 10px; background: #f0f0f0; margin: 10px 0; font-size: 11px; }
+            .signature { margin-top: 40px; text-align: right; }
+            .signature-line { border-top: 1px solid #000; width: 250px; display: inline-block; text-align: center; padding-top: 5px; }
+        </style>
+        </head><body>
+            <div class="receipt-box">
+                <div class="header">
+                    <div class="logo">
+                        Rabelo Tour
+                        <span>Desde 1992</span>
+                    </div>
+                    <div style="text-align: right;">
+                        <div class="receipt-title">RECIBO</div>
+                        <div style="font-size: 10px; color: #666;">CÓDIGO: ${passenger.id.slice(0,6).toUpperCase()}</div>
+                    </div>
+                    <div class="receipt-value">
+                        R$ ${passenger.paidAmount.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
+                    </div>
+                </div>
+
+                <div class="row">
+                    <span class="label">Cliente:</span>
+                    <span class="value">${client.name} ${passenger.saleType === 'AGENCY' ? `(Agência: ${passenger.agencyName})` : ''}</span>
+                </div>
+                <div class="row">
+                    <span class="label">CPF/CNPJ:</span>
+                    <span class="value">${client.cpf}</span>
+                    <span class="label" style="width: auto; margin-left: 20px;">Telefone:</span>
+                    <span class="value">${client.phone || '-'}</span>
+                </div>
+                <div class="row">
+                    <span class="label">Endereço:</span>
+                    <span class="value">${client.address || '-'}</span>
+                </div>
+
+                <div class="box-info">
+                    <strong>Histórico / Referência:</strong><br/>
+                    Pagamento ${statusText} referente ao pacote turístico: <strong>${pkg.title}</strong><br/>
+                    Data da Viagem: ${new Date(pkg.date).toLocaleDateString()}<br/>
+                    Passageiros: ${passenger.qtdAdult} Ad, ${passenger.qtdChild} Cri, ${passenger.qtdSenior} Ido.
+                </div>
+
+                <div class="row">
+                    <span class="label">Recebemos a quantia de:</span>
+                    <span class="value" style="font-style: italic;">(Valor numérico acima)</span>
+                </div>
+
+                <div style="display: flex; justify-content: space-between; margin-top: 20px; font-size: 11px; border: 1px solid #eee; padding: 10px;">
+                    <div>
+                        <strong>Valor Total Pacote:</strong> R$ ${passenger.agreedPrice.toLocaleString('pt-BR', {minimumFractionDigits: 2})}<br/>
+                        <strong>Total Pago:</strong> R$ ${passenger.paidAmount.toLocaleString('pt-BR', {minimumFractionDigits: 2})}<br/>
+                        <strong>Saldo Restante:</strong> R$ ${remaining.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
+                    </div>
+                    <div>
+                        <strong>Data do Recibo:</strong> ${new Date().toLocaleDateString()}<br/>
+                        <strong>Responsável:</strong> ${currentUser.name}
+                    </div>
+                </div>
+
+                <div class="signature">
+                    <div class="signature-line">
+                        Rabelo Tour<br/>
+                        <span style="font-size: 9px;">Assinatura Autorizada</span>
+                    </div>
+                </div>
+                
+                <div style="margin-top: 20px; font-size: 9px; color: #888; text-align: center;">
+                    Petrópolis - RJ | Contato: (24) 2237-4990 / 98824-9204
+                </div>
+            </div>
+            <script>window.print();</script>
+        </body></html>
+      `;
+      const win = window.open('', '', 'width=800,height=600');
+      if (win) { win.document.write(printContent); win.document.close(); }
+  };
+
+  const handlePrintContract = (passenger: PackagePassenger) => {
+      const client = clients.find(c => c.id === passenger.clientId);
+      const pkg = travelPackages.find(p => p.id === passenger.packageId);
+      if (!client || !pkg) return;
+
+      const printContent = `
+        <html><head><title>Contrato - ${client.name}</title>
+        <style>
+            body { font-family: 'Times New Roman', serif; font-size: 11px; padding: 30px; line-height: 1.3; text-align: justify; }
+            h1 { text-align: center; font-size: 16px; font-weight: bold; margin-bottom: 5px; }
+            h2 { text-align: center; font-size: 14px; margin-top: 0; margin-bottom: 20px; }
+            .box { border: 1px solid #000; padding: 10px; margin-bottom: 15px; }
+            .clause-title { font-weight: bold; margin-top: 10px; text-transform: uppercase; font-size: 11px; }
+            .clause-text { margin-bottom: 5px; }
+            .signatures { margin-top: 50px; display: flex; justify-content: space-between; text-align: center; }
+            .sig-line { border-top: 1px solid #000; width: 40%; padding-top: 5px; }
+        </style>
+        </head><body>
+            <h1>CONTRATO DE ADESÃO</h1>
+            <div style="border: 1px solid #000; padding: 5px; font-size: 10px; text-align: center; margin-bottom: 20px;">
+                O ato de inscrição para participação programada de viagem ou excursão implica automaticamente na adesão do participante às "condições gerais" e às "condições especificadas" estabelecidas na forma abaixo.
+            </div>
+
+            <h2>VIAGENS RABELO TOUR PETRÓPOLIS S/C LTDA.<br/>EMBRATUR Nº 10.04828057000134</h2>
+
+            <div class="box">
+                <strong>CONTRATANTE (PASSAGEIRO):</strong> ${client.name}<br/>
+                <strong>CPF:</strong> ${client.cpf} &nbsp;&nbsp; <strong>RG:</strong> ${client.rg || '___________'}<br/>
+                <strong>ENDEREÇO:</strong> ${client.address || '____________________________________________________'}<br/>
+                <strong>PACOTE:</strong> ${pkg.title} &nbsp;&nbsp; <strong>DATA:</strong> ${new Date(pkg.date).toLocaleDateString()}<br/>
+                <strong>VALOR TOTAL:</strong> R$ ${passenger.agreedPrice.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
+                ${passenger.saleType === 'AGENCY' ? `<br/><strong>AGÊNCIA:</strong> ${passenger.agencyName}` : ''}
+            </div>
+
+            <div class="clause-title">1-RESPONSABILIDADE</div>
+            <div class="clause-text">A OPERADORA é responsável pelo planejamento, organização e execução da programação e, mesmo sendo intermediária entre o USUÁRIO e os demais prestadores de serviços envolvidos na mesma, pessoas físicas ou jurídicas, respondendo pela escolha, nos termos da Lei Civil e, no que couber, nos termos da Lei de Defesa do Consumidor. Conseqüentemente, não responde, nem se solidariza por quaisquer atos, fatos ou eventos, onde a responsabilidade local ou contratual das demais pessoas físicas ou jurídicas seja direta e específica, como no caso dos transportadores aéreos, terrestres, marítimos ou ferroviários e hoteleiros, que responderão na forma da lei.</div>
+
+            <div class="clause-title">2-NOSSOS PREÇOS INCLUEM</div>
+            <div class="clause-text">Todos os serviços especificados nos programas da RABELO TOUR com acompanhamento de guia.</div>
+
+            <div class="clause-title">3-NOSSOS PREÇOS NÃO INCLUEM</div>
+            <div class="clause-text">Despesas com documentação, taxa de turismo, bebidas, inclusive nas refeições; refeições a "la carte", lavanderia, telefonemas interurbanos, bem como outras despesa não prevista no programa, inclusive vôos, pernoites ou refeições que por motivos alheios à situação da OPERADORA, venham a ocorrer fora dos especificamente previstos.</div>
+
+            <div class="clause-title">4-INSCRIÇÃO</div>
+            <div class="clause-text">Será confirmada mediante pagamento de sinal determinado pela OPERADORA (consultar tabela de preços em vigor). O saldo deverá estar regularizado até 10 (dez) dias úteis antes da saída da excursão internacional e América do Sul. Pagamentos fora destes prazos estarão sujeitos a reajuste. Pagamentos com cheques pré-datados que forem devolvidos ficará sob a responsabilidade do USUÁRIO, inclusive despesa extras: taxas de banco, honorários advocatício, cartório e etc.</div>
+
+            <div class="clause-title">5-CANCELAMENTO</div>
+            <div class="clause-text">Será aceito, com restituição da importância paga, quando formalizado até 15 dias úteis antes da partida da excursão internacional América do Sul e 10 dias úteis antes da excursão nacional. APÓS ESTE PRAZO, SERÃO DEVIDOS PELO COMPRADOR 20% DO VALOR DA EXCURSÃO. OCORRENDO NOS ÚLTIMOS TRÊS DIAS ÚTEIS ANTES DA SAÍDA, SERÃO DEVIDOS 50% DO VALOR DA EXCURSÃO, INDEPENDENTE DA APRESENTAÇÃO DE ATESTADOS MÉDICOS, CASO A EMPRESA CONSIGA REVENDER O LUGAR, INDEPENDENTE DA DATA DO CANCELAMENTO, HAVERÁ RESTITUIÇÃO INTEGRAL DA IMPORTÂNCIA PAGA.</div>
+
+            <div class="clause-title">6-TRANSFERÊNCIA</div>
+            <div class="clause-text">Será aceita desde que o passageiro indique outra pessoa para viajar em seu lugar (até 15 dias úteis antes da excursão internacional América do Sul e 10 dias úteis antes da partida da excursão nacional), caso contrário, será considerada desistência e terá o mesmo tratamento dado ao cancelamento. (item 5)</div>
+
+            <div class="clause-title">7-ABANDONO</div>
+            <div class="clause-text">O passageiro que abandonar a viagem, ou parte dela após a mesma haver sido iniciada, não terá direito a reembolso.</div>
+
+            <div class="clause-title">8-DESLIGAMENTO</div>
+            <div class="clause-text">A Operadora reserva-se o direito de desligar do grupo o passageiro que venha prejudicar a excursão.</div>
+
+            <div class="clause-title">9-TAXA CAMBIAL E PAGAMENTO</div>
+            <div class="clause-text">Os cálculos para conversão em reais dos preços das excursões internacionais América do Sul, serão pelo valor do dólar turismo. Obs: Na compra através do Agente de Viagens as garantias acima apenas serão válidas caso o pagamento tenha sido enviado a RABELO TOUR, em tempo hábil, por Ordem Bancária.</div>
+
+            <div class="clause-title">10-TRANSPORTE</div>
+            <div class="clause-text">a) A RABELO TOUR freta ônibus de empresas selecionadas, estes ônibus possuem equipamentos de última geração, ar condicionado, sanitário químico, frigobar, poltronas reclináveis, janelas panorâmicas e sistema de som.<br/>b) Para roteiros com trajetos rodoviários de curta duração, translados, city tour, e outros serviços poderão ser realizados em veículos menores tipo: van, micro ônibus e ônibus sem ar condicionado.</div>
+
+            <div class="clause-title">11-HOTELARIA</div>
+            <div class="clause-text">a) A RABELO TOUR, utiliza hotéis padrão 3, 4 e 5 estrelas, não sendo possível a hospedagem nos hotéis normalmente utilizados pela RABELO TOUR, por estarem sem disponibilidade ou terem sofrido quedas no padrão de serviço, estes serão substituídos por outros hotéis da mesma classificação. Em caso de ser só possível, por razões de força maior, a obtenção de hotéis de classificação inferior, o cliente será reembolsado pela diferença do preço entre o hotel previsto no programa e o hotel utilizado.<br/>b) Circunstâncias alheias a nossa vontade, como quebra de contrato e desacordo sobre tarifas ou qualidade na prestação de serviços, poderão ocorrer, ocasionando a substituição dos hotéis mencionados.<br/>c) A hospedagem nas excursões é prevista em apartamentos duplos. O passageiro já inscrito que não puder ser acomodado em apartamentos com outra pessoa, será alojado individual, pagando 70% (setenta por cento) da diferença correspondente (individual bonificado), a qual será cobrado pela operadora três dias antes da partida.<br/>d) O apartamento triplo é formado por uma cama adicional, nem sempre do mesmo padrão estabelecido para o apartamento duplo. A Operadora não se responsabiliza por eventuais problemas causados por este tipo de acomodação quando solicitado pelo passageiro, não havendo, inclusive, implicação no preço pago pela excursão.<br/>e) As diárias dos hotéis iniciam-se às 12:00 h do dia da chegada do hóspede e vencem às 12:00 h do dia de sua partida (horário máximo para a desocupação do apartamento).</div>
+
+            <div class="clause-title">12-BAGAGEM PERMITIDA</div>
+            <div class="clause-text">a) Será permitido o transporte de uma mala por passageiro, cujas medidas não ultrapassem 70 x 50 x 20 centímetros.<br/>b) Os passageiros terão direito, ainda, de transportar consigo 1 (um) pequeno volume de mão (tipo bolsa RABELO TOUR), o qual deverá estar sempre em seu poder.<br/>c) Aos Srs. Passageiros é facultado o uso do porta bagagens do ônibus exclusivamente para transportar objetos que possam ser acondicionados em sua mala (BAGAGEM PERMITIDA);<br/>d) O extravio comprovado de malas com etiquetas RABELO TOUR transportada nos traslados e viagens terrestres, desde que considerada bagagem permitida, será ressarcido desde que comprovada a falha da Operadora, como instituem os Arts. 90 a 98 do Decreto Federal nº 92.353, que regulamenta os Transportes Rodoviários Interestaduais e Internacionais de Passageiros, cujo valor máximo não ultrapassará a 5 (cinco) salários mínimos;<br/>e) Dinheiro, jóias ou qualquer objeto de valor (não componente de vestuário), não devem ser transportados nas malas, pois não estão amparados pelo Decreto Federal nº 92.353.</div>
+
+            <div class="clause-title">13-DOCUMENTOS DE VIAGEM</div>
+            <div class="clause-text">Indispensável portarem Carteira de Identidade de órgão de Segurança Pública (Félix Pacheco, Pedro Mello, etc.) ou Passaporte atualizado. Qualquer outro tipo de Carteira de Identidade (Militar, OAB, CRM, Pereira Faustino, etc.), não é aceita para finalidade de viagem internacional. Carteiras de Identidade em mau estado de conservação, com rasura, não plastificada, bem como as de modelo antigo (com foto desatualizada) e xerox não são válidas.<br/>- MENORES DE 21 ANOS – Devem portar Carteira de Identidade (dentro dos requisitos especificados acima) ou Passaporte atualizado, e autorização do Juizado de Menores se desacompanhados de um dos genitores, ou de ambos, ou havendo discordância entre eles sobre o consentimento da viagem, conforme Artigo 2º, Portaria 13/95.<br/>- ESTRANGEIROS RESIDENTES NO BRASIL (INCLUSIVE COM DULA NACIONALIDADE) E TURISTAS EM TRÂNSITO – Passaporte, com vistos dos países a serem visitados, acompanhado da Célula de Identidade de Estrangeiro.<br/>A FALTA DE DOCUMENTAÇÃO ADEQUADA EXIME A RABELO TOUR DE QUALQUER RESPONSABILIDADE, INCLUSIVE REEMBOLSO.</div>
+
+            <div class="clause-title">14-IMPORTANTE</div>
+            <div class="clause-text">a) Para o correto andamento da excursão, ou por motivos técnicos, a ordem do programa poderá ser invertida ou alterada, sem prejuízo de total cumprimento da programação;<br/>b) A interrupção do tráfego nas estradas normalmente nos programas exime a RABELO TOUR de responsabilidade pela continuação da viagem. Pernoites e refeições que excedem ao total programado, bem como viagem(ns) por avião que resulte(m) desta interrupção, serão pagos diretamente pelos passageiros aos Hotéis, Restaurantes e Cias. Aéreas, não cabendo qualquer reembolso por parte da RABELO TOUR.;<br/>c) A Empresa garante a realização das excursões programadas desde que consiga a inscrição de, no mínimo, 25 passageiros. Caso este número mínimo não seja alcançado até 5 (cinco) dias antes da viagem, a mesma será cancelada, sendo o cliente imediatamente ressarcido com o valor total pago.</div>
+
+            <div class="clause-title">15-RECLAMÇÕES</div>
+            <div class="clause-text">No caso de reclamações quanto à prestação de serviço, o USUÁRIO as encaminhará por escrito ao Operador, em 30 dias após o encerramento dos serviços, conforme Artigo 26, item I, Parágrafo 1º do Código de Defesa do Consumidor. Senão o fizer, após este prazo a relação contratual será considerada perfeita e acabada, desobrigando o Operador de qualquer responsabilidade, salvo quanto a eventuais danos. A arbitragem, de comum acordo, poderá ser adotada para dirimir quaisquer dúvidas pendentes da aplicação do presente contrato. Nenhuma reclamação será considerada caso o usuário, ao invés de utilizar quaisquer dos procedimentos legais previstos na Lei nº 8078/90, preferir o uso dos meio de comunicação, ocasionando publicidade negativa que produzirá à Operadora danos materiais, de responsabilidade do usuário.</div>
+
+            <div class="clause-title">16-FORO DE ELEIÇÃO</div>
+            <div class="clause-text">Para dirimir toda e qualquer dúvida proveniente da aplicação do presente contrato, por eleição, os USUÁRIOS escolhem o Foro da cidade do Rio de Janeiro, renunciando a todo e qualquer outro por mais privilegiados que sejam.</div>
+
+            <div class="clause-title">17-CONCORDÂNCIA</div>
+            <div class="clause-text">Ao participar de uma das excursões da RABELO TOUR, o USUÁRIO, por si, ou através da Agência de Viagens sua mandatária, declara conhecer, pelo que adere contratualmente, as CONDIÇÕES GERAIS e específicas para operação do programa adquirido, comprometendo-se, quando for o caso, por si e seus familiares.</div>
+
+            <div style="margin-top: 30px;">Petrópolis, ${new Date().toLocaleDateString()}</div>
+
+            <div class="signatures">
+                <div class="sig-line">
+                    Assinatura do Agente de Viagens Vendedor
+                </div>
+                <div class="sig-line">
+                    <strong>${client.name}</strong><br/>
+                    Assinatura do Cliente
+                </div>
+            </div>
+            
+            <script>window.print();</script>
+        </body></html>
+      `;
+      const win = window.open('', '', 'width=800,height=600');
+      if (win) { win.document.write(printContent); win.document.close(); }
+  };
 
   if (selectedPackage) {
       // DETAILS VIEW
@@ -399,18 +486,10 @@ const TravelPackagesView: React.FC = () => {
 
       // Calculations for the current form state (Preview)
       const currentTotal = (saleForm.qtdAdult * selectedPackage.adultPrice) + 
-                           (saleForm.qtdChild * selectedPackage.childPrice) + 
+                           (saleForm.qtdChild * selectedPackage.childPrice) +
                            (saleForm.qtdSenior * selectedPackage.seniorPrice);
       const currentFinal = Math.max(0, currentTotal - saleForm.discount);
-      
-      let estimatedCommission = 0;
-      if (saleForm.saleType === 'AGENCY') estimatedCommission = currentFinal * 0.12;
-      else if (saleForm.saleType === 'PROMOTER') estimatedCommission = currentFinal * 0.10;
-      else estimatedCommission = currentFinal * 0.01;
-      
-      const estimatedCardFee = (saleForm.paymentMethod !== 'VISTA') 
-          ? currentFinal * (saleForm.cardFeeRate / 100)
-          : 0;
+      const estimatedCommission = currentFinal * (saleForm.saleType === 'AGENCY' ? 0.12 : 0.01);
 
       return (
           <div className="space-y-6 animate-fade-in">
@@ -454,113 +533,28 @@ const TravelPackagesView: React.FC = () => {
                               </div>
                               <form onSubmit={handleRegisterSale}>
                                   
-                                  {/* TYPE OF SALE & PAYMENT METHOD SELECTION */}
-                                  <div className="mb-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-                                      <div className="bg-white p-3 rounded border border-slate-200">
-                                          <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Canal de Venda</label>
-                                          <div className="flex flex-col gap-2">
-                                              <div className="flex gap-4">
-                                                  <label className="flex items-center gap-2 cursor-pointer">
-                                                      <input 
-                                                        type="radio" name="saleType" value="DIRECT"
-                                                        checked={saleForm.saleType === 'DIRECT'}
-                                                        onChange={() => setSaleForm({...saleForm, saleType: 'DIRECT'})}
-                                                        className="text-emerald-600 focus:ring-emerald-500"
-                                                      />
-                                                      <span className="text-sm font-medium">👤 Direta (1%)</span>
-                                                  </label>
-                                                  <label className="flex items-center gap-2 cursor-pointer">
-                                                      <input 
-                                                        type="radio" name="saleType" value="AGENCY"
-                                                        checked={saleForm.saleType === 'AGENCY'}
-                                                        onChange={() => setSaleForm({...saleForm, saleType: 'AGENCY'})}
-                                                        className="text-emerald-600 focus:ring-emerald-500"
-                                                      />
-                                                      <span className="text-sm font-medium">🏢 Agência (12%)</span>
-                                                  </label>
-                                              </div>
-                                              <label className="flex items-center gap-2 cursor-pointer mt-1">
-                                                  <input 
-                                                    type="radio" name="saleType" value="PROMOTER"
-                                                    checked={saleForm.saleType === 'PROMOTER'}
-                                                    onChange={() => setSaleForm({...saleForm, saleType: 'PROMOTER'})}
-                                                    className="text-emerald-600 focus:ring-emerald-500"
-                                                  />
-                                                  <span className="text-sm font-medium text-indigo-700 font-bold">📢 Promotor (10%)</span>
-                                              </label>
-                                          </div>
-                                      </div>
-
-                                      <div className="bg-white p-3 rounded border border-slate-200">
-                                          <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Método de Pagamento</label>
-                                          <div className="flex flex-col gap-2">
-                                              <label className="flex items-center gap-2 cursor-pointer">
-                                                  <input 
-                                                    type="radio" name="paymentMethod" value="VISTA"
-                                                    checked={saleForm.paymentMethod === 'VISTA'}
-                                                    onChange={() => {
-                                                        setSaleForm({...saleForm, paymentMethod: 'VISTA', cardFeeRate: 0, installments: 1, discountType: 'FIXED', discountPercent: 0});
-                                                    }}
-                                                    className="text-emerald-600 focus:ring-emerald-500"
-                                                  />
-                                                  <span className="text-sm font-medium">À Vista (Din/Pix)</span>
-                                              </label>
-                                              <div className="flex gap-4">
-                                                  <label className="flex items-center gap-2 cursor-pointer">
-                                                      <input 
-                                                        type="radio" name="paymentMethod" value="CARTAO_DEBITO"
-                                                        checked={saleForm.paymentMethod === 'CARTAO_DEBITO'}
-                                                        onChange={() => {
-                                                            setSaleForm({...saleForm, paymentMethod: 'CARTAO_DEBITO', discount: 0, installments: 1});
-                                                        }}
-                                                        className="text-emerald-600 focus:ring-emerald-500"
-                                                      />
-                                                      <span className="text-sm font-medium">Débito</span>
-                                                  </label>
-                                                  <label className="flex items-center gap-2 cursor-pointer">
-                                                      <input 
-                                                        type="radio" name="paymentMethod" value="CARTAO_CREDITO"
-                                                        checked={saleForm.paymentMethod === 'CARTAO_CREDITO'}
-                                                        onChange={() => {
-                                                            setSaleForm({...saleForm, paymentMethod: 'CARTAO_CREDITO', discount: 0, installments: 1});
-                                                        }}
-                                                        className="text-emerald-600 focus:ring-emerald-500"
-                                                      />
-                                                      <span className="text-sm font-medium">Crédito</span>
-                                                  </label>
-                                              </div>
-                                          </div>
-                                          
-                                          {/* Payment Details Sub-section */}
-                                          {saleForm.paymentMethod !== 'VISTA' && (
-                                              <div className="mt-3 pt-3 border-t border-slate-100 grid grid-cols-2 gap-2 animate-fade-in">
-                                                  <div>
-                                                      <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Origem</label>
-                                                      <select 
-                                                          value={saleForm.transactionSource}
-                                                          onChange={e => setSaleForm({...saleForm, transactionSource: e.target.value as any})}
-                                                          className="w-full border p-1 rounded text-xs bg-slate-50"
-                                                      >
-                                                          <option value="MACHINE">Maquininha</option>
-                                                          <option value="LINK">Link Pagto</option>
-                                                      </select>
-                                                  </div>
-                                                  {saleForm.paymentMethod === 'CARTAO_CREDITO' && (
-                                                      <div>
-                                                          <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Parcelas</label>
-                                                          <select 
-                                                              value={saleForm.installments}
-                                                              onChange={e => setSaleForm({...saleForm, installments: parseInt(e.target.value)})}
-                                                              className="w-full border p-1 rounded text-xs bg-slate-50"
-                                                          >
-                                                              {Array.from({length: 12}, (_, i) => i + 1).map(num => (
-                                                                  <option key={num} value={num}>{num}x</option>
-                                                              ))}
-                                                          </select>
-                                                      </div>
-                                                  )}
-                                              </div>
-                                          )}
+                                  {/* TYPE OF SALE SELECTION */}
+                                  <div className="mb-4 bg-white p-3 rounded border border-slate-200">
+                                      <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Tipo de Venda (Comissão)</label>
+                                      <div className="flex gap-4">
+                                          <label className="flex items-center gap-2 cursor-pointer">
+                                              <input 
+                                                type="radio" name="saleType" value="DIRECT"
+                                                checked={saleForm.saleType === 'DIRECT'}
+                                                onChange={() => setSaleForm({...saleForm, saleType: 'DIRECT'})}
+                                                className="text-emerald-600 focus:ring-emerald-500"
+                                              />
+                                              <span className="text-sm font-medium">Venda Direta (1%)</span>
+                                          </label>
+                                          <label className="flex items-center gap-2 cursor-pointer">
+                                              <input 
+                                                type="radio" name="saleType" value="AGENCY"
+                                                checked={saleForm.saleType === 'AGENCY'}
+                                                onChange={() => setSaleForm({...saleForm, saleType: 'AGENCY'})}
+                                                className="text-emerald-600 focus:ring-emerald-500"
+                                              />
+                                              <span className="text-sm font-medium">Agência (12%)</span>
+                                          </label>
                                       </div>
                                   </div>
 
@@ -574,31 +568,25 @@ const TravelPackagesView: React.FC = () => {
                                           />
                                       </div>
                                       <div className="md:col-span-2">
-                                          <label className="text-xs font-bold text-slate-500">
-                                              {saleForm.saleType === 'AGENCY' ? 'Nome do Contato na Agência' : saleForm.saleType === 'PROMOTER' ? 'Nome do Cliente' : 'Nome Completo Cliente'}
-                                          </label>
+                                          <label className="text-xs font-bold text-slate-500">{saleForm.saleType === 'AGENCY' ? 'Nome do Contato na Agência' : 'Nome Completo Cliente'}</label>
                                           <input 
                                             value={saleForm.name} onChange={e => setSaleForm({...saleForm, name: e.target.value})}
                                             className="w-full border p-2 rounded text-sm" required
                                           />
                                       </div>
                                       
-                                      {/* AGENCY OR PROMOTER SPECIFIC FIELDS */}
-                                      {saleForm.saleType !== 'DIRECT' && (
+                                      {/* AGENCY SPECIFIC FIELDS */}
+                                      {saleForm.saleType === 'AGENCY' && (
                                           <>
                                               <div className="md:col-span-2">
-                                                  <label className="text-xs font-bold text-slate-500">
-                                                      {saleForm.saleType === 'AGENCY' ? 'Nome da Agência' : 'Nome do Promotor'}
-                                                  </label>
+                                                  <label className="text-xs font-bold text-slate-500">Nome da Agência</label>
                                                   <input 
                                                     value={saleForm.agencyName} onChange={e => setSaleForm({...saleForm, agencyName: e.target.value})}
                                                     className="w-full border p-2 rounded text-sm" required
                                                   />
                                               </div>
                                               <div>
-                                                  <label className="text-xs font-bold text-slate-500">
-                                                      {saleForm.saleType === 'AGENCY' ? 'Telefone Agência' : 'Telefone Promotor'}
-                                                  </label>
+                                                  <label className="text-xs font-bold text-slate-500">Telefone Agência</label>
                                                   <input 
                                                     value={saleForm.agencyPhone} onChange={e => setSaleForm({...saleForm, agencyPhone: e.target.value})}
                                                     className="w-full border p-2 rounded text-sm"
@@ -669,77 +657,21 @@ const TravelPackagesView: React.FC = () => {
                                               />
                                           </div>
                                       </div>
-                                      
-                                      <div className="flex justify-between items-center border-t border-slate-100 pt-2 gap-4">
-                                          <div className="flex-1">
-                                              {saleForm.paymentMethod === 'VISTA' ? (
-                                                  <div className="flex flex-col">
-                                                      <div className="flex justify-between items-center mb-1">
-                                                          <label className="text-xs font-bold text-green-600">Desconto à Vista</label>
-                                                          {/* Toggle Type */}
-                                                          <div className="flex bg-slate-100 rounded-lg p-0.5 border border-slate-200">
-                                                              <button
-                                                                type="button"
-                                                                onClick={() => handleToggleDiscountType('FIXED')}
-                                                                className={`text-[10px] px-3 py-1 rounded-md font-bold transition-all ${saleForm.discountType === 'FIXED' ? 'bg-white shadow text-slate-800' : 'text-slate-400 hover:text-slate-600'}`}
-                                                              >
-                                                                  R$
-                                                              </button>
-                                                              <button
-                                                                type="button"
-                                                                onClick={() => handleToggleDiscountType('PERCENTAGE')}
-                                                                className={`text-[10px] px-3 py-1 rounded-md font-bold transition-all ${saleForm.discountType === 'PERCENTAGE' ? 'bg-white shadow text-slate-800' : 'text-slate-400 hover:text-slate-600'}`}
-                                                              >
-                                                                  %
-                                                              </button>
-                                                          </div>
-                                                      </div>
-                                                      
-                                                      {saleForm.discountType === 'FIXED' ? (
-                                                          <div className="flex items-center border border-green-300 rounded overflow-hidden bg-white focus-within:ring-2 focus-within:ring-green-500">
-                                                              <span className="bg-green-100 text-green-600 px-2 py-1 font-bold border-r border-green-300 text-xs">R$</span>
-                                                              <input 
-                                                                type="text" 
-                                                                inputMode="numeric"
-                                                                className="p-1 outline-none text-right font-medium text-green-700 w-full" 
-                                                                value={saleForm.discount.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
-                                                                onChange={e => handleDiscountChange(e.target.value)}
-                                                                placeholder="0,00"
-                                                              />
-                                                          </div>
-                                                      ) : (
-                                                          <div className="flex items-center border border-green-300 rounded overflow-hidden bg-white focus-within:ring-2 focus-within:ring-green-500">
-                                                              <input 
-                                                                type="number" min="0" max="100"
-                                                                className="p-1 outline-none text-right font-medium text-green-700 w-full" 
-                                                                value={saleForm.discountPercent}
-                                                                onChange={e => setSaleForm({...saleForm, discountPercent: parseFloat(e.target.value) || 0})}
-                                                                placeholder="0"
-                                                              />
-                                                              <span className="bg-green-100 text-green-600 px-2 py-1 font-bold border-l border-green-300 text-xs">%</span>
-                                                          </div>
-                                                      )}
-                                                      {saleForm.discountType === 'PERCENTAGE' && saleForm.discount > 0 && (
-                                                          <p className="text-[10px] text-green-600 mt-1 font-bold text-right">
-                                                              - R$ {saleForm.discount.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
-                                                          </p>
-                                                      )}
-                                                  </div>
-                                              ) : (
-                                                  <div className="flex flex-col bg-red-50 p-2 rounded border border-red-100">
-                                                      <div className="flex justify-between items-center mb-1">
-                                                          <label className="text-xs font-bold text-red-600">Taxa Calculada</label>
-                                                          <span className="text-xs font-bold text-red-800">{saleForm.cardFeeRate}%</span>
-                                                      </div>
-                                                      {estimatedCardFee > 0 && (
-                                                          <p className="text-[10px] text-red-500 mt-1 font-bold">
-                                                              Custo da Taxa: R$ {estimatedCardFee.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
-                                                          </p>
-                                                      )}
-                                                  </div>
-                                              )}
+                                      <div className="flex justify-between items-center border-t border-slate-100 pt-2">
+                                          <div className="flex flex-col">
+                                              <label className="text-xs font-bold text-slate-500 mr-2">Desconto (R$)</label>
+                                              <div className="flex items-center border border-slate-300 rounded overflow-hidden bg-white focus-within:ring-2 focus-within:ring-emerald-500 w-32">
+                                                  <span className="bg-slate-100 text-slate-600 px-2 py-1 font-bold border-r border-slate-300 text-xs">R$</span>
+                                                  <input 
+                                                    type="text" 
+                                                    inputMode="numeric"
+                                                    className="p-1 outline-none text-right font-medium text-red-600 w-full" 
+                                                    value={saleForm.discount.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
+                                                    onChange={e => handleDiscountChange(e.target.value)}
+                                                    placeholder="0,00"
+                                                  />
+                                              </div>
                                           </div>
-
                                           <div className="text-right">
                                               <span className="text-xs text-slate-500 block">Total a Pagar</span>
                                               <span className="text-lg font-bold text-emerald-600">R$ {currentFinal.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
@@ -761,28 +693,11 @@ const TravelPackagesView: React.FC = () => {
                                   const client = clients.find(c => c.id === p.clientId);
                                   return (
                                       <div key={p.id} className={`bg-white border p-4 rounded-lg hover:shadow-md transition-shadow relative ${editingPassenger?.id === p.id ? 'border-blue-500 ring-2 ring-blue-100' : 'border-slate-200'}`}>
-                                          <div className="absolute top-2 right-2 flex gap-1">
-                                              {p.saleType === 'AGENCY' && (
-                                                  <span className="text-[10px] bg-purple-100 text-purple-700 px-2 py-0.5 rounded font-bold uppercase border border-purple-200">
-                                                      Agência
-                                                  </span>
-                                              )}
-                                              {p.saleType === 'PROMOTER' && (
-                                                  <span className="text-[10px] bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded font-bold uppercase border border-indigo-200">
-                                                      Promotor
-                                                  </span>
-                                              )}
-                                              {p.paymentMethod === 'CARTAO_CREDITO' || p.paymentMethod === 'CARTAO_DEBITO' ? (
-                                                  <span className="text-[10px] bg-orange-100 text-orange-700 px-2 py-0.5 rounded font-bold uppercase border border-orange-200">
-                                                      {p.paymentMethod === 'CARTAO_CREDITO' ? `Crédito ${p.installments}x` : 'Débito'}
-                                                  </span>
-                                              ) : (
-                                                  <span className="text-[10px] bg-green-100 text-green-700 px-2 py-0.5 rounded font-bold uppercase border border-green-200">
-                                                      À Vista
-                                                  </span>
-                                              )}
-                                          </div>
-
+                                          {p.saleType === 'AGENCY' && (
+                                              <div className="absolute top-2 right-2 text-[10px] bg-purple-100 text-purple-700 px-2 py-0.5 rounded font-bold uppercase border border-purple-200">
+                                                  Agência: {p.agencyName}
+                                              </div>
+                                          )}
                                           <div className="flex justify-between items-start mb-2">
                                               <div>
                                                   <div className="flex items-center gap-2">
@@ -803,14 +718,9 @@ const TravelPackagesView: React.FC = () => {
                                                   </div>
                                                   {p.paxList && (
                                                       <div className="mt-2 p-2 bg-slate-50 rounded text-xs text-slate-600 border border-slate-100">
-                                                          <strong>PAX Lista:</strong><br/>
+                                                          <strong>PAX Agência:</strong><br/>
                                                           {p.paxList}
                                                       </div>
-                                                  )}
-                                                  {p.agencyName && (
-                                                      <p className="mt-1 text-xs text-indigo-600 font-bold">
-                                                          Venda por: {p.agencyName}
-                                                      </p>
                                                   )}
                                               </div>
                                               <div className="text-right mt-6">
@@ -818,17 +728,8 @@ const TravelPackagesView: React.FC = () => {
                                                       {p.status === 'PAID' ? 'QUITADO' : p.status === 'PARTIAL' ? 'PARCIAL' : 'PENDENTE'}
                                                   </span>
                                                   <p className="font-bold text-slate-800">R$ {p.agreedPrice.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</p>
-                                                  {p.discount > 0 && (
-                                                      <p className="text-xs text-green-600 font-bold">
-                                                          - Desc: R$ {p.discount.toLocaleString('pt-BR', {minimumFractionDigits: 2})} 
-                                                          {p.discountType === 'PERCENTAGE' && ` (${p.discountPercent}%)`}
-                                                      </p>
-                                                  )}
-                                                  {p.cardFeeValue && p.cardFeeValue > 0 && (
-                                                      <p className="text-[10px] text-red-500 font-bold mt-1">
-                                                          Taxa ({p.cardFeeRate}%): R$ {p.cardFeeValue.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
-                                                      </p>
-                                                  )}
+                                                  {p.discount > 0 && <p className="text-xs text-red-500">- Desc: R$ {p.discount.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</p>}
+                                                  <p className="text-[10px] text-slate-400 mt-1">Comissão: R$ {p.commissionValue?.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</p>
                                               </div>
                                           </div>
                                           
@@ -1240,8 +1141,6 @@ const TravelPackagesView: React.FC = () => {
                                                 <td className="p-3">
                                                     {p.saleType === 'AGENCY' ? 
                                                         <span className="bg-purple-100 text-purple-700 px-2 py-0.5 rounded text-xs font-bold">Agência</span> : 
-                                                        p.saleType === 'PROMOTER' ? 
-                                                        <span className="bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded text-xs font-bold">Promotor</span> :
                                                         <span className="bg-slate-100 text-slate-600 px-2 py-0.5 rounded text-xs font-bold">Direta</span>
                                                     }
                                                 </td>

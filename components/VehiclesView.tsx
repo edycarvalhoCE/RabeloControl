@@ -1,9 +1,8 @@
-
 import React, { useState } from 'react';
 import { useStore } from '../services/store';
 
 const VehiclesView: React.FC = () => {
-  const { buses, addBus, updateBusStatus, fuelRecords } = useStore();
+  const { buses, addBus, updateBusStatus } = useStore();
   const [showAddForm, setShowAddForm] = useState(false);
   const [newBus, setNewBus] = useState({ 
     plate: '', 
@@ -36,17 +35,6 @@ const VehiclesView: React.FC = () => {
     // We ignore BUSY status for this simple toggle, or we can force it to MAINTENANCE from BUSY too.
     const newStatus = currentStatus === 'MAINTENANCE' ? 'AVAILABLE' : 'MAINTENANCE';
     updateBusStatus(busId, newStatus);
-  };
-
-  const calculateMedia = (busId: string) => {
-      const records = fuelRecords.filter(r => r.busId === busId && r.dieselLiters > 0 && r.kmEnd > r.kmStart);
-      if (records.length === 0) return 0;
-
-      const totalLiters = records.reduce((acc, r) => acc + r.dieselLiters, 0);
-      const totalKm = records.reduce((acc, r) => acc + (r.kmEnd - r.kmStart), 0);
-
-      if (totalLiters === 0) return 0;
-      return totalKm / totalLiters;
   };
 
   return (
@@ -120,63 +108,51 @@ const VehiclesView: React.FC = () => {
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {buses.map(bus => {
-              const media = calculateMedia(bus.id);
-              return (
-                  <div key={bus.id} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
-                      <div className={`h-2 w-full ${bus.status === 'AVAILABLE' ? 'bg-green-500' : bus.status === 'MAINTENANCE' ? 'bg-red-500' : 'bg-blue-500'}`}></div>
-                      <div className="p-5 flex-1">
-                          <div className="flex justify-between items-start mb-2">
-                              <div>
-                                  <h3 className="text-xl font-bold text-slate-800">{bus.plate}</h3>
-                                  <p className="text-sm text-slate-500">{bus.model}</p>
-                              </div>
-                              <span className={`px-2 py-1 rounded text-xs font-bold ${
-                                  bus.status === 'AVAILABLE' ? 'bg-green-100 text-green-700' : 
-                                  bus.status === 'MAINTENANCE' ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'
-                              }`}>
-                                  {bus.status === 'AVAILABLE' ? 'Disponível' : bus.status === 'MAINTENANCE' ? 'Em Manutenção' : 'Em Viagem'}
-                              </span>
+          {buses.map(bus => (
+              <div key={bus.id} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
+                  <div className={`h-2 w-full ${bus.status === 'AVAILABLE' ? 'bg-green-500' : bus.status === 'MAINTENANCE' ? 'bg-red-500' : 'bg-blue-500'}`}></div>
+                  <div className="p-5 flex-1">
+                      <div className="flex justify-between items-start mb-2">
+                          <div>
+                              <h3 className="text-xl font-bold text-slate-800">{bus.plate}</h3>
+                              <p className="text-sm text-slate-500">{bus.model}</p>
                           </div>
-                          
-                          {/* Media Box */}
-                          <div className="my-3 bg-slate-50 border border-slate-100 p-2 rounded flex justify-between items-center">
-                              <span className="text-xs font-bold text-slate-500 uppercase">Média Consumo</span>
-                              <span className={`font-bold text-lg ${media > 3.5 ? 'text-green-600' : media > 2.5 ? 'text-yellow-600' : 'text-red-600'}`}>
-                                  {media.toFixed(2)} Km/L
-                              </span>
-                          </div>
-
-                          <div className="flex flex-wrap gap-2">
-                              <span className="bg-slate-100 text-slate-600 text-xs px-2 py-1 rounded-full font-medium">
-                                💺 {bus.capacity} Lugares
-                              </span>
-                              {bus.features && bus.features.slice(0,3).map((feat, idx) => (
-                                  <span key={idx} className="bg-blue-50 text-blue-700 text-xs px-2 py-1 rounded-full border border-blue-100">
-                                      {feat}
-                                  </span>
-                              ))}
-                              {bus.features.length > 3 && <span className="text-xs text-slate-400 self-center">+{bus.features.length - 3}</span>}
-                          </div>
+                          <span className={`px-2 py-1 rounded text-xs font-bold ${
+                              bus.status === 'AVAILABLE' ? 'bg-green-100 text-green-700' : 
+                              bus.status === 'MAINTENANCE' ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'
+                          }`}>
+                              {bus.status === 'AVAILABLE' ? 'Disponível' : bus.status === 'MAINTENANCE' ? 'Em Manutenção' : 'Em Viagem'}
+                          </span>
                       </div>
                       
-                      <div className="bg-slate-50 p-3 border-t border-slate-100 flex justify-between items-center">
-                          <span className="text-xs text-slate-500 font-medium uppercase tracking-wider">Ações Rápidas</span>
-                          <button 
-                            onClick={() => handleStatusToggle(bus.id, bus.status)}
-                            disabled={bus.status === 'BUSY'}
-                            className={`text-xs font-bold px-3 py-1.5 rounded transition-colors ${
-                                bus.status === 'MAINTENANCE' 
-                                ? 'bg-green-600 text-white hover:bg-green-700' 
-                                : 'bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed'
-                            }`}
-                          >
-                              {bus.status === 'MAINTENANCE' ? 'Liberar Veículo' : 'Por em Manutenção'}
-                          </button>
+                      <div className="mt-4 flex flex-wrap gap-2">
+                          <span className="bg-slate-100 text-slate-600 text-xs px-2 py-1 rounded-full font-medium">
+                            💺 {bus.capacity} Lugares
+                          </span>
+                          {bus.features && bus.features.map((feat, idx) => (
+                              <span key={idx} className="bg-blue-50 text-blue-700 text-xs px-2 py-1 rounded-full border border-blue-100">
+                                  {feat}
+                              </span>
+                          ))}
                       </div>
                   </div>
-              );
-          })}
+                  
+                  <div className="bg-slate-50 p-3 border-t border-slate-100 flex justify-between items-center">
+                      <span className="text-xs text-slate-500 font-medium uppercase tracking-wider">Ações Rápidas</span>
+                      <button 
+                        onClick={() => handleStatusToggle(bus.id, bus.status)}
+                        disabled={bus.status === 'BUSY'}
+                        className={`text-xs font-bold px-3 py-1.5 rounded transition-colors ${
+                            bus.status === 'MAINTENANCE' 
+                            ? 'bg-green-600 text-white hover:bg-green-700' 
+                            : 'bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed'
+                        }`}
+                      >
+                          {bus.status === 'MAINTENANCE' ? 'Liberar Veículo' : 'Por em Manutenção'}
+                      </button>
+                  </div>
+              </div>
+          ))}
       </div>
     </div>
   );

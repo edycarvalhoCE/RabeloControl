@@ -6,7 +6,7 @@ import { getFinancialInsight } from '../services/geminiService';
 import { Logo } from './Logo';
 
 const Dashboard: React.FC = () => {
-  const { bookings, transactions, buses, parts, currentUser, users, timeOffs, updateTimeOffStatus, settings, fuelRecords } = useStore();
+  const { bookings, transactions, buses, parts, currentUser, users, timeOffs, updateTimeOffStatus, settings } = useStore();
   const [insight, setInsight] = useState<string>('');
   const [loadingAi, setLoadingAi] = useState(false);
 
@@ -22,11 +22,6 @@ const Dashboard: React.FC = () => {
   
   const totalExpenses = transactions
     .filter(t => t.type === 'EXPENSE')
-    .reduce((acc, curr) => acc + curr.amount, 0);
-
-  // Calculate Specific Expense Categories
-  const totalCardFees = transactions
-    .filter(t => t.type === 'EXPENSE' && t.category === 'Taxas Cartão')
     .reduce((acc, curr) => acc + curr.amount, 0);
 
   const profit = totalRevenue - totalExpenses;
@@ -71,15 +66,6 @@ const Dashboard: React.FC = () => {
     .sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime())
     .slice(0, 10); // Show last 10 records
 
-  // FUEL EFFICIENCY CALCULATION
-  const busEfficiency = buses.map(bus => {
-      const records = fuelRecords.filter(r => r.busId === bus.id && r.dieselLiters > 0 && r.kmEnd > r.kmStart);
-      const totalLiters = records.reduce((acc, r) => acc + r.dieselLiters, 0);
-      const totalKm = records.reduce((acc, r) => acc + (r.kmEnd - r.kmStart), 0);
-      const media = totalLiters > 0 ? totalKm / totalLiters : 0;
-      return { ...bus, media };
-  }).sort((a,b) => b.media - a.media).slice(0, 5); // Top 5 best
-
   const formatDateString = (dateStr: string) => {
     if(!dateStr) return '';
     const [year, month, day] = dateStr.split('-');
@@ -122,33 +108,25 @@ const Dashboard: React.FC = () => {
       )}
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 relative overflow-hidden">
           <div className="absolute top-0 right-0 w-16 h-16 bg-green-50 rounded-bl-full -mr-2 -mt-2"></div>
-          <p className="text-slate-500 text-xs font-bold uppercase z-10 relative">Saldo em Caixa</p>
-          <p className={`text-xl font-bold mt-2 z-10 relative ${profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+          <p className="text-slate-500 text-sm font-medium z-10 relative">Saldo em Caixa</p>
+          <p className={`text-2xl font-bold mt-2 z-10 relative ${profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
             {formatCurrency(profit)}
           </p>
         </div>
         <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-          <p className="text-slate-500 text-xs font-bold uppercase">Viagens Ativas</p>
-          <p className="text-xl font-bold text-blue-600 mt-2">{currentTrips.length}</p>
+          <p className="text-slate-500 text-sm font-medium">Viagens em Andamento</p>
+          <p className="text-2xl font-bold text-blue-600 mt-2">{currentTrips.length}</p>
         </div>
         <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-          <p className="text-slate-500 text-xs font-bold uppercase">Manutenção</p>
-          <p className="text-xl font-bold text-orange-500 mt-2">{maintenanceBuses}</p>
+          <p className="text-slate-500 text-sm font-medium">Em Manutenção</p>
+          <p className="text-2xl font-bold text-orange-500 mt-2">{maintenanceBuses}</p>
         </div>
         <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-          <p className="text-slate-500 text-xs font-bold uppercase">Alerta Estoque</p>
-          <p className="text-xl font-bold text-red-500 mt-2">{lowStockParts} itens</p>
-        </div>
-        {/* NEW KPI: CARD FEES */}
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-8 h-8 bg-red-50 rounded-bl-full"></div>
-            <p className="text-slate-500 text-xs font-bold uppercase">Custo Taxas Cartão</p>
-            <p className="text-xl font-bold text-red-600 mt-2">
-                {formatCurrency(totalCardFees)}
-            </p>
+          <p className="text-slate-500 text-sm font-medium">Alerta de Estoque</p>
+          <p className="text-2xl font-bold text-red-500 mt-2">{lowStockParts} itens</p>
         </div>
       </div>
 
@@ -214,49 +192,16 @@ const Dashboard: React.FC = () => {
               </div>
           </div>
 
-          {/* RIGHT COLUMN */}
+          {/* RIGHT COLUMN (Pie Chart + Time Off History) */}
           <div className="space-y-6">
-              
-              {/* FLEET EFFICIENCY CARD */}
-              <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                  <div className="p-4 bg-slate-50 border-b border-slate-200">
-                      <h3 className="font-bold text-slate-700">🏆 Eficiência (Média Km/L)</h3>
-                  </div>
-                  <div className="p-4 space-y-3">
-                      {busEfficiency.length === 0 ? (
-                          <p className="text-center text-xs text-slate-400 italic">Sem dados de abastecimento suficientes.</p>
-                      ) : (
-                          busEfficiency.map((bus, idx) => (
-                              <div key={bus.id} className="flex justify-between items-center border-b border-slate-100 pb-2 last:border-0 last:pb-0">
-                                  <div className="flex items-center gap-2">
-                                      <span className={`text-xs font-bold w-5 h-5 flex items-center justify-center rounded-full ${idx === 0 ? 'bg-yellow-100 text-yellow-700' : 'bg-slate-100 text-slate-500'}`}>
-                                          {idx + 1}
-                                      </span>
-                                      <div>
-                                          <p className="text-sm font-bold text-slate-800">{bus.plate}</p>
-                                          <p className="text-[10px] text-slate-500">{bus.model}</p>
-                                      </div>
-                                  </div>
-                                  <div className="text-right">
-                                      <p className={`font-bold text-sm ${bus.media > 3.5 ? 'text-green-600' : 'text-slate-700'}`}>
-                                          {bus.media.toFixed(2)}
-                                      </p>
-                                      <p className="text-[10px] text-slate-400">km/l</p>
-                                  </div>
-                              </div>
-                          ))
-                      )}
-                  </div>
-              </div>
-
-              <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 h-64">
+              <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 h-80">
                   <h3 className="text-lg font-semibold text-slate-700 mb-4">Status da Frota</h3>
                   <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
                           <Pie
                               data={busStatusData}
-                              innerRadius={40}
-                              outerRadius={60}
+                              innerRadius={60}
+                              outerRadius={80}
                               paddingAngle={5}
                               dataKey="value"
                           >
@@ -267,10 +212,10 @@ const Dashboard: React.FC = () => {
                           <Tooltip />
                       </PieChart>
                   </ResponsiveContainer>
-                  <div className="flex justify-center gap-2 text-[10px] text-slate-600 mt-[-10px] flex-wrap">
+                  <div className="flex justify-center gap-4 text-sm text-slate-600 mt-[-20px]">
                       {busStatusData.map((entry, index) => (
                           <div key={index} className="flex items-center gap-1">
-                              <div className="w-2 h-2 rounded-full" style={{ backgroundColor: COLORS[index] }}></div>
+                              <div className="w-3 h-3 rounded-full" style={{ backgroundColor: COLORS[index] }}></div>
                               {entry.name}: {entry.value}
                           </div>
                       ))}
@@ -280,9 +225,9 @@ const Dashboard: React.FC = () => {
               {/* TIME OFF HISTORY */}
               <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                    <div className="p-4 bg-slate-50 border-b border-slate-200">
-                       <h3 className="font-bold text-slate-700">Histórico de Folgas</h3>
+                       <h3 className="font-bold text-slate-700">Histórico de Folgas e Férias</h3>
                    </div>
-                   <div className="max-h-60 overflow-y-auto divide-y divide-slate-100">
+                   <div className="max-h-80 overflow-y-auto divide-y divide-slate-100">
                        {sortedTimeOffs.length === 0 ? (
                            <p className="p-4 text-center text-slate-500 text-sm">Nenhum registro recente.</p>
                        ) : (
@@ -303,6 +248,19 @@ const Dashboard: React.FC = () => {
                                            )}
                                             {t.status === 'REJECTED' && (
                                                <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded font-bold">Recusado</span>
+                                           )}
+                                           {/* Cancel Button (To free up driver) */}
+                                           {t.status === 'APPROVED' && (
+                                               <button 
+                                                    onClick={() => {
+                                                        if(window.confirm(`Deseja cancelar a folga de ${driver?.name}? O motorista ficará disponível novamente.`)) {
+                                                            updateTimeOffStatus(t.id, 'REJECTED');
+                                                        }
+                                                    }}
+                                                    className="block text-[10px] text-red-500 hover:underline mt-1 cursor-pointer"
+                                               >
+                                                   Cancelar Folga
+                                               </button>
                                            )}
                                        </div>
                                    </div>

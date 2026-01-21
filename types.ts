@@ -15,8 +15,6 @@ export interface SystemSettings {
   phone?: string;
   address?: string;
   aiApiKey?: string; // Nova chave para IA
-  subscriptionStatus?: 'ACTIVE' | 'LOCKED'; // Controle de Pagamento
-  subscriptionDueDate?: string; // Data de vencimento para aviso
 }
 
 export interface User {
@@ -26,7 +24,6 @@ export interface User {
   role: UserRole | string; // Allow string for legacy data compatibility
   avatar: string;
   status?: 'APPROVED' | 'PENDING' | 'REJECTED'; // New field for access control
-  dailyRate?: number; // Valor da diária do motorista
 }
 
 export interface Bus {
@@ -203,30 +200,19 @@ export interface PackagePassenger {
   qtdAdult: number;
   qtdChild: number;
   qtdSenior: number;
-  discount: number; // Valor em R$
+  discount: number;
   agreedPrice: number;
   paidAmount: number;
   status: 'PENDING' | 'PARTIAL' | 'PAID';
   
   // Commission Fields
-  saleType?: 'DIRECT' | 'AGENCY' | 'PROMOTER';
-  agencyName?: string; // Used for Promoter Name as well
-  agencyPhone?: string; // Used for Promoter Phone as well
+  saleType?: 'DIRECT' | 'AGENCY';
+  agencyName?: string;
+  agencyPhone?: string;
   paxList?: string; // Text field for PAX names in agency sale
-  commissionRate?: number; // 0.01, 0.10 or 0.12
+  commissionRate?: number; // 0.01 or 0.12
   commissionValue?: number;
   sellerId?: string;
-
-  // Payment Details for Fee Tracking
-  paymentMethod?: 'VISTA' | 'CARTAO_CREDITO' | 'CARTAO_DEBITO';
-  transactionSource?: 'MACHINE' | 'LINK'; // Maquininha ou Link
-  installments?: number; // Numero de parcelas
-  cardFeeRate?: number; // % applied
-  cardFeeValue?: number; // $ value deducted
-
-  // Discount Details
-  discountType?: 'FIXED' | 'PERCENTAGE';
-  discountPercent?: number; 
 }
 
 export interface PackageLead {
@@ -261,8 +247,6 @@ export interface FuelRecord {
   cost: number;
   stationName?: string;
   loggedBy: string;
-  kmStart: number;
-  kmEnd: number;
 }
 
 export interface FuelSupply {

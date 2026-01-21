@@ -30,9 +30,7 @@ const DriverPortal: React.FC = () => {
       arlaLiters: 0,
       location: 'STREET' as 'GARAGE' | 'STREET',
       cost: 0,
-      stationName: '',
-      kmStart: 0,
-      kmEnd: 0
+      stationName: ''
   });
 
   // --- LOGIC TO MERGE BOOKINGS AND CHARTER SCHEDULE ---
@@ -87,17 +85,6 @@ const DriverPortal: React.FC = () => {
   const myReports = maintenanceReports.filter(r => r.driverId === currentUser.id).sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   const myLiabilities = driverLiabilities.filter(l => l.driverId === currentUser.id).sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
-  // --- EARNINGS CALCULATION ---
-  const myCompletedTrips = bookings.filter(b => b.driverId === currentUser.id && b.status === 'COMPLETED');
-  const myTripsWithPay = myCompletedTrips.map(trip => {
-      const start = new Date(trip.startTime);
-      const end = new Date(trip.endTime);
-      const diffTime = Math.abs(end.getTime() - start.getTime());
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) || 1; 
-      return { ...trip, days: diffDays, earnings: diffDays * (currentUser.dailyRate || 0) };
-  });
-  const totalEarnings = myTripsWithPay.reduce((acc, t) => acc + t.earnings, 0);
-
   const handleRequest = (e: React.FormEvent) => {
     e.preventDefault();
     if (requestDate) {
@@ -128,19 +115,7 @@ const DriverPortal: React.FC = () => {
   const handleFuelSubmit = (e: React.FormEvent) => {
       e.preventDefault();
       if (!fuelForm.busId || fuelForm.dieselLiters <= 0) {
-          alert('Preencha os dados de veículo e diesel corretamente.');
-          return;
-      }
-      if (fuelForm.kmStart <= 0 || fuelForm.kmEnd <= 0) {
-          alert("É obrigatório informar a KM Inicial e Final.");
-          return;
-      }
-      if (fuelForm.kmEnd <= fuelForm.kmStart) {
-          alert("KM Final deve ser maior que KM Inicial.");
-          return;
-      }
-      if (fuelForm.hasArla && fuelForm.arlaLiters <= 0) {
-          alert("Informe a quantidade de litros de Arla.");
+          alert('Preencha os dados corretamente.');
           return;
       }
       
@@ -148,9 +123,7 @@ const DriverPortal: React.FC = () => {
           ...fuelForm,
           cost: fuelForm.location === 'STREET' ? fuelForm.cost : 0,
           stationName: fuelForm.location === 'STREET' ? fuelForm.stationName : '',
-          loggedBy: currentUser.id,
-          kmStart: fuelForm.kmStart,
-          kmEnd: fuelForm.kmEnd
+          loggedBy: currentUser.id
       });
       
       alert('Abastecimento registrado!');
@@ -162,9 +135,7 @@ const DriverPortal: React.FC = () => {
         arlaLiters: 0,
         location: 'STREET',
         cost: 0,
-        stationName: '',
-        kmStart: 0,
-        kmEnd: 0
+        stationName: ''
       });
   };
 
@@ -229,9 +200,9 @@ const DriverPortal: React.FC = () => {
         </button>
         <button 
             onClick={() => setActiveTab('finance')}
-            className={`pb-2 px-1 font-medium text-sm transition-colors whitespace-nowrap ${activeTab === 'finance' ? 'border-b-2 border-emerald-600 text-emerald-600' : 'text-slate-500 hover:text-slate-700'}`}
+            className={`pb-2 px-1 font-medium text-sm transition-colors whitespace-nowrap ${activeTab === 'finance' ? 'border-b-2 border-red-600 text-red-600' : 'text-slate-500 hover:text-slate-700'}`}
         >
-            💸 Financeiro (Diárias/Multas)
+            💸 Descontos / Avarias
         </button>
         <button 
             onClick={() => setActiveTab('documents')}
@@ -348,30 +319,6 @@ const DriverPortal: React.FC = () => {
                         </div>
                     </div>
 
-                    {/* KM Fields */}
-                    <div className="grid grid-cols-2 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200">
-                        <div>
-                            <label className="block text-sm font-bold text-slate-800 mb-1">KM Inicial *</label>
-                            <input 
-                                type="number" min="0" required
-                                value={fuelForm.kmStart || ''} 
-                                onChange={e => setFuelForm({...fuelForm, kmStart: parseInt(e.target.value)})}
-                                className="w-full border p-2 rounded-lg outline-none text-lg font-semibold"
-                                placeholder="0"
-                            />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-bold text-slate-800 mb-1">KM Final *</label>
-                            <input 
-                                type="number" min="0" required
-                                value={fuelForm.kmEnd || ''} 
-                                onChange={e => setFuelForm({...fuelForm, kmEnd: parseInt(e.target.value)})}
-                                className="w-full border p-2 rounded-lg outline-none text-lg font-semibold"
-                                placeholder="0"
-                            />
-                        </div>
-                    </div>
-
                     <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
                         <label className="block text-sm font-bold text-slate-800 mb-2">Quantidade Diesel (Litros)</label>
                         <input 
@@ -417,9 +364,9 @@ const DriverPortal: React.FC = () => {
 
                     {fuelForm.hasArla && (
                         <div className="animate-fade-in pl-8">
-                             <label className="block text-xs font-bold text-slate-600 mb-1">Qtd. Arla (Litros) *</label>
+                             <label className="block text-xs font-bold text-slate-600 mb-1">Qtd. Arla (Litros)</label>
                              <input 
-                                type="number" step="0.1" min="0" required={fuelForm.hasArla}
+                                type="number" step="0.1" min="0"
                                 value={fuelForm.arlaLiters || ''} 
                                 onChange={e => setFuelForm({...fuelForm, arlaLiters: parseFloat(e.target.value)})}
                                 className="w-full border p-2 rounded outline-none"
@@ -437,104 +384,60 @@ const DriverPortal: React.FC = () => {
 
         {/* FINANCE / LIABILITIES TAB */}
         {activeTab === 'finance' && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                
-                {/* MY EARNINGS SECTION (NEW) */}
-                <div className="space-y-4">
-                    <div className="bg-emerald-50 border border-emerald-200 p-5 rounded-xl shadow-sm">
-                        <h3 className="font-bold text-emerald-800 text-lg mb-1">Minhas Diárias (Estimado)</h3>
-                        <p className="text-sm text-emerald-600 mb-3">Valor da Diária Cadastrado: <strong>R$ {currentUser.dailyRate?.toLocaleString('pt-BR') || '0,00'}</strong></p>
-                        <p className="text-3xl font-bold text-emerald-700 mb-4">
-                            R$ {totalEarnings.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
-                        </p>
-                        <p className="text-xs text-slate-500 italic">
-                            *Cálculo baseado apenas em viagens marcadas como 'CONCLUÍDAS' no sistema. O pagamento real depende do fechamento do caixa da empresa.
-                        </p>
+            <div className="space-y-4">
+                <h2 className="text-2xl font-bold text-slate-800">Meus Débitos (Avarias e Multas)</h2>
+                {myLiabilities.length === 0 ? (
+                    <div className="p-10 bg-white rounded-xl border-2 border-dashed border-slate-200 text-center text-slate-500">
+                        <p>Nenhuma pendência registrada em seu nome. Parabéns!</p>
                     </div>
-
-                    <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                        <div className="p-4 border-b border-slate-100 bg-slate-50">
-                            <h4 className="font-bold text-slate-700 text-sm uppercase">Detalhamento de Viagens</h4>
-                        </div>
-                        <div className="max-h-60 overflow-y-auto">
-                            {myTripsWithPay.length === 0 ? (
-                                <p className="p-4 text-center text-slate-400 text-sm">Nenhuma viagem concluída contabilizada.</p>
-                            ) : (
-                                <ul className="divide-y divide-slate-100">
-                                    {myTripsWithPay.map(trip => (
-                                        <li key={trip.id} className="p-3 hover:bg-slate-50">
-                                            <div className="flex justify-between font-medium text-slate-800 text-sm">
-                                                <span>{trip.destination}</span>
-                                                <span className="text-emerald-600">R$ {trip.earnings.toLocaleString('pt-BR')}</span>
-                                            </div>
-                                            <div className="flex justify-between text-xs text-slate-500 mt-1">
-                                                <span>{new Date(trip.startTime).toLocaleDateString()}</span>
-                                                <span>{trip.days} dia(s)</span>
-                                            </div>
-                                        </li>
-                                    ))}
-                                </ul>
-                            )}
-                        </div>
-                    </div>
-                </div>
-
-                {/* MY LIABILITIES SECTION */}
-                <div className="space-y-4">
-                    <h2 className="text-xl font-bold text-slate-800">Débitos (Avarias e Multas)</h2>
-                    {myLiabilities.length === 0 ? (
-                        <div className="p-10 bg-white rounded-xl border-2 border-dashed border-slate-200 text-center text-slate-500">
-                            <p>Nenhuma pendência registrada em seu nome. Parabéns!</p>
-                        </div>
-                    ) : (
-                        <div className="space-y-4">
-                            {myLiabilities.map(liability => {
-                                const progress = (liability.paidAmount / liability.totalAmount) * 100;
-                                return (
-                                    <div key={liability.id} className="bg-white p-5 rounded-xl shadow-sm border border-red-100 flex flex-col justify-between relative overflow-hidden">
-                                        {liability.status === 'PAID' && (
-                                            <div className="absolute top-2 right-2 bg-green-100 text-green-800 text-xs font-bold px-2 py-1 rounded">QUITADO</div>
-                                        )}
-                                        <div>
-                                            <div className="flex justify-between items-start mb-2">
-                                                <span className={`text-xs font-bold px-2 py-1 rounded ${liability.type === 'AVARIA' ? 'bg-orange-100 text-orange-700' : 'bg-red-100 text-red-700'}`}>
-                                                    {liability.type}
-                                                </span>
-                                                <span className="text-sm text-slate-500">{new Date(liability.date).toLocaleDateString()}</span>
-                                            </div>
-                                            <h4 className="font-bold text-slate-800 mb-1">{liability.description}</h4>
-                                            <p className="text-2xl font-bold text-red-600 mb-2">
-                                                R$ {liability.totalAmount.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
-                                            </p>
+                ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {myLiabilities.map(liability => {
+                            const progress = (liability.paidAmount / liability.totalAmount) * 100;
+                            return (
+                                <div key={liability.id} className="bg-white p-5 rounded-xl shadow-sm border border-red-100 flex flex-col justify-between relative overflow-hidden">
+                                    {liability.status === 'PAID' && (
+                                        <div className="absolute top-2 right-2 bg-green-100 text-green-800 text-xs font-bold px-2 py-1 rounded">QUITADO</div>
+                                    )}
+                                    <div>
+                                        <div className="flex justify-between items-start mb-2">
+                                            <span className={`text-xs font-bold px-2 py-1 rounded ${liability.type === 'AVARIA' ? 'bg-orange-100 text-orange-700' : 'bg-red-100 text-red-700'}`}>
+                                                {liability.type}
+                                            </span>
+                                            <span className="text-sm text-slate-500">{new Date(liability.date).toLocaleDateString()}</span>
                                         </div>
-                                        
-                                        <div className="mt-4">
-                                            <div className="flex justify-between text-xs text-slate-500 mb-1">
-                                                <span>Pago: R$ {liability.paidAmount.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
-                                                <span>{progress.toFixed(0)}%</span>
-                                            </div>
-                                            <div className="w-full bg-slate-100 rounded-full h-2.5 mb-2">
-                                                <div className="bg-green-500 h-2.5 rounded-full" style={{width: `${progress}%`}}></div>
-                                            </div>
+                                        <h4 className="font-bold text-slate-800 mb-1">{liability.description}</h4>
+                                        <p className="text-2xl font-bold text-red-600 mb-2">
+                                            R$ {liability.totalAmount.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
+                                        </p>
+                                    </div>
+                                    
+                                    <div className="mt-4">
+                                        <div className="flex justify-between text-xs text-slate-500 mb-1">
+                                            <span>Pago: R$ {liability.paidAmount.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                                            <span>{progress.toFixed(0)}%</span>
                                         </div>
-
-                                        <div className="bg-slate-50 p-3 rounded border border-slate-200 mt-2">
-                                            <p className="text-xs text-slate-500 font-bold uppercase mb-1">Plano de Pagamento</p>
-                                            <div className="flex justify-between items-center text-sm">
-                                                <span>Desconto em Folha:</span>
-                                                <span className="font-bold">{liability.installments}x</span>
-                                            </div>
-                                            <div className="flex justify-between items-center text-sm mt-1">
-                                                <span>Valor Parcela:</span>
-                                                <span className="font-bold">R$ {(liability.totalAmount / liability.installments).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
-                                            </div>
+                                        <div className="w-full bg-slate-100 rounded-full h-2.5 mb-2">
+                                            <div className="bg-green-500 h-2.5 rounded-full" style={{width: `${progress}%`}}></div>
                                         </div>
                                     </div>
-                                );
-                            })}
-                        </div>
-                    )}
-                </div>
+
+                                    <div className="bg-slate-50 p-3 rounded border border-slate-200 mt-2">
+                                        <p className="text-xs text-slate-500 font-bold uppercase mb-1">Plano de Pagamento</p>
+                                        <div className="flex justify-between items-center text-sm">
+                                            <span>Desconto em Folha:</span>
+                                            <span className="font-bold">{liability.installments}x</span>
+                                        </div>
+                                        <div className="flex justify-between items-center text-sm mt-1">
+                                            <span>Valor Parcela:</span>
+                                            <span className="font-bold">R$ {(liability.totalAmount / liability.installments).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                )}
             </div>
         )}
 

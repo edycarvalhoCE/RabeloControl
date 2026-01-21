@@ -1,10 +1,9 @@
-
 import React, { useState } from 'react';
 import { useStore } from '../services/store';
 import { UserRole, Bus, Booking } from '../types';
 
 const BookingsView: React.FC = () => {
-  const { bookings, buses, users, updateBooking, updateBookingStatus, settings } = useStore();
+  const { bookings, buses, users, updateBooking, updateBookingStatus } = useStore();
   
   // --- FILTER STATE ---
   const [filters, setFilters] = useState({
@@ -166,7 +165,6 @@ const BookingsView: React.FC = () => {
       const sStart = safeDate(booking.startTime) + ' ' + safeTime(booking.startTime);
       const sEnd = safeDate(booking.endTime) + ' ' + safeTime(booking.endTime);
       const sPres = safeDate(booking.presentationTime) + ' ' + safeTime(booking.presentationTime);
-      const companyName = settings?.companyName || 'RabeloTour';
 
       const printContent = `
         <html><head><title>OS - ${booking.destination}</title>
@@ -181,7 +179,7 @@ const BookingsView: React.FC = () => {
             h3 {margin: 15px 0 5px 0; font-size: 16px; text-transform:uppercase; background:#eee; padding:5px;}
         </style>
         </head><body>
-            <div class="header"><h1>${companyName} - ORDEM DE SERVIÇO</h1></div>
+            <div class="header"><h1>RabeloTour - ORDEM DE SERVIÇO</h1></div>
             
             <h3>Dados da Viagem</h3>
             <div class="row"><span class="label">Destino:</span><span class="value">${booking.destination}</span></div>
@@ -222,12 +220,11 @@ const BookingsView: React.FC = () => {
   const handlePrintContract = (booking: Booking) => {
     const bus = buses.find(b => b.id === booking.busId);
     
-    // Use settings or defaults
     const companyInfo = {
-        name: settings?.companyName || "VIAGENS RABELO TOUR",
-        cnpj: settings?.cnpj || "04.828.057/0001-34",
-        address: settings?.address || "Estrada do Gentio, 30, Bairro Itaipava, Petrópolis RJ",
-        phones: settings?.phone || "24 2237-4990",
+        name: "VIAGENS RABELO TOUR",
+        cnpj: "04.828.057/0001-34",
+        address: "Estrada do Gentio, 30, Bairro Itaipava, Petrópolis RJ",
+        phones: "24 2237-4990 / 24 98824-9204",
         email: "rabelovt@ig.com.br"
     };
 
@@ -241,7 +238,12 @@ const BookingsView: React.FC = () => {
           <style>
               body { font-family: 'Times New Roman', serif; font-size: 11px; padding: 20px; line-height: 1.2; color: #000; }
               .header { text-align: center; border-bottom: 2px solid #000; margin-bottom: 10px; padding-bottom: 5px; }
-              .header h1 { margin: 0; font-size: 24px; font-weight: bold; font-style: italic; color: #1e3a8a; } 
+              .header h1 { margin: 0; font-size: 24px; font-weight: bold; font-style: italic; color: #1e3a8a; } /* Blueish similar to logo */
+              .header span { font-size: 10px; }
+              
+              .top-table { width: 100%; border-collapse: collapse; margin-bottom: 10px; }
+              .top-table td { border: 1px solid #000; padding: 4px; vertical-align: top; }
+              .label { font-weight: bold; font-size: 10px; display: block; margin-bottom: 2px; }
               
               .section-title { background: #eee; font-weight: bold; border: 1px solid #000; padding: 2px 5px; margin-top: 10px; font-size: 11px; }
               
@@ -260,7 +262,7 @@ const BookingsView: React.FC = () => {
       <body>
           <div style="display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 1px solid #000; padding-bottom: 5px; margin-bottom: 10px;">
              <div>
-                <h1 style="margin:0; font-family: sans-serif; font-style: italic; color: #000; font-size: 22px;">${companyInfo.name}</h1>
+                <h1 style="margin:0; font-family: sans-serif; font-style: italic; color: #000; font-size: 22px;">VIAGENS<br/>Rabelo Tour</h1>
                 <div style="background: #000; color: #fff; display: inline-block; padding: 1px 4px; font-weight: bold; font-size: 10px;">DESDE 1992</div>
              </div>
              <div style="text-align: right;">
