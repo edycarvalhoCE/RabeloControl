@@ -24,6 +24,11 @@ const Dashboard: React.FC = () => {
     .filter(t => t.type === 'EXPENSE')
     .reduce((acc, curr) => acc + curr.amount, 0);
 
+  // Calculate Specific Expense Categories
+  const totalCardFees = transactions
+    .filter(t => t.type === 'EXPENSE' && t.category === 'Taxas Cartão')
+    .reduce((acc, curr) => acc + curr.amount, 0);
+
   const profit = totalRevenue - totalExpenses;
   const activeBookings = bookings.filter(b => b.status === 'CONFIRMED').length;
   const maintenanceBuses = buses.filter(b => b.status === 'MAINTENANCE').length;
@@ -117,25 +122,33 @@ const Dashboard: React.FC = () => {
       )}
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
         <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 relative overflow-hidden">
           <div className="absolute top-0 right-0 w-16 h-16 bg-green-50 rounded-bl-full -mr-2 -mt-2"></div>
-          <p className="text-slate-500 text-sm font-medium z-10 relative">Saldo em Caixa</p>
-          <p className={`text-2xl font-bold mt-2 z-10 relative ${profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+          <p className="text-slate-500 text-xs font-bold uppercase z-10 relative">Saldo em Caixa</p>
+          <p className={`text-xl font-bold mt-2 z-10 relative ${profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
             {formatCurrency(profit)}
           </p>
         </div>
         <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-          <p className="text-slate-500 text-sm font-medium">Viagens em Andamento</p>
-          <p className="text-2xl font-bold text-blue-600 mt-2">{currentTrips.length}</p>
+          <p className="text-slate-500 text-xs font-bold uppercase">Viagens Ativas</p>
+          <p className="text-xl font-bold text-blue-600 mt-2">{currentTrips.length}</p>
         </div>
         <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-          <p className="text-slate-500 text-sm font-medium">Em Manutenção</p>
-          <p className="text-2xl font-bold text-orange-500 mt-2">{maintenanceBuses}</p>
+          <p className="text-slate-500 text-xs font-bold uppercase">Manutenção</p>
+          <p className="text-xl font-bold text-orange-500 mt-2">{maintenanceBuses}</p>
         </div>
         <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-          <p className="text-slate-500 text-sm font-medium">Alerta de Estoque</p>
-          <p className="text-2xl font-bold text-red-500 mt-2">{lowStockParts} itens</p>
+          <p className="text-slate-500 text-xs font-bold uppercase">Alerta Estoque</p>
+          <p className="text-xl font-bold text-red-500 mt-2">{lowStockParts} itens</p>
+        </div>
+        {/* NEW KPI: CARD FEES */}
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-8 h-8 bg-red-50 rounded-bl-full"></div>
+            <p className="text-slate-500 text-xs font-bold uppercase">Custo Taxas Cartão</p>
+            <p className="text-xl font-bold text-red-600 mt-2">
+                {formatCurrency(totalCardFees)}
+            </p>
         </div>
       </div>
 

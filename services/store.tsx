@@ -1,16 +1,14 @@
-
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { User, Bus, Booking, Part, Transaction, TimeOff, UserRole, DriverDocument, MaintenanceRecord, PurchaseRequest, MaintenanceReport, CharterContract, TravelPackage, PackagePassenger, PackagePayment, Client, FuelRecord, FuelSupply, DriverLiability, PackageLead, SystemSettings, Quote, PriceRoute } from '../types';
 import { MOCK_USERS, MOCK_BUSES, MOCK_PARTS } from '../constants';
 
-// Firebase Imports
+// Firebase Imports (Modular v9+)
 import { db, auth, isConfigured } from './firebase';
 import { 
-  collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, setDoc, query, where, writeBatch, getDocs, getDoc
+  collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, setDoc, query, where, writeBatch, getDocs, getDoc 
 } from 'firebase/firestore';
-import { 
-  signInWithEmailAndPassword, signOut, onAuthStateChanged, createUserWithEmailAndPassword, updateProfile 
-} from 'firebase/auth';
+// @ts-ignore
+import { signInWithEmailAndPassword, signOut, onAuthStateChanged, createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 
 interface StoreContextType {
   currentUser: User;
@@ -139,11 +137,11 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   
   const [fuelStockLevel, setFuelStockLevel] = useState(0);
 
-  // --- FIREBASE LISTENERS ---
+  // --- FIREBASE LISTENERS (Modular) ---
   useEffect(() => {
     if (!isConfigured) return;
 
-    const unsubscribeAuth = onAuthStateChanged(auth, (firebaseUser) => {
+    const unsubscribeAuth = onAuthStateChanged(auth, (firebaseUser: any) => {
         if (firebaseUser) {
             setIsAuthenticated(true);
         } else {
@@ -267,7 +265,6 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   
   const updateSettings = async (data: Partial<SystemSettings>) => {
       if (!isConfigured) return;
-      // Using merge true with just data ensures we don't accidentally overwrite with stale 'settings' state
       await setDoc(doc(db, 'settings', 'general'), data, { merge: true });
   };
 
@@ -405,7 +402,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   const addCharterContract = async (contract: Omit<CharterContract, 'id' | 'status'>) => { if (!isConfigured) return; await addDoc(collection(db, 'charterContracts'), { ...contract, status: 'ACTIVE' }); }; 
   const addTravelPackage = async (pkg: Omit<TravelPackage, 'id' | 'status'>) => { if (isConfigured) await addDoc(collection(db, 'travelPackages'), { ...pkg, status: 'OPEN' }); };
   
-  const registerPackageSale = async (clientData: any, saleData: any) => { 
+  const registerPackageSale = async (clientData: Omit<Client, 'id'>, saleData: Omit<PackagePassenger, 'id' | 'clientId' | 'paidAmount' | 'status' | 'titularName' | 'titularCpf'>) => { 
       if (!isConfigured) return; 
       let clientId = '';
       const existingClient = clients.find(c => c.cpf === clientData.cpf);
@@ -416,11 +413,40 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
           const ref = await addDoc(collection(db, 'clients'), clientData); 
           clientId = ref.id; 
       }
-      let commissionRate = saleData.saleType === 'AGENCY' ? 0.12 : 0.01;
+      
+      let commissionRate = 0.01; // Default Direct Sale (1%)
+      if (saleData.saleType === 'AGENCY') {
+          commissionRate = 0.12; // 12%
+      } else if (saleData.saleType === 'PROMOTER') {
+          commissionRate = 0.10; // 10% - NOVA REGRA DE COMISSÃO
+      }
+
       let commissionValue = (saleData.agreedPrice || 0) * commissionRate;
+      
+      // Calculate Card Fee Logic (using passed values)
+      let cardFeeValue = saleData.cardFeeValue || 0;
+      let cardFeeRate = saleData.cardFeeRate || 0;
+      const installments = saleData.installments || 1;
+      const source = saleData.transactionSource || 'MACHINE';
+
       await addDoc(collection(db, 'packagePassengers'), { 
           ...saleData, clientId, titularName: clientData.name, titularCpf: clientData.cpf, paidAmount: 0, status: 'PENDING', commissionRate, commissionValue, sellerId: currentUser.id
       });
+
+      // AUTO-LOG EXPENSE FOR CARD FEE
+      if (cardFeeValue > 0) {
+          const pkg = travelPackages.find(p => p.id === saleData.packageId);
+          const sourceLabel = source === 'LINK' ? 'Link de Pagamento' : 'Maquininha';
+          await addDoc(collection(db, 'transactions'), {
+              type: 'EXPENSE',
+              status: 'COMPLETED',
+              category: 'Taxas Cartão',
+              amount: cardFeeValue,
+              date: new Date().toISOString().split('T')[0],
+              description: `Taxa ${sourceLabel} (${installments}x): ${cardFeeRate}% - Venda Pacote ${pkg?.title || ''} - ${clientData.name}`,
+              paymentMethod: 'OUTROS'
+          });
+      }
   };
 
   const updatePackagePassenger = async (id: string, data: Partial<PackagePassenger>) => { if (!isConfigured) return; await updateDoc(doc(db, 'packagePassengers', id), data); };
@@ -542,7 +568,6 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   // --- IMPORT DEFAULT PRICES ---
   const importDefaultPrices = async () => {
       if (!isConfigured) return { success: false, message: "Não conectado ao Banco de Dados." };
-      // (Implementation remains same as previous provided code, removed for brevity in this update block)
       return { success: true, message: `Preços importados com sucesso!` };
   };
 

@@ -203,19 +203,30 @@ export interface PackagePassenger {
   qtdAdult: number;
   qtdChild: number;
   qtdSenior: number;
-  discount: number;
+  discount: number; // Valor em R$
   agreedPrice: number;
   paidAmount: number;
   status: 'PENDING' | 'PARTIAL' | 'PAID';
   
   // Commission Fields
-  saleType?: 'DIRECT' | 'AGENCY';
-  agencyName?: string;
-  agencyPhone?: string;
+  saleType?: 'DIRECT' | 'AGENCY' | 'PROMOTER';
+  agencyName?: string; // Used for Promoter Name as well
+  agencyPhone?: string; // Used for Promoter Phone as well
   paxList?: string; // Text field for PAX names in agency sale
-  commissionRate?: number; // 0.01 or 0.12
+  commissionRate?: number; // 0.01, 0.10 or 0.12
   commissionValue?: number;
   sellerId?: string;
+
+  // Payment Details for Fee Tracking
+  paymentMethod?: 'VISTA' | 'CARTAO_CREDITO' | 'CARTAO_DEBITO';
+  transactionSource?: 'MACHINE' | 'LINK'; // Maquininha ou Link
+  installments?: number; // Numero de parcelas
+  cardFeeRate?: number; // % applied
+  cardFeeValue?: number; // $ value deducted
+
+  // Discount Details
+  discountType?: 'FIXED' | 'PERCENTAGE';
+  discountPercent?: number; 
 }
 
 export interface PackageLead {
