@@ -1,12 +1,30 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useStore } from '../services/store';
-import { UserRole, DriverLiability, DriverFee } from '../types';
+import { UserRole, DriverLiability, DriverFee, PaymentRateProfile } from '../types';
 
 const FinanceView: React.FC = () => {
-  const { transactions, addTransaction, users, addDriverLiability, driverLiabilities, payDriverLiability, driverFees, addDriverFee, payDriverFee, deleteDriverFee } = useStore();
+  const { transactions, addTransaction, users, addDriverLiability, driverLiabilities, payDriverLiability, driverFees, addDriverFee, payDriverFee, deleteDriverFee, settings, updateSettings, currentUser } = useStore();
   const [filter, setFilter] = useState<'ALL' | 'INCOME' | 'EXPENSE'>('ALL');
-  const [activeTab, setActiveTab] = useState<'CASHBOOK' | 'LIABILITIES' | 'FEES'>('CASHBOOK');
+  const [activeTab, setActiveTab] = useState<'CASHBOOK' | 'LIABILITIES' | 'FEES' | 'RATES'>('CASHBOOK');
+
+  // --- RATES CONFIG STATE ---
+  const [rateForm, setRateForm] = useState<{
+      maquininha: PaymentRateProfile;
+      ecommerce: PaymentRateProfile;
+      site: PaymentRateProfile;
+  }>({
+      maquininha: { debit: 0, creditCash: 0, creditInstallment2to6: 0, creditInstallment7to12: 0 },
+      ecommerce: { debit: 0, creditCash: 0, creditInstallment2to6: 0, creditInstallment7to12: 0 },
+      site: { debit: 0, creditCash: 0, creditInstallment2to6: 0, creditInstallment7to12: 0 }
+  });
+
+  // Load existing rates on mount/tab change
+  useEffect(() => {
+      if (settings?.paymentRates) {
+          setRateForm(settings.paymentRates);
+      }
+  }, [settings]);
 
   // --- MANUAL TRANSACTION STATE ---
   const [newTrans, setNewTrans] = useState({ 
@@ -57,6 +75,8 @@ const FinanceView: React.FC = () => {
       u.role === 'DRIVER' ||
       u.role === 'Motorista'
   );
+
+  const canManageRates = currentUser.role === UserRole.MANAGER || currentUser.role === UserRole.DEVELOPER || currentUser.role === UserRole.FINANCE;
 
   // --- FILTERS ---
   const realizedTransactions = transactions
@@ -185,6 +205,23 @@ const FinanceView: React.FC = () => {
       }
   };
 
+  const handleSaveRates = async () => {
+      await updateSettings({ paymentRates: rateForm });
+      alert("Taxas atualizadas com sucesso!");
+  };
+
+  const handleRateChange = (category: 'maquininha' | 'ecommerce' | 'site', field: keyof PaymentRateProfile, value: string) => {
+      // Allow user to type, only validate on blur or submit if needed. Store as number.
+      const numValue = parseFloat(value);
+      setRateForm(prev => ({
+          ...prev,
+          [category]: {
+              ...prev[category],
+              [field]: isNaN(numValue) ? 0 : numValue
+          }
+      }));
+  };
+
   // Currency Helpers
   const handleCurrencyChange = (e: React.ChangeEvent<HTMLInputElement>, setter: any) => {
     const value = e.target.value;
@@ -195,6 +232,21 @@ const FinanceView: React.FC = () => {
 
   const currentBalance = realizedTransactions.reduce((acc, t) => t.type === 'INCOME' ? acc + t.amount : acc - t.amount, 0);
   const projectedIncome = pendingTransactions.filter(t => t.type === 'INCOME').reduce((acc, t) => acc + t.amount, 0);
+
+  const RateInput = ({ label, value, onChange }: { label: string, value: number, onChange: (val: string) => void }) => (
+      <div>
+          <label className="block text-xs font-bold text-slate-500 mb-1">{label}</label>
+          <div className="flex items-center border border-slate-300 rounded overflow-hidden bg-white focus-within:ring-2 focus-within:ring-blue-500">
+              <input 
+                  type="number" step="0.01" min="0"
+                  value={value} 
+                  onChange={(e) => onChange(e.target.value)}
+                  className="w-full p-2 outline-none text-right font-bold text-slate-800 text-sm"
+              />
+              <span className="bg-slate-100 text-slate-600 px-3 py-2 font-bold border-l border-slate-300 text-xs">%</span>
+          </div>
+      </div>
+  );
 
   return (
     <div className="space-y-6 animate-fade-in relative">
@@ -253,6 +305,14 @@ const FinanceView: React.FC = () => {
             >
                 💥 Avarias e Multas
             </button>
+            {canManageRates && (
+                <button 
+                    onClick={() => setActiveTab('RATES')}
+                    className={`px-6 py-3 font-bold text-sm whitespace-nowrap ${activeTab === 'RATES' ? 'border-b-2 border-emerald-600 text-emerald-600' : 'text-slate-500 hover:text-slate-700'}`}
+                >
+                    ⚙️ Configurar Taxas
+                </button>
+            )}
         </div>
 
         {activeTab === 'CASHBOOK' && (
@@ -709,6 +769,7 @@ const FinanceView: React.FC = () => {
             </div>
         )}
 
+        {/* LIABILITIES TAB */}
         {activeTab === 'LIABILITIES' && (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <div className="bg-white p-6 rounded-xl shadow-sm border border-red-200 h-fit">
@@ -828,6 +889,71 @@ const FinanceView: React.FC = () => {
                                 )}
                             </tbody>
                         </table>
+                    </div>
+                </div>
+            </div>
+        )}
+
+        {/* RATES CONFIG TAB */}
+        {activeTab === 'RATES' && canManageRates && (
+            <div className="animate-fade-in">
+                <div className="flex justify-between items-center mb-6">
+                    <div>
+                        <h2 className="text-2xl font-bold text-emerald-800">Configuração de Taxas</h2>
+                        <p className="text-sm text-slate-500">Defina as taxas para cálculo automático na venda de pacotes.</p>
+                    </div>
+                    <button 
+                        onClick={handleSaveRates}
+                        className="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2 rounded-lg font-bold shadow-md transition-transform active:scale-95"
+                    >
+                        Salvar Taxas
+                    </button>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    {/* MAQUININHA */}
+                    <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                        <div className="bg-slate-800 text-white p-4">
+                            <h3 className="font-bold flex items-center gap-2">
+                                <span>💳</span> Maquininha (Física)
+                            </h3>
+                        </div>
+                        <div className="p-6 space-y-4">
+                            <RateInput label="Débito (1 dia)" value={rateForm.maquininha.debit} onChange={(v) => handleRateChange('maquininha', 'debit', v)} />
+                            <RateInput label="Crédito à Vista (30 dias)" value={rateForm.maquininha.creditCash} onChange={(v) => handleRateChange('maquininha', 'creditCash', v)} />
+                            <RateInput label="Crédito Parcelado (2x até 6x)" value={rateForm.maquininha.creditInstallment2to6} onChange={(v) => handleRateChange('maquininha', 'creditInstallment2to6', v)} />
+                            <RateInput label="Crédito Parcelado (7x até 12x)" value={rateForm.maquininha.creditInstallment7to12} onChange={(v) => handleRateChange('maquininha', 'creditInstallment7to12', v)} />
+                        </div>
+                    </div>
+
+                    {/* ECOMMERCE (LINK) */}
+                    <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                        <div className="bg-blue-600 text-white p-4">
+                            <h3 className="font-bold flex items-center gap-2">
+                                <span>🔗</span> Ecommerce (Link Pagto)
+                            </h3>
+                        </div>
+                        <div className="p-6 space-y-4">
+                            <RateInput label="Débito (1 dia)" value={rateForm.ecommerce.debit} onChange={(v) => handleRateChange('ecommerce', 'debit', v)} />
+                            <RateInput label="Crédito à Vista (30 dias)" value={rateForm.ecommerce.creditCash} onChange={(v) => handleRateChange('ecommerce', 'creditCash', v)} />
+                            <RateInput label="Crédito Parcelado (2x até 6x)" value={rateForm.ecommerce.creditInstallment2to6} onChange={(v) => handleRateChange('ecommerce', 'creditInstallment2to6', v)} />
+                            <RateInput label="Crédito Parcelado (7x até 12x)" value={rateForm.ecommerce.creditInstallment7to12} onChange={(v) => handleRateChange('ecommerce', 'creditInstallment7to12', v)} />
+                        </div>
+                    </div>
+
+                    {/* SITE */}
+                    <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                        <div className="bg-purple-600 text-white p-4">
+                            <h3 className="font-bold flex items-center gap-2">
+                                <span>🌐</span> Site (Integrado)
+                            </h3>
+                        </div>
+                        <div className="p-6 space-y-4">
+                            <RateInput label="Débito (1 dia)" value={rateForm.site.debit} onChange={(v) => handleRateChange('site', 'debit', v)} />
+                            <RateInput label="Crédito à Vista (30 dias)" value={rateForm.site.creditCash} onChange={(v) => handleRateChange('site', 'creditCash', v)} />
+                            <RateInput label="Crédito Parcelado (2x até 6x)" value={rateForm.site.creditInstallment2to6} onChange={(v) => handleRateChange('site', 'creditInstallment2to6', v)} />
+                            <RateInput label="Crédito Parcelado (7x até 12x)" value={rateForm.site.creditInstallment7to12} onChange={(v) => handleRateChange('site', 'creditInstallment7to12', v)} />
+                        </div>
                     </div>
                 </div>
             </div>

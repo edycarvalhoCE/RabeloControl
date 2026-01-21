@@ -7,6 +7,13 @@ export enum UserRole {
   MECHANIC = 'MECANICO'
 }
 
+export interface PaymentRateProfile {
+  debit: number;
+  creditCash: number; // À vista
+  creditInstallment2to6: number;
+  creditInstallment7to12: number;
+}
+
 export interface SystemSettings {
   id: string;
   companyName: string;
@@ -15,6 +22,13 @@ export interface SystemSettings {
   phone?: string;
   address?: string;
   aiApiKey?: string; // Nova chave para IA
+  
+  // Payment Rates Configuration
+  paymentRates?: {
+    maquininha: PaymentRateProfile;
+    ecommerce: PaymentRateProfile; // Link de Pagamento
+    site: PaymentRateProfile;
+  };
 }
 
 export interface User {

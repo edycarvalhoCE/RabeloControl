@@ -116,7 +116,12 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       cnpj: '',
       phone: '',
       address: '',
-      aiApiKey: ''
+      aiApiKey: '',
+      paymentRates: {
+          maquininha: { debit: 1.47, creditCash: 3.24, creditInstallment2to6: 2.86, creditInstallment7to12: 3.93 },
+          ecommerce: { debit: 0, creditCash: 3.99, creditInstallment2to6: 4.5, creditInstallment7to12: 5.5 },
+          site: { debit: 0, creditCash: 3.99, creditInstallment2to6: 4.5, creditInstallment7to12: 5.5 },
+      }
   });
   
   // Data States
@@ -160,7 +165,16 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
     const unsubscribeSettings = onSnapshot(doc(db, 'settings', 'general'), (doc) => {
         if (doc.exists()) {
-            setSettings({ id: 'general', ...doc.data() } as SystemSettings);
+            const data = doc.data() as SystemSettings;
+            // Ensure rates structure exists if pulling from older DB record
+            if (!data.paymentRates) {
+                data.paymentRates = {
+                    maquininha: { debit: 1.47, creditCash: 3.24, creditInstallment2to6: 2.86, creditInstallment7to12: 3.93 },
+                    ecommerce: { debit: 0, creditCash: 3.99, creditInstallment2to6: 4.5, creditInstallment7to12: 5.5 },
+                    site: { debit: 0, creditCash: 3.99, creditInstallment2to6: 4.5, creditInstallment7to12: 5.5 },
+                };
+            }
+            setSettings({ id: 'general', ...data });
         }
     });
 

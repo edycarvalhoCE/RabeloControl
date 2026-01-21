@@ -4,7 +4,7 @@ import { useStore } from '../services/store';
 import { PackagePassenger, TravelPackage, Client, PackageLead } from '../types';
 
 const TravelPackagesView: React.FC = () => {
-  const { travelPackages, packagePassengers, packagePayments, clients, addTravelPackage, registerPackageSale, updatePackagePassenger, deletePackagePassenger, addPackagePayment, currentUser, packageLeads, addPackageLead, updatePackageLead, deletePackageLead } = useStore();
+  const { travelPackages, packagePassengers, packagePayments, clients, addTravelPackage, registerPackageSale, updatePackagePassenger, deletePackagePassenger, addPackagePayment, currentUser, packageLeads, addPackageLead, updatePackageLead, deletePackageLead, settings } = useStore();
   
   const [selectedPackage, setSelectedPackage] = useState<TravelPackage | null>(null);
   const [showNewPackageForm, setShowNewPackageForm] = useState(false);
@@ -37,7 +37,7 @@ const TravelPackagesView: React.FC = () => {
       qtdSenior: 0,
       
       // Payment & Discount Logic
-      paymentMethod: 'PIX' as 'PIX' | 'MAQUININHA' | 'LINK_PAGAMENTO' | 'LINK_EXTERNO' | 'DINHEIRO',
+      paymentMethod: 'PIX' as 'PIX' | 'MAQUININHA' | 'LINK_PAGAMENTO' | 'LINK_EXTERNO' | 'DINHEIRO' | 'SITE',
       installments: 1,
       
       discountType: 'VALUE' as 'VALUE' | 'PERCENT',
@@ -52,6 +52,40 @@ const TravelPackagesView: React.FC = () => {
   // Payment Modal
   const [selectedPassengerForPayment, setSelectedPassengerForPayment] = useState<PackagePassenger | null>(null);
   const [newPayment, setNewPayment] = useState({ amount: 0, date: new Date().toISOString().split('T')[0], method: 'PIX', installments: 1, notes: '' });
+
+  // Effect to update card fee automatically when method or installments change
+  useEffect(() => {
+      const { paymentMethod, installments } = saleForm;
+      const rates = settings?.paymentRates;
+
+      if (!rates) return;
+
+      let newRate = 0;
+      let profile = null;
+
+      if (paymentMethod === 'MAQUININHA') profile = rates.maquininha;
+      else if (paymentMethod === 'LINK_PAGAMENTO') profile = rates.ecommerce;
+      else if (paymentMethod === 'SITE') profile = rates.site;
+
+      if (profile) {
+          if (installments === 1) {
+              // Assuming debit/credit choice logic here. For safety in simple form, we map 1x to Credit Cash mostly, 
+              // but ideally we'd have a Debit/Credit toggle. 
+              // Since standard practice for installments=1 is "Credit Cash":
+              newRate = profile.creditCash;
+          } else if (installments >= 2 && installments <= 6) {
+              newRate = profile.creditInstallment2to6;
+          } else if (installments >= 7) {
+              newRate = profile.creditInstallment7to12;
+          }
+      }
+
+      // Only update if it's different to avoid loops, and allows manual override if needed
+      // (Currently forcing override on change)
+      if ((paymentMethod === 'MAQUININHA' || paymentMethod === 'LINK_PAGAMENTO' || paymentMethod === 'SITE') && newRate !== saleForm.cardFeeRate) {
+          setSaleForm(prev => ({ ...prev, cardFeeRate: newRate }));
+      }
+  }, [saleForm.paymentMethod, saleForm.installments, settings]);
 
   // --- Handlers ---
 
@@ -179,16 +213,12 @@ const TravelPackagesView: React.FC = () => {
 
   // PAYMENT LOGIC HANDLERS
   const handlePaymentMethodChange = (method: string) => {
-      let fee = 0;
-      if (method === 'MAQUININHA') fee = 4.50; // Example default
-      if (method === 'LINK_PAGAMENTO') fee = 5.50; // Example default
-      
       setSaleForm(prev => ({
           ...prev,
           paymentMethod: method as any,
-          cardFeeRate: fee,
           installments: 1 // Reset installments
       }));
+      // Fee update logic is handled by useEffect
   };
 
   const calculateFinancials = () => {
@@ -209,7 +239,7 @@ const TravelPackagesView: React.FC = () => {
       
       let feeValue = 0;
       // Fee applies to Final Price (what is charged on the card)
-      if (saleForm.paymentMethod === 'MAQUININHA' || saleForm.paymentMethod === 'LINK_PAGAMENTO') {
+      if (saleForm.paymentMethod === 'MAQUININHA' || saleForm.paymentMethod === 'LINK_PAGAMENTO' || saleForm.paymentMethod === 'SITE') {
           feeValue = finalPrice * (saleForm.cardFeeRate / 100);
       }
 
@@ -551,6 +581,7 @@ const TravelPackagesView: React.FC = () => {
                                                   <option value="DINHEIRO">Dinheiro (Espécie)</option>
                                                   <option value="MAQUININHA">Cartão (Maquininha)</option>
                                                   <option value="LINK_PAGAMENTO">Link de Pagamento (Cartão)</option>
+                                                  <option value="SITE">Site (Integrado)</option>
                                                   <option value="LINK_EXTERNO">Link Externo (Sem Taxa)</option>
                                               </select>
                                           </div>
@@ -586,7 +617,7 @@ const TravelPackagesView: React.FC = () => {
                                               </div>
                                           ) : null}
 
-                                          {(saleForm.paymentMethod === 'MAQUININHA' || saleForm.paymentMethod === 'LINK_PAGAMENTO') && (
+                                          {(saleForm.paymentMethod === 'MAQUININHA' || saleForm.paymentMethod === 'LINK_PAGAMENTO' || saleForm.paymentMethod === 'SITE') && (
                                               <div className="flex gap-2">
                                                   <div className="w-1/2">
                                                       <label className="block text-xs font-bold text-slate-500 mb-1">Parcelas</label>
@@ -606,6 +637,7 @@ const TravelPackagesView: React.FC = () => {
                                                           value={saleForm.cardFeeRate}
                                                           onChange={(e) => setSaleForm({...saleForm, cardFeeRate: parseFloat(e.target.value) || 0})}
                                                           className="w-full border p-2 rounded text-sm text-right"
+                                                          title="Taxa calculada automaticamente pelas configurações"
                                                       />
                                                   </div>
                                               </div>
@@ -630,7 +662,7 @@ const TravelPackagesView: React.FC = () => {
                                           </div>
                                           
                                           {/* FEES DISPLAY */}
-                                          {(saleForm.paymentMethod === 'MAQUININHA' || saleForm.paymentMethod === 'LINK_PAGAMENTO') && (
+                                          {(saleForm.paymentMethod === 'MAQUININHA' || saleForm.paymentMethod === 'LINK_PAGAMENTO' || saleForm.paymentMethod === 'SITE') && (
                                               <>
                                                   <div className="flex justify-between text-xs text-orange-600 mt-2 pt-2 border-t border-slate-200 border-dashed">
                                                       <span>Taxa Cartão ({saleForm.cardFeeRate}%):</span>
