@@ -9,7 +9,7 @@ const UsersView: React.FC = () => {
   const [editingUser, setEditingUser] = useState<User | null>(null);
 
   // Form State
-  const [formData, setFormData] = useState({ name: '', email: '', role: UserRole.DRIVER as UserRole });
+  const [formData, setFormData] = useState({ name: '', email: '', role: UserRole.DRIVER as UserRole, dailyRate: 0 });
 
   const isManager = currentUser.role === UserRole.DEVELOPER || currentUser.role === UserRole.MANAGER;
 
@@ -19,7 +19,12 @@ const UsersView: React.FC = () => {
 
   const handleEdit = (user: User) => {
       setEditingUser(user);
-      setFormData({ name: user.name, email: user.email, role: user.role as UserRole });
+      setFormData({ 
+          name: user.name, 
+          email: user.email, 
+          role: user.role as UserRole,
+          dailyRate: user.dailyRate || 0
+      });
       setShowForm(true);
   };
 
@@ -45,6 +50,13 @@ const UsersView: React.FC = () => {
       }
   };
 
+  const handleDailyRateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const value = e.target.value;
+      const digits = value.replace(/\D/g, "");
+      const realValue = Number(digits) / 100;
+      setFormData(prev => ({ ...prev, dailyRate: realValue }));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if(formData.name && formData.email) {
@@ -57,7 +69,7 @@ const UsersView: React.FC = () => {
             addUser(formData);
             alert("Usuário criado com sucesso!");
         }
-        setFormData({ name: '', email: '', role: UserRole.DRIVER });
+        setFormData({ name: '', email: '', role: UserRole.DRIVER, dailyRate: 0 });
         setEditingUser(null);
         setShowForm(false);
     }
@@ -66,7 +78,7 @@ const UsersView: React.FC = () => {
   const handleCancel = () => {
       setShowForm(false);
       setEditingUser(null);
-      setFormData({ name: '', email: '', role: UserRole.DRIVER });
+      setFormData({ name: '', email: '', role: UserRole.DRIVER, dailyRate: 0 });
   };
 
   return (
@@ -74,7 +86,7 @@ const UsersView: React.FC = () => {
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold text-slate-800">Gestão de Usuários</h2>
         <button 
-          onClick={() => { setShowForm(!showForm); setEditingUser(null); setFormData({ name: '', email: '', role: UserRole.DRIVER }); }}
+          onClick={() => { setShowForm(!showForm); setEditingUser(null); setFormData({ name: '', email: '', role: UserRole.DRIVER, dailyRate: 0 }); }}
           className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium shadow-sm transition-colors"
         >
           {showForm ? 'Cancelar' : '+ Novo Usuário'}
@@ -148,21 +160,41 @@ const UsersView: React.FC = () => {
                           />
                       </div>
                   </div>
-                  <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-1">Função no Sistema</label>
-                      <select 
-                        value={formData.role}
-                        onChange={e => setFormData({...formData, role: e.target.value as UserRole})}
-                        className="w-full border p-2 rounded focus:ring-2 focus:ring-blue-500 outline-none"
-                      >
-                          <option value={UserRole.DRIVER}>Motorista</option>
-                          <option value={UserRole.MECHANIC}>Mecânico</option>
-                          <option value={UserRole.FINANCE}>Financeiro</option>
-                          <option value={UserRole.MANAGER}>Gerente</option>
-                          {currentUser.role === UserRole.DEVELOPER && (
-                              <option value={UserRole.DEVELOPER}>Desenvolvedor (Admin)</option>
-                          )}
-                      </select>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                          <label className="block text-sm font-medium text-slate-700 mb-1">Função no Sistema</label>
+                          <select 
+                            value={formData.role}
+                            onChange={e => setFormData({...formData, role: e.target.value as UserRole})}
+                            className="w-full border p-2 rounded focus:ring-2 focus:ring-blue-500 outline-none"
+                          >
+                              <option value={UserRole.DRIVER}>Motorista</option>
+                              <option value={UserRole.MECHANIC}>Mecânico</option>
+                              <option value={UserRole.FINANCE}>Financeiro</option>
+                              <option value={UserRole.MANAGER}>Gerente</option>
+                              {currentUser.role === UserRole.DEVELOPER && (
+                                  <option value={UserRole.DEVELOPER}>Desenvolvedor (Admin)</option>
+                              )}
+                          </select>
+                      </div>
+                      
+                      {/* Driver Daily Rate Field */}
+                      {formData.role === UserRole.DRIVER && (
+                          <div className="animate-fade-in">
+                              <label className="block text-sm font-medium text-slate-700 mb-1">Valor Diária Padrão</label>
+                              <div className="flex items-center border border-slate-300 rounded overflow-hidden bg-white focus-within:ring-2 focus-within:ring-blue-500">
+                                  <span className="bg-slate-100 text-slate-600 px-3 py-2 font-bold border-r border-slate-300 text-sm">R$</span>
+                                  <input 
+                                      type="text" 
+                                      inputMode="numeric"
+                                      value={formData.dailyRate.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} 
+                                      onChange={handleDailyRateChange}
+                                      className="w-full p-2 outline-none text-right font-bold text-slate-800"
+                                      placeholder="0,00"
+                                  />
+                              </div>
+                          </div>
+                      )}
                   </div>
                   <div className="flex gap-2 pt-2">
                       <button type="button" onClick={handleCancel} className="flex-1 bg-slate-200 text-slate-800 py-2 rounded font-bold hover:bg-slate-300">
@@ -187,6 +219,9 @@ const UsersView: React.FC = () => {
                               {user.role}
                           </span>
                           <p className="text-xs text-slate-400 mt-1">{user.email}</p>
+                          {user.role === UserRole.DRIVER && user.dailyRate && user.dailyRate > 0 && (
+                              <p className="text-xs text-green-600 font-bold mt-1">Diária: R$ {user.dailyRate.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</p>
+                          )}
                       </div>
                   </div>
                   <div className="flex flex-col gap-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">

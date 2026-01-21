@@ -6,7 +6,7 @@ import { Booking } from '../types';
 import { Logo } from './Logo';
 
 const DriverPortal: React.FC = () => {
-  const { currentUser, bookings, timeOffs, addTimeOff, documents, buses, addMaintenanceReport, maintenanceReports, addFuelRecord, driverLiabilities, charterContracts } = useStore();
+  const { currentUser, bookings, timeOffs, addTimeOff, documents, buses, addMaintenanceReport, maintenanceReports, addFuelRecord, driverLiabilities, charterContracts, driverFees } = useStore();
   
   // Request State
   const [requestType, setRequestType] = useState<'FOLGA' | 'FERIAS'>('FOLGA');
@@ -84,6 +84,7 @@ const DriverPortal: React.FC = () => {
   const myDocuments = documents.filter(d => d.driverId === currentUser.id);
   const myReports = maintenanceReports.filter(r => r.driverId === currentUser.id).sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   const myLiabilities = driverLiabilities.filter(l => l.driverId === currentUser.id).sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  const myFees = driverFees.filter(f => f.driverId === currentUser.id).sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
   const handleRequest = (e: React.FormEvent) => {
     e.preventDefault();
@@ -209,9 +210,9 @@ const DriverPortal: React.FC = () => {
         </button>
         <button 
             onClick={() => setActiveTab('finance')}
-            className={`pb-2 px-1 font-medium text-sm transition-colors whitespace-nowrap ${activeTab === 'finance' ? 'border-b-2 border-red-600 text-red-600' : 'text-slate-500 hover:text-slate-700'}`}
+            className={`pb-2 px-1 font-medium text-sm transition-colors whitespace-nowrap ${activeTab === 'finance' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}
         >
-            💸 Descontos / Avarias
+            💰 Diárias e Descontos
         </button>
         <button 
             onClick={() => setActiveTab('documents')}
@@ -401,60 +402,106 @@ const DriverPortal: React.FC = () => {
 
         {/* FINANCE / LIABILITIES TAB */}
         {activeTab === 'finance' && (
-            <div className="space-y-4">
-                <h2 className="text-2xl font-bold text-slate-800">Meus Débitos (Avarias e Multas)</h2>
-                {myLiabilities.length === 0 ? (
-                    <div className="p-10 bg-white rounded-xl border-2 border-dashed border-slate-200 text-center text-slate-500">
-                        <p>Nenhuma pendência registrada em seu nome. Parabéns!</p>
-                    </div>
-                ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {myLiabilities.map(liability => {
-                            const progress = (liability.paidAmount / liability.totalAmount) * 100;
-                            return (
-                                <div key={liability.id} className="bg-white p-5 rounded-xl shadow-sm border border-red-100 flex flex-col justify-between relative overflow-hidden">
-                                    {liability.status === 'PAID' && (
-                                        <div className="absolute top-2 right-2 bg-green-100 text-green-800 text-xs font-bold px-2 py-1 rounded">QUITADO</div>
-                                    )}
-                                    <div>
-                                        <div className="flex justify-between items-start mb-2">
-                                            <span className={`text-xs font-bold px-2 py-1 rounded ${liability.type === 'AVARIA' ? 'bg-orange-100 text-orange-700' : 'bg-red-100 text-red-700'}`}>
-                                                {liability.type}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* DIARIAS SECTION */}
+                <div>
+                    <h3 className="text-xl font-bold text-slate-800 mb-4 flex items-center gap-2">
+                        <span className="bg-blue-100 text-blue-700 p-1.5 rounded text-sm">💰</span>
+                        Diárias a Receber
+                    </h3>
+                    
+                    <div className="bg-white rounded-xl shadow-sm border border-blue-100 overflow-hidden">
+                        <div className="p-4 bg-blue-50 border-b border-blue-100 flex justify-between items-center">
+                            <span className="text-sm font-bold text-blue-900">Total Pendente</span>
+                            <span className="text-lg font-bold text-blue-700">
+                                R$ {myFees.filter(f => f.status === 'PENDING').reduce((acc, f) => acc + f.amount, 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}
+                            </span>
+                        </div>
+                        <div className="divide-y divide-slate-100 max-h-96 overflow-y-auto">
+                            {myFees.length === 0 ? (
+                                <p className="p-6 text-center text-slate-500 text-sm">Nenhuma diária registrada.</p>
+                            ) : (
+                                myFees.map(fee => (
+                                    <div key={fee.id} className="p-4 hover:bg-slate-50">
+                                        <div className="flex justify-between items-start mb-1">
+                                            <span className="font-bold text-slate-800">{fee.description}</span>
+                                            <span className={`text-xs px-2 py-0.5 rounded font-bold ${fee.status === 'PAID' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                                                {fee.status === 'PAID' ? 'PAGO' : 'PENDENTE'}
                                             </span>
-                                            <span className="text-sm text-slate-500">{new Date(liability.date).toLocaleDateString()}</span>
                                         </div>
-                                        <h4 className="font-bold text-slate-800 mb-1">{liability.description}</h4>
-                                        <p className="text-2xl font-bold text-red-600 mb-2">
-                                            R$ {liability.totalAmount.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
-                                        </p>
+                                        <div className="flex justify-between text-sm text-slate-600">
+                                            <span>{new Date(fee.date).toLocaleDateString()}</span>
+                                            <span className="font-bold">R$ {fee.amount.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                                        </div>
+                                        {fee.paymentDate && (
+                                            <p className="text-xs text-green-600 mt-1 text-right">Recebido em: {new Date(fee.paymentDate).toLocaleDateString()}</p>
+                                        )}
                                     </div>
-                                    
-                                    <div className="mt-4">
-                                        <div className="flex justify-between text-xs text-slate-500 mb-1">
-                                            <span>Pago: R$ {liability.paidAmount.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
-                                            <span>{progress.toFixed(0)}%</span>
-                                        </div>
-                                        <div className="w-full bg-slate-100 rounded-full h-2.5 mb-2">
-                                            <div className="bg-green-500 h-2.5 rounded-full" style={{width: `${progress}%`}}></div>
-                                        </div>
-                                    </div>
-
-                                    <div className="bg-slate-50 p-3 rounded border border-slate-200 mt-2">
-                                        <p className="text-xs text-slate-500 font-bold uppercase mb-1">Plano de Pagamento</p>
-                                        <div className="flex justify-between items-center text-sm">
-                                            <span>Desconto em Folha:</span>
-                                            <span className="font-bold">{liability.installments}x</span>
-                                        </div>
-                                        <div className="flex justify-between items-center text-sm mt-1">
-                                            <span>Valor Parcela:</span>
-                                            <span className="font-bold">R$ {(liability.totalAmount / liability.installments).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            );
-                        })}
+                                ))
+                            )}
+                        </div>
                     </div>
-                )}
+                </div>
+
+                {/* LIABILITIES SECTION */}
+                <div>
+                    <h3 className="text-xl font-bold text-slate-800 mb-4 flex items-center gap-2">
+                        <span className="bg-red-100 text-red-700 p-1.5 rounded text-sm">📉</span>
+                        Débitos (Avarias/Multas)
+                    </h3>
+                    <div className="space-y-4">
+                        {myLiabilities.length === 0 ? (
+                            <div className="p-10 bg-white rounded-xl border-2 border-dashed border-slate-200 text-center text-slate-500">
+                                <p>Nenhuma pendência registrada em seu nome.</p>
+                            </div>
+                        ) : (
+                            myLiabilities.map(liability => {
+                                const progress = (liability.paidAmount / liability.totalAmount) * 100;
+                                return (
+                                    <div key={liability.id} className="bg-white p-5 rounded-xl shadow-sm border border-red-100 flex flex-col justify-between relative overflow-hidden">
+                                        {liability.status === 'PAID' && (
+                                            <div className="absolute top-2 right-2 bg-green-100 text-green-800 text-xs font-bold px-2 py-1 rounded">QUITADO</div>
+                                        )}
+                                        <div>
+                                            <div className="flex justify-between items-start mb-2">
+                                                <span className={`text-xs font-bold px-2 py-1 rounded ${liability.type === 'AVARIA' ? 'bg-orange-100 text-orange-700' : 'bg-red-100 text-red-700'}`}>
+                                                    {liability.type}
+                                                </span>
+                                                <span className="text-sm text-slate-500">{new Date(liability.date).toLocaleDateString()}</span>
+                                            </div>
+                                            <h4 className="font-bold text-slate-800 mb-1">{liability.description}</h4>
+                                            <p className="text-2xl font-bold text-red-600 mb-2">
+                                                R$ {liability.totalAmount.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
+                                            </p>
+                                        </div>
+                                        
+                                        <div className="mt-4">
+                                            <div className="flex justify-between text-xs text-slate-500 mb-1">
+                                                <span>Pago: R$ {liability.paidAmount.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                                                <span>{progress.toFixed(0)}%</span>
+                                            </div>
+                                            <div className="w-full bg-slate-100 rounded-full h-2.5 mb-2">
+                                                <div className="bg-green-500 h-2.5 rounded-full" style={{width: `${progress}%`}}></div>
+                                            </div>
+                                        </div>
+
+                                        <div className="bg-slate-50 p-3 rounded border border-slate-200 mt-2">
+                                            <p className="text-xs text-slate-500 font-bold uppercase mb-1">Plano de Pagamento</p>
+                                            <div className="flex justify-between items-center text-sm">
+                                                <span>Desconto em Folha:</span>
+                                                <span className="font-bold">{liability.installments}x</span>
+                                            </div>
+                                            <div className="flex justify-between items-center text-sm mt-1">
+                                                <span>Valor Parcela:</span>
+                                                <span className="font-bold">R$ {(liability.totalAmount / liability.installments).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })
+                        )}
+                    </div>
+                </div>
             </div>
         )}
 

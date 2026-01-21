@@ -1,6 +1,6 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { User, Bus, Booking, Part, Transaction, TimeOff, UserRole, DriverDocument, MaintenanceRecord, PurchaseRequest, MaintenanceReport, CharterContract, TravelPackage, PackagePassenger, PackagePayment, Client, FuelRecord, FuelSupply, DriverLiability, PackageLead, SystemSettings, Quote, PriceRoute } from '../types';
+import { User, Bus, Booking, Part, Transaction, TimeOff, UserRole, DriverDocument, MaintenanceRecord, PurchaseRequest, MaintenanceReport, CharterContract, TravelPackage, PackagePassenger, PackagePayment, Client, FuelRecord, FuelSupply, DriverLiability, PackageLead, SystemSettings, Quote, PriceRoute, DriverFee } from '../types';
 import { MOCK_USERS, MOCK_BUSES, MOCK_PARTS } from '../constants';
 
 // Firebase Imports
@@ -36,6 +36,7 @@ interface StoreContextType {
   fuelSupplies: FuelSupply[];
   fuelStockLevel: number;
   driverLiabilities: DriverLiability[];
+  driverFees: DriverFee[]; // New
   quotes: Quote[];
   priceRoutes: PriceRoute[];
   
@@ -48,7 +49,7 @@ interface StoreContextType {
   addUser: (user: Omit<User, 'id' | 'avatar'>) => void;
   updateUser: (id: string, data: Partial<User>) => Promise<void>;
   deleteUser: (id: string) => Promise<void>;
-  addBooking: (booking: Omit<Booking, 'id' | 'status'>) => Promise<{ success: boolean; message: string }>;
+  addBooking: (booking: Omit<Booking, 'id' | 'status'>, driverFeeTotal?: number) => Promise<{ success: boolean; message: string }>;
   updateBooking: (id: string, data: Partial<Booking>) => Promise<{ success: boolean; message: string }>;
   updateBookingStatus: (id: string, status: Booking['status']) => void;
   addPart: (part: Omit<Part, 'id'>) => void;
@@ -83,6 +84,11 @@ interface StoreContextType {
   addDriverLiability: (liability: Omit<DriverLiability, 'id' | 'status' | 'paidAmount'>, createExpense?: boolean) => void;
   payDriverLiability: (id: string, amount: number) => Promise<void>;
   
+  // Driver Fee Actions
+  addDriverFee: (fee: Omit<DriverFee, 'id' | 'status'>) => Promise<void>;
+  payDriverFee: (id: string) => Promise<void>;
+  deleteDriverFee: (id: string) => Promise<void>;
+
   // Quote & Price Actions
   addQuote: (quote: Omit<Quote, 'id' | 'status' | 'createdAt'>) => Promise<void>;
   updateQuote: (id: string, data: Partial<Quote>) => Promise<void>;
@@ -132,6 +138,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   const [fuelRecords, setFuelRecords] = useState<FuelRecord[]>([]);
   const [fuelSupplies, setFuelSupplies] = useState<FuelSupply[]>([]);
   const [driverLiabilities, setDriverLiabilities] = useState<DriverLiability[]>([]);
+  const [driverFees, setDriverFees] = useState<DriverFee[]>([]);
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [priceRoutes, setPriceRoutes] = useState<PriceRoute[]>([]);
   
@@ -176,6 +183,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         { name: 'fuelRecords', setter: setFuelRecords },
         { name: 'fuelSupplies', setter: setFuelSupplies },
         { name: 'driverLiabilities', setter: setDriverLiabilities },
+        { name: 'driverFees', setter: setDriverFees },
         { name: 'quotes', setter: setQuotes },
         { name: 'priceRoutes', setter: setPriceRoutes },
     ];
@@ -280,7 +288,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     });
   };
 
-  const addBooking = async (bookingData: Omit<Booking, 'id' | 'status'>) => {
+  const addBooking = async (bookingData: Omit<Booking, 'id' | 'status'>, driverFeeTotal?: number) => {
     if (!isConfigured) return { success: false, message: "Banco de dados desconectado." };
     if (!checkAvailability(bookingData.busId, bookingData.startTime, bookingData.endTime)) return { success: false, message: 'Conflito: Este ônibus já está alugado neste período!' };
 
@@ -307,6 +315,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         if (newBooking.freelanceDriverName === undefined) delete newBooking.freelanceDriverName;
         const docRef = await addDoc(collection(db, 'bookings'), newBooking);
         
+        // 1. Transaction Logic (Income from Client)
         if (newBooking.value > 0 && newBooking.paymentStatus !== 'PENDING') {
             let transStatus = newBooking.paymentStatus === 'PAID' ? 'COMPLETED' : 'PENDING';
             let transDesc = `Locação: ${newBooking.clientName} - ${newBooking.destination}`;
@@ -316,6 +325,24 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                 date: newBooking.paymentDate || new Date().toISOString(), description: transDesc, relatedBookingId: docRef.id
             });
         }
+
+        // 2. Driver Fee Logic (Expense to Driver or Freelance)
+        if ((bookingData.driverId || bookingData.freelanceDriverName) && driverFeeTotal && driverFeeTotal > 0) {
+            const feeData: Omit<DriverFee, 'id' | 'status'> = {
+                driverId: bookingData.driverId,
+                amount: driverFeeTotal,
+                date: bookingData.startTime.split('T')[0], // Use trip start date
+                description: `Diária - Viagem: ${bookingData.destination}`,
+                relatedBookingId: docRef.id
+            };
+            
+            if (!bookingData.driverId && bookingData.freelanceDriverName) {
+                feeData.freelanceDriverName = bookingData.freelanceDriverName;
+            }
+
+            await addDoc(collection(db, 'driverFees'), { ...feeData, status: 'PENDING' });
+        }
+
         return { success: true, message: 'Agendamento salvo com sucesso!' };
     } catch (e: any) {
         return { success: false, message: 'Erro ao salvar no banco: ' + (e.message || 'Erro desconhecido') };
@@ -479,6 +506,35 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
           type: 'INCOME', status: 'COMPLETED', category: 'Reembolso Avaria/Multa', amount: amount, date: new Date().toISOString().split('T')[0], description: `Abatimento ${liability.type} - ${driver?.name} (${liability.description})`
       });
   };
+
+  // --- DRIVER FEES ACTIONS ---
+  const addDriverFee = async (fee: Omit<DriverFee, 'id' | 'status'>) => {
+      if (!isConfigured) return;
+      await addDoc(collection(db, 'driverFees'), { ...fee, status: 'PENDING' });
+  };
+
+  const payDriverFee = async (id: string) => {
+      if (!isConfigured) return;
+      const fee = driverFees.find(f => f.id === id);
+      if (!fee) return;
+      const driver = users.find(u => u.id === fee.driverId);
+      const driverName = driver ? driver.name : fee.freelanceDriverName || 'Motorista';
+      
+      const paymentDate = new Date().toISOString().split('T')[0];
+      await updateDoc(doc(db, 'driverFees', id), { status: 'PAID', paymentDate });
+      
+      // CREATE EXPENSE TRANSACTION
+      await addDoc(collection(db, 'transactions'), {
+          type: 'EXPENSE',
+          status: 'COMPLETED',
+          category: 'Diárias Motorista',
+          amount: fee.amount,
+          date: paymentDate,
+          description: `Pagamento de Diária - ${driverName} (${fee.description})`
+      });
+  };
+
+  const deleteDriverFee = async (id: string) => { if (isConfigured) await deleteDoc(doc(db, 'driverFees', id)); };
 
   const addQuote = async (quote: Omit<Quote, 'id' | 'status' | 'createdAt'>) => { if (!isConfigured) return; await addDoc(collection(db, 'quotes'), { ...quote, status: 'NEW', createdAt: new Date().toISOString() }); };
   const updateQuote = async (id: string, data: Partial<Quote>) => { if (!isConfigured) return; await updateDoc(doc(db, 'quotes', id), data); };
@@ -665,11 +721,12 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
   return (
     <StoreContext.Provider value={{
-      currentUser: currentUser!, isAuthenticated, settings, users, buses, bookings, parts, transactions, timeOffs, documents, maintenanceRecords, purchaseRequests, maintenanceReports, charterContracts, travelPackages, packagePassengers, packagePayments, clients, packageLeads, fuelRecords, fuelSupplies, fuelStockLevel, driverLiabilities, quotes, priceRoutes,
+      currentUser: currentUser!, isAuthenticated, settings, users, buses, bookings, parts, transactions, timeOffs, documents, maintenanceRecords, purchaseRequests, maintenanceReports, charterContracts, travelPackages, packagePassengers, packagePayments, clients, packageLeads, fuelRecords, fuelSupplies, fuelStockLevel, driverLiabilities, quotes, priceRoutes, driverFees,
       switchUser, addUser, updateUser, deleteUser, addBooking, updateBooking, updateBookingStatus, addPart, updateStock, addTransaction, addTimeOff, updateTimeOffStatus, deleteTimeOff, addDocument, deleteDocument, addMaintenanceRecord, addPurchaseRequest, updatePurchaseRequestStatus, addMaintenanceReport, updateMaintenanceReportStatus, addBus, updateBusStatus, addCharterContract, addTravelPackage, registerPackageSale, updatePackagePassenger, deletePackagePassenger, addPackagePayment, addPackageLead, updatePackageLead, deletePackageLead, addFuelRecord, addFuelSupply, addDriverLiability, payDriverLiability,
       login, logout, register, updateSettings, seedDatabase,
       addQuote, updateQuote, convertQuoteToBooking, deleteQuote,
-      addPriceRoute, updatePriceRoute, deletePriceRoute, importDefaultPrices, clearPriceTable
+      addPriceRoute, updatePriceRoute, deletePriceRoute, importDefaultPrices, clearPriceTable,
+      addDriverFee, payDriverFee, deleteDriverFee
     }}>
       {children}
     </StoreContext.Provider>

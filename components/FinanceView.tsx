@@ -1,12 +1,12 @@
 
 import React, { useState } from 'react';
 import { useStore } from '../services/store';
-import { UserRole, DriverLiability } from '../types';
+import { UserRole, DriverLiability, DriverFee } from '../types';
 
 const FinanceView: React.FC = () => {
-  const { transactions, addTransaction, users, addDriverLiability, driverLiabilities, payDriverLiability } = useStore();
+  const { transactions, addTransaction, users, addDriverLiability, driverLiabilities, payDriverLiability, driverFees, addDriverFee, payDriverFee, deleteDriverFee } = useStore();
   const [filter, setFilter] = useState<'ALL' | 'INCOME' | 'EXPENSE'>('ALL');
-  const [activeTab, setActiveTab] = useState<'CASHBOOK' | 'LIABILITIES'>('CASHBOOK');
+  const [activeTab, setActiveTab] = useState<'CASHBOOK' | 'LIABILITIES' | 'FEES'>('CASHBOOK');
 
   // --- MANUAL TRANSACTION STATE ---
   const [newTrans, setNewTrans] = useState({ 
@@ -33,6 +33,14 @@ const FinanceView: React.FC = () => {
       amount: 0,
       installments: 1,
       createExpense: true 
+  });
+
+  // --- DRIVER FEE STATE ---
+  const [feeForm, setFeeForm] = useState({
+      driverId: '',
+      amount: 0,
+      date: new Date().toISOString().split('T')[0],
+      description: ''
   });
 
   // --- RECEIVE PAYMENT MODAL STATE ---
@@ -125,6 +133,27 @@ const FinanceView: React.FC = () => {
       });
   };
 
+  const handleFeeSubmit = (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!feeForm.driverId || feeForm.amount <= 0) return;
+
+      addDriverFee(feeForm);
+      alert('Diária lançada com sucesso! Ela aparecerá como Pendente.');
+      setFeeForm({ driverId: '', amount: 0, date: new Date().toISOString().split('T')[0], description: '' });
+  };
+
+  const handlePayFee = async (id: string) => {
+      if (confirm("Confirmar o pagamento desta diária? Isso irá gerar uma despesa no caixa.")) {
+          await payDriverFee(id);
+      }
+  };
+
+  const handleDeleteFee = async (id: string) => {
+      if (confirm("Tem certeza que deseja excluir este lançamento de diária?")) {
+          await deleteDriverFee(id);
+      }
+  };
+
   const handleReceivePayment = async (e: React.FormEvent) => {
       e.preventDefault();
       if (paymentModal.liability && paymentModal.amount > 0) {
@@ -144,16 +173,6 @@ const FinanceView: React.FC = () => {
 
   const currentBalance = realizedTransactions.reduce((acc, t) => t.type === 'INCOME' ? acc + t.amount : acc - t.amount, 0);
   const projectedIncome = pendingTransactions.filter(t => t.type === 'INCOME').reduce((acc, t) => acc + t.amount, 0);
-
-  const getMethodLabel = (method?: string) => {
-      switch(method) {
-          case 'BOLETO': return 'Boleto';
-          case 'CARTAO_CREDITO': return 'C. Crédito';
-          case 'PIX': return 'Pix';
-          case 'DINHEIRO': return 'Dinheiro';
-          default: return method || '-';
-      }
-  };
 
   return (
     <div className="space-y-6 animate-fade-in relative">
@@ -193,18 +212,24 @@ const FinanceView: React.FC = () => {
         )}
 
         {/* TABS */}
-        <div className="flex border-b border-slate-300">
+        <div className="flex border-b border-slate-300 overflow-x-auto">
             <button 
                 onClick={() => setActiveTab('CASHBOOK')}
-                className={`px-6 py-3 font-bold text-sm ${activeTab === 'CASHBOOK' ? 'border-b-2 border-slate-800 text-slate-800' : 'text-slate-500 hover:text-slate-700'}`}
+                className={`px-6 py-3 font-bold text-sm whitespace-nowrap ${activeTab === 'CASHBOOK' ? 'border-b-2 border-slate-800 text-slate-800' : 'text-slate-500 hover:text-slate-700'}`}
             >
                 📚 Livro Caixa
             </button>
             <button 
-                onClick={() => setActiveTab('LIABILITIES')}
-                className={`px-6 py-3 font-bold text-sm ${activeTab === 'LIABILITIES' ? 'border-b-2 border-red-600 text-red-600' : 'text-slate-500 hover:text-slate-700'}`}
+                onClick={() => setActiveTab('FEES')}
+                className={`px-6 py-3 font-bold text-sm whitespace-nowrap ${activeTab === 'FEES' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}
             >
-                💥 Avarias e Multas (Motoristas)
+                💸 Diárias (Motoristas)
+            </button>
+            <button 
+                onClick={() => setActiveTab('LIABILITIES')}
+                className={`px-6 py-3 font-bold text-sm whitespace-nowrap ${activeTab === 'LIABILITIES' ? 'border-b-2 border-red-600 text-red-600' : 'text-slate-500 hover:text-slate-700'}`}
+            >
+                💥 Avarias e Multas
             </button>
         </div>
 
@@ -479,6 +504,132 @@ const FinanceView: React.FC = () => {
                     </form>
                 </div>
             </div>
+            </div>
+        )}
+
+        {/* DRIVER FEES TAB */}
+        {activeTab === 'FEES' && (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="bg-white p-6 rounded-xl shadow-sm border border-blue-200 h-fit">
+                    <h3 className="font-bold text-lg mb-4 text-blue-800 flex items-center gap-2">
+                        <span className="bg-blue-100 p-1.5 rounded">💸</span>
+                        Lançar Diária de Motorista
+                    </h3>
+                    <p className="text-xs text-slate-500 mb-4">
+                        Registe aqui o valor que deve ser pago ao motorista. Ao realizar o pagamento, a despesa será lançada no caixa.
+                    </p>
+                    <form onSubmit={handleFeeSubmit} className="space-y-4">
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Motorista</label>
+                            <select 
+                                required value={feeForm.driverId} 
+                                onChange={e => setFeeForm({...feeForm, driverId: e.target.value})}
+                                className="w-full border p-2 rounded bg-slate-50 focus:ring-2 focus:ring-blue-500 outline-none"
+                            >
+                                <option value="">Selecione...</option>
+                                {drivers.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                            </select>
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Data da Viagem</label>
+                            <input 
+                                type="date" required value={feeForm.date} 
+                                onChange={e => setFeeForm({...feeForm, date: e.target.value})} 
+                                className="w-full border p-2 rounded" 
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Descrição</label>
+                            <input 
+                                required value={feeForm.description} 
+                                onChange={e => setFeeForm({...feeForm, description: e.target.value})} 
+                                className="w-full border p-2 rounded" 
+                                placeholder="Ex: Viagem Beto Carrero (5 dias)" 
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Valor da Diária (Total)</label>
+                            <div className="flex items-center border border-slate-300 rounded-lg overflow-hidden bg-white">
+                                <span className="bg-slate-100 text-slate-600 px-3 py-2 font-bold border-r border-slate-300">R$</span>
+                                <input 
+                                    type="text" inputMode="numeric" required 
+                                    value={feeForm.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} 
+                                    onChange={e => handleCurrencyChange(e, setFeeForm)} 
+                                    className="w-full p-2 outline-none text-right font-bold text-blue-700" 
+                                />
+                            </div>
+                        </div>
+                        <button type="submit" className="w-full bg-blue-700 text-white font-bold py-3 rounded hover:bg-blue-800">
+                            Registrar a Pagar
+                        </button>
+                    </form>
+                </div>
+
+                <div className="lg:col-span-2">
+                    <h3 className="font-bold text-slate-700 mb-4">Relatório de Diárias (Contas a Pagar)</h3>
+                    <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                        <table className="w-full text-left">
+                            <thead className="bg-slate-50 text-slate-600 text-xs uppercase font-bold border-b border-slate-200">
+                                <tr>
+                                    <th className="p-3">Data</th>
+                                    <th className="p-3">Motorista</th>
+                                    <th className="p-3">Descrição</th>
+                                    <th className="p-3 text-right">Valor</th>
+                                    <th className="p-3 text-center">Status</th>
+                                    <th className="p-3 text-right">Ação</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                                {driverFees.length === 0 ? (
+                                    <tr><td colSpan={6} className="p-8 text-center text-slate-500">Nenhuma diária registrada.</td></tr>
+                                ) : (
+                                    driverFees.sort((a,b) => (a.status === 'PENDING' ? -1 : 1)).map(fee => {
+                                        const drv = fee.driverId ? users.find(u => u.id === fee.driverId) : null;
+                                        const driverName = drv ? drv.name : (fee.freelanceDriverName ? `${fee.freelanceDriverName} (F)` : 'Desconhecido');
+                                        
+                                        return (
+                                            <tr key={fee.id} className={`hover:bg-slate-50 ${fee.status === 'PAID' ? 'opacity-60 bg-slate-50' : ''}`}>
+                                                <td className="p-3 text-sm text-slate-600">
+                                                    {new Date(fee.date).toLocaleDateString()}
+                                                </td>
+                                                <td className="p-3 font-bold text-slate-800">{driverName}</td>
+                                                <td className="p-3 text-sm text-slate-600">{fee.description}</td>
+                                                <td className="p-3 text-right font-bold text-blue-600">R$ {fee.amount.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
+                                                <td className="p-3 text-center">
+                                                    {fee.status === 'PAID' ? (
+                                                        <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded font-bold">PAGO</span>
+                                                    ) : (
+                                                        <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-1 rounded font-bold">PENDENTE</span>
+                                                    )}
+                                                </td>
+                                                <td className="p-3 text-right flex justify-end gap-2">
+                                                    {fee.status === 'PENDING' ? (
+                                                        <>
+                                                            <button 
+                                                                onClick={() => handlePayFee(fee.id)}
+                                                                className="text-xs bg-green-600 text-white px-2 py-1 rounded hover:bg-green-700 font-bold shadow-sm"
+                                                            >
+                                                                Pagar
+                                                            </button>
+                                                            <button 
+                                                                onClick={() => handleDeleteFee(fee.id)}
+                                                                className="text-xs text-red-400 hover:text-red-600"
+                                                            >
+                                                                ✕
+                                                            </button>
+                                                        </>
+                                                    ) : (
+                                                        <span className="text-[10px] text-slate-400 italic">Pago em {fee.paymentDate ? new Date(fee.paymentDate).toLocaleDateString() : '-'}</span>
+                                                    )}
+                                                </td>
+                                            </tr>
+                                        );
+                                    })
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
             </div>
         )}
 

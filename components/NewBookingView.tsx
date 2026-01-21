@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+
+import React, { useState, useEffect } from 'react';
 import { useStore } from '../services/store';
 import { UserRole } from '../types';
 
@@ -24,7 +25,48 @@ const NewBookingView: React.FC = () => {
     observations: ''
   });
 
+  // Driver Fee State
+  const [driverDailyValue, setDriverDailyValue] = useState(0);
+  const [calculatedDays, setCalculatedDays] = useState(0);
+
   const drivers = users.filter(u => u.role === UserRole.DRIVER);
+
+  // Auto-fill Driver Daily Rate when driver is selected
+  useEffect(() => {
+      if (!formData.isFreelance && formData.driverId) {
+          const selectedDriver = drivers.find(d => d.id === formData.driverId);
+          if (selectedDriver && selectedDriver.dailyRate) {
+              setDriverDailyValue(selectedDriver.dailyRate);
+          } else {
+              setDriverDailyValue(0); // Reset if no default rate
+          }
+      } else if (formData.isFreelance) {
+          // Keep current value or reset, user decides. 
+          // Usually better to keep as 0 or last entered value if switching back and forth
+      }
+  }, [formData.driverId, formData.isFreelance, drivers]);
+
+  // Effect to calculate days whenever start/end time changes
+  useEffect(() => {
+      if (formData.startTime && formData.endTime) {
+          const start = new Date(formData.startTime);
+          const end = new Date(formData.endTime);
+          
+          if (!isNaN(start.getTime()) && !isNaN(end.getTime())) {
+              // Reset times to midnight to count days inclusively properly
+              const startDay = new Date(start); startDay.setHours(0,0,0,0);
+              const endDay = new Date(end); endDay.setHours(0,0,0,0);
+              
+              const diffTime = Math.abs(endDay.getTime() - startDay.getTime());
+              const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
+              
+              // Logic: Include start day. So if start==end, days=1. If start!=end, days = diff + 1.
+              setCalculatedDays(diffDays + 1);
+          }
+      } else {
+          setCalculatedDays(0);
+      }
+  }, [formData.startTime, formData.endTime]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -34,6 +76,8 @@ const NewBookingView: React.FC = () => {
          // Handle checkbox for freelance
          const isChecked = (e.target as HTMLInputElement).checked;
          setFormData(prev => ({ ...prev, isFreelance: isChecked, driverId: '', freelanceDriverName: '' }));
+         // If freelance, reset daily value so user enters it manually
+         if (isChecked) setDriverDailyValue(0);
     } else {
         setFormData(prev => ({ ...prev, [name]: value }));
     }
@@ -48,6 +92,13 @@ const NewBookingView: React.FC = () => {
     const realValue = Number(digits) / 100;
     
     setFormData(prev => ({ ...prev, value: realValue }));
+  };
+
+  const handleDriverFeeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    const digits = value.replace(/\D/g, "");
+    const realValue = Number(digits) / 100;
+    setDriverDailyValue(realValue);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -87,7 +138,10 @@ const NewBookingView: React.FC = () => {
         observations: formData.observations
     };
 
-    const result = await addBooking(payload);
+    // Calculate total driver fee
+    const totalDriverFee = driverDailyValue * calculatedDays;
+
+    const result = await addBooking(payload, totalDriverFee);
 
     if (result.success) {
       setMsg({ type: 'success', text: result.message });
@@ -98,6 +152,7 @@ const NewBookingView: React.FC = () => {
         paymentStatus: 'PENDING', paymentDate: '',
         departureLocation: '', presentationTime: '', observations: ''
       });
+      setDriverDailyValue(0);
       window.scrollTo(0,0);
       setTimeout(() => setMsg(null), 3000);
     } else {
@@ -177,7 +232,7 @@ const NewBookingView: React.FC = () => {
                     </select>
                 </div>
                 
-                <div className="bg-slate-50 p-3 rounded border border-slate-200">
+                <div className="bg-slate-50 p-3 rounded border border-slate-200 space-y-3">
                     <div className="flex justify-between items-center mb-2">
                         <label className="block text-sm font-bold text-slate-700">Motorista *</label>
                         <label className="flex items-center space-x-2 text-sm cursor-pointer">
@@ -206,6 +261,34 @@ const NewBookingView: React.FC = () => {
                             <option value="">Selecione o Motorista da Frota</option>
                             {drivers.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
                         </select>
+                    )}
+
+                    {/* DRIVER FEE INPUT */}
+                    {(formData.driverId || formData.isFreelance) && (
+                        <div className="pt-2 border-t border-slate-200 animate-fade-in">
+                            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Valor da Diária (Unitário)</label>
+                            <div className="flex items-center gap-2">
+                                <div className="flex-1 flex items-center border border-slate-300 rounded overflow-hidden bg-white focus-within:ring-2 focus-within:ring-blue-500">
+                                    <span className="bg-slate-100 text-slate-600 px-2 py-1.5 font-bold border-r border-slate-300 text-xs">R$</span>
+                                    <input 
+                                        type="text" 
+                                        inputMode="numeric"
+                                        value={driverDailyValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} 
+                                        onChange={handleDriverFeeChange} 
+                                        className="w-full p-1.5 outline-none text-right font-bold text-slate-800 text-sm" 
+                                        placeholder="0,00" 
+                                    />
+                                </div>
+                                <div className="text-xs text-slate-600 bg-blue-50 px-2 py-1 rounded border border-blue-100">
+                                    <span className="font-bold">{calculatedDays}</span> {calculatedDays === 1 ? 'dia' : 'dias'}
+                                </div>
+                            </div>
+                            {driverDailyValue > 0 && calculatedDays > 0 && (
+                                <p className="text-xs text-green-600 font-bold mt-1 text-right">
+                                    Total a Pagar Motorista: R$ {(driverDailyValue * calculatedDays).toLocaleString('pt-BR', {minimumFractionDigits: 2})}
+                                </p>
+                            )}
+                        </div>
                     )}
                 </div>
             </div>

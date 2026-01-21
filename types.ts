@@ -24,6 +24,7 @@ export interface User {
   role: UserRole | string; // Allow string for legacy data compatibility
   avatar: string;
   status?: 'APPROVED' | 'PENDING' | 'REJECTED'; // New field for access control
+  dailyRate?: number; // Valor padrão da diária
 }
 
 export interface Bus {
@@ -104,6 +105,18 @@ export interface Transaction {
     current: number;
     total: number;
   };
+}
+
+export interface DriverFee {
+  id: string;
+  driverId: string | null; // Pode ser null se for freelance
+  freelanceDriverName?: string; // Nome se for freelance
+  amount: number;
+  date: string; // Data da viagem ou referência
+  description: string; // Ex: "Viagem para Aparecida"
+  status: 'PENDING' | 'PAID';
+  paymentDate?: string; // Data que a empresa pagou
+  relatedBookingId?: string;
 }
 
 export interface TimeOff {
