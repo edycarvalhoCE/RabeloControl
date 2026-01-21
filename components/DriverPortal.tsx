@@ -36,7 +36,8 @@ const DriverPortal: React.FC = () => {
       hasArla: false,
       arlaLiters: 0,
       location: 'STREET' as 'GARAGE' | 'STREET',
-      cost: 0,
+      cost: 0, // This is Diesel Cost or Total if Arla not separated
+      arlaCost: 0,
       stationName: '',
       kmStart: 0,
       kmEnd: 0
@@ -147,10 +148,15 @@ const DriverPortal: React.FC = () => {
       const distance = fuelForm.kmEnd - fuelForm.kmStart;
       const average = distance / fuelForm.dieselLiters;
       
+      // Calculate Total Cost
+      // If STREET + Arla, we sum both for the main financial record
+      const totalCost = fuelForm.location === 'STREET' ? (fuelForm.cost + (fuelForm.hasArla ? fuelForm.arlaCost : 0)) : 0;
+
       addFuelRecord({
           ...fuelForm,
           arlaLiters: fuelForm.hasArla ? fuelForm.arlaLiters : 0, // Ensure clean data
-          cost: fuelForm.location === 'STREET' ? fuelForm.cost : 0,
+          cost: totalCost,
+          arlaCost: fuelForm.hasArla && fuelForm.location === 'STREET' ? fuelForm.arlaCost : 0,
           stationName: fuelForm.location === 'STREET' ? fuelForm.stationName : '',
           loggedBy: currentUser.id,
           // New Fields
@@ -168,6 +174,7 @@ const DriverPortal: React.FC = () => {
         arlaLiters: 0,
         location: 'STREET',
         cost: 0,
+        arlaCost: 0,
         stationName: '',
         kmStart: 0,
         kmEnd: 0
@@ -398,13 +405,30 @@ const DriverPortal: React.FC = () => {
                         <div className="bg-orange-50 p-4 rounded-xl border border-orange-100 space-y-3 animate-fade-in">
                             <h4 className="text-sm font-bold text-orange-800 uppercase tracking-wide">Detalhes do Posto</h4>
                             <div>
-                                <label className="block text-xs font-bold text-orange-700 mb-1">Valor Pago (R$)</label>
+                                <label className="block text-xs font-bold text-orange-700 mb-1">
+                                    {fuelForm.hasArla ? 'Valor Diesel (R$)' : 'Valor Pago (R$)'}
+                                </label>
                                 <input 
                                 type="number" step="0.01"
                                 value={fuelForm.cost || ''} onChange={e => setFuelForm({...fuelForm, cost: parseFloat(e.target.value)})}
                                 className="w-full border border-orange-200 p-2 rounded text-sm" placeholder="0.00"
                                 />
                             </div>
+
+                            {/* Arla Cost Input */}
+                            {fuelForm.hasArla && (
+                                <div>
+                                    <label className="block text-xs font-bold text-blue-800 mb-1">
+                                        Valor Arla (R$)
+                                    </label>
+                                    <input 
+                                    type="number" step="0.01"
+                                    value={fuelForm.arlaCost || ''} onChange={e => setFuelForm({...fuelForm, arlaCost: parseFloat(e.target.value)})}
+                                    className="w-full border border-blue-300 p-2 rounded text-sm text-blue-900 font-bold" placeholder="0.00"
+                                    />
+                                </div>
+                            )}
+
                             <div>
                                 <label className="block text-xs font-bold text-orange-700 mb-1">Nome do Posto</label>
                                 <input 
@@ -550,254 +574,6 @@ const DriverPortal: React.FC = () => {
                                                 <span className="font-bold">R$ {(liability.totalAmount / liability.installments).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
                                             </div>
                                         </div>
-                                    </div>
-                                );
-                            })
-                        )}
-                    </div>
-                </div>
-            </div>
-        )}
-
-        {/* ... remaining modals ... */}
-        {selectedBooking && (
-            <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" onClick={() => setSelectedBooking(null)}>
-                <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full overflow-hidden animate-fade-in" onClick={e => e.stopPropagation()}>
-                    <div className="bg-slate-800 p-4 flex justify-between items-center text-white">
-                        <h3 className="font-bold text-lg">Detalhes da Viagem</h3>
-                        <button onClick={() => setSelectedBooking(null)} className="text-slate-400 hover:text-white font-bold text-xl">&times;</button>
-                    </div>
-                    <div className="p-6 space-y-4">
-                        <div className="flex items-start gap-4 mb-2">
-                            <div className="bg-blue-100 p-3 rounded-lg">
-                                <span className="text-2xl">🚌</span>
-                            </div>
-                            <div>
-                                <h2 className="text-2xl font-bold text-slate-800">{selectedBooking.destination}</h2>
-                                {(() => {
-                                    const bus = buses.find(b => b.id === selectedBooking.busId);
-                                    return bus ? <p className="text-slate-600 font-medium">{bus.plate} - {bus.model}</p> : null;
-                                })()}
-                            </div>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-4 bg-slate-50 p-3 rounded-lg border border-slate-100">
-                            <div>
-                                <p className="text-xs text-slate-500 font-bold uppercase">Saída</p>
-                                <p className="text-sm font-semibold text-slate-800">{formatDateTime(selectedBooking.startTime)}</p>
-                            </div>
-                            <div>
-                                <p className="text-xs text-slate-500 font-bold uppercase">Retorno</p>
-                                <p className="text-sm font-semibold text-slate-800">{formatDateTime(selectedBooking.endTime)}</p>
-                            </div>
-                            <div className="col-span-2">
-                                <p className="text-xs text-slate-500 font-bold uppercase">Local de Apresentação</p>
-                                <p className="text-sm text-slate-800">{selectedBooking.presentationTime ? formatDateTime(selectedBooking.presentationTime) : formatDateTime(selectedBooking.startTime)} - {selectedBooking.departureLocation || 'Garagem'}</p>
-                            </div>
-                        </div>
-
-                        <div className="space-y-2">
-                            <div>
-                                <p className="text-xs text-slate-500 font-bold uppercase">Cliente / Contratante</p>
-                                <p className="text-sm font-medium">{selectedBooking.clientName}</p>
-                                {selectedBooking.clientPhone && <p className="text-sm text-blue-600">{selectedBooking.clientPhone}</p>}
-                            </div>
-                            
-                            {selectedBooking.observations && (
-                                <div className="bg-yellow-50 p-3 rounded border border-yellow-100">
-                                    <p className="text-xs text-yellow-700 font-bold uppercase mb-1">Observações / Instruções</p>
-                                    <p className="text-sm text-slate-700 whitespace-pre-wrap">{selectedBooking.observations}</p>
-                                </div>
-                            )}
-                        </div>
-
-                        <button 
-                            onClick={() => setSelectedBooking(null)}
-                            className="w-full bg-slate-800 text-white py-3 rounded-lg font-bold hover:bg-slate-700 mt-2"
-                        >
-                            Fechar Detalhes
-                        </button>
-                    </div>
-                </div>
-            </div>
-        )}
-
-        {/* ... (rest of the file remains unchanged) ... */}
-        {activeTab === 'documents' && (
-            <div className="space-y-4">
-                <h2 className="text-xl font-bold text-slate-800">Documentos Disponíveis</h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {myDocuments.length === 0 ? (
-                        <p className="text-slate-500 col-span-2 text-center py-10 bg-white rounded-lg border border-dashed border-slate-300">
-                            Nenhum documento disponível para você.
-                        </p>
-                    ) : (
-                        myDocuments.map(doc => (
-                            <div key={doc.id} className="bg-white p-5 rounded-lg shadow-sm border border-slate-200 flex justify-between items-center">
-                                <div className="flex items-center gap-3">
-                                    <div className="bg-blue-100 p-3 rounded text-blue-600">
-                                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-                                    </div>
-                                    <div>
-                                        <h3 className="font-bold text-slate-800">{doc.title}</h3>
-                                        <p className="text-xs text-slate-500">Upload: {formatDateString(doc.uploadDate)}</p>
-                                    </div>
-                                </div>
-                                <a 
-                                    href={doc.fileContent} 
-                                    download={doc.fileName}
-                                    className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-                                >
-                                    Baixar
-                                </a>
-                            </div>
-                        ))
-                    )}
-                </div>
-            </div>
-        )}
-
-        {activeTab === 'requests' && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 h-fit">
-                    <h2 className="text-lg font-bold text-slate-800 mb-4">Solicitar Folga / Férias</h2>
-                    <form onSubmit={handleRequest} className="space-y-4">
-                        <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-1">Tipo</label>
-                            <select 
-                                value={requestType} 
-                                onChange={e => setRequestType(e.target.value as any)}
-                                className="w-full border p-2 rounded focus:ring-2 focus:ring-blue-500 outline-none"
-                            >
-                                <option value="FOLGA">Folga (Dia Único)</option>
-                                <option value="FERIAS">Férias (Período)</option>
-                            </select>
-                        </div>
-                        
-                        <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-1">Data Início</label>
-                            <input 
-                                type="date" required 
-                                value={requestDate} onChange={e => setRequestDate(e.target.value)}
-                                className="w-full border p-2 rounded focus:ring-2 focus:ring-blue-500 outline-none"
-                            />
-                        </div>
-
-                        {requestType === 'FERIAS' && (
-                            <div className="animate-fade-in">
-                                <label className="block text-sm font-medium text-slate-700 mb-1">Data Fim</label>
-                                <input 
-                                    type="date" required 
-                                    value={requestEndDate} onChange={e => setRequestEndDate(e.target.value)}
-                                    className="w-full border p-2 rounded focus:ring-2 focus:ring-blue-500 outline-none"
-                                />
-                            </div>
-                        )}
-
-                        <button type="submit" className="w-full bg-slate-800 text-white font-medium py-2 rounded hover:bg-slate-700">
-                            Enviar Solicitação
-                        </button>
-                    </form>
-                </div>
-
-                <div>
-                    <h3 className="font-bold text-slate-700 mb-3">Histórico de Solicitações</h3>
-                    <div className="space-y-2">
-                        {myTimeOffs.map(t => (
-                            <div key={t.id} className="bg-slate-50 p-3 rounded flex justify-between items-center text-sm border border-slate-200">
-                                <div>
-                                    <span className="font-semibold block text-slate-800">{t.type}</span>
-                                    <span className="text-slate-500">
-                                        {formatDateString(t.date)}
-                                        {t.endDate && ` até ${formatDateString(t.endDate)}`}
-                                    </span>
-                                </div>
-                                {getStatusBadge(t.status)}
-                            </div>
-                        ))}
-                        {myTimeOffs.length === 0 && <p className="text-slate-400 text-sm">Nenhuma solicitação.</p>}
-                    </div>
-                </div>
-            </div>
-        )}
-
-        {activeTab === 'report' && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 h-fit border-l-4 border-l-red-500">
-                    <h2 className="text-lg font-bold text-slate-800 mb-2">Reportar Problema no Veículo</h2>
-                    <p className="text-sm text-slate-500 mb-4">Viu algo errado? Avise a oficina imediatamente.</p>
-                    
-                    <form onSubmit={handleReportSubmit} className="space-y-4">
-                        <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-1">Veículo</label>
-                            <select 
-                                required value={reportForm.busId}
-                                onChange={e => setReportForm({...reportForm, busId: e.target.value})}
-                                className="w-full border p-2 rounded focus:ring-2 focus:ring-red-500 outline-none"
-                            >
-                                <option value="">Selecione o ônibus...</option>
-                                {buses.map(b => (
-                                    <option key={b.id} value={b.id}>{b.plate} - {b.model}</option>
-                                ))}
-                            </select>
-                        </div>
-                        <div className="grid grid-cols-2 gap-4">
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-1">Data</label>
-                                <input 
-                                    type="date" required 
-                                    value={reportForm.date} onChange={e => setReportForm({...reportForm, date: e.target.value})}
-                                    className="w-full border p-2 rounded focus:ring-2 focus:ring-red-500 outline-none"
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-1">Tipo de Serviço</label>
-                                <select 
-                                    value={reportForm.type}
-                                    onChange={e => setReportForm({...reportForm, type: e.target.value})}
-                                    className="w-full border p-2 rounded focus:ring-2 focus:ring-red-500 outline-none"
-                                >
-                                    <option value="MECANICA">Mecânica</option>
-                                    <option value="ELETRICA">Elétrica</option>
-                                    <option value="LIMPEZA">Limpeza</option>
-                                    <option value="CARROCERIA">Carroceria</option>
-                                    <option value="OUTROS">Outros</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-1">Observação / Defeito</label>
-                            <textarea 
-                                required value={reportForm.description}
-                                onChange={e => setReportForm({...reportForm, description: e.target.value})}
-                                placeholder="Descreva o problema (ex: Freio fazendo barulho, Luz queimada...)"
-                                className="w-full border p-2 rounded focus:ring-2 focus:ring-red-500 outline-none h-24 resize-none"
-                            />
-                        </div>
-                        <button type="submit" className="w-full bg-red-600 text-white font-medium py-2 rounded hover:bg-red-700">
-                            Enviar Reporte
-                        </button>
-                    </form>
-                </div>
-
-                <div>
-                    <h3 className="font-bold text-slate-700 mb-3">Meus Reportes Recentes</h3>
-                    <div className="space-y-3">
-                        {myReports.length === 0 ? (
-                            <p className="text-slate-400 text-sm">Nenhum reporte enviado.</p>
-                        ) : (
-                            myReports.map(r => {
-                                const bus = buses.find(b => b.id === r.busId);
-                                return (
-                                    <div key={r.id} className="bg-white p-4 rounded-lg shadow-sm border border-slate-200">
-                                        <div className="flex justify-between items-start mb-2">
-                                            <span className="font-bold text-slate-800">{bus?.plate}</span>
-                                            {getStatusBadge(r.status)}
-                                        </div>
-                                        <p className="text-sm text-slate-600 mb-1">{r.description}</p>
-                                        <p className="text-xs text-slate-400">
-                                            {r.type} • {formatDateString(r.date)}
-                                        </p>
                                     </div>
                                 );
                             })

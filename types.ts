@@ -280,6 +280,7 @@ export interface FuelRecord {
   kmStart?: number;
   kmEnd?: number;
   averageConsumption?: number; // KM/L
+  arlaCost?: number; // Custo específico do Arla quando na rua
 }
 
 export interface FuelSupply {

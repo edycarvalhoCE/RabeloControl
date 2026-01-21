@@ -37,7 +37,8 @@ const InventoryView: React.FC = () => {
       hasArla: false,
       arlaLiters: 0,
       location: 'GARAGE' as 'GARAGE' | 'STREET',
-      cost: 0,
+      cost: 0, // This will serve as Diesel Cost (or Total if Arla not separate)
+      arlaCost: 0, // Explicit Arla Cost
       stationName: '',
       // NEW KM FIELDS
       kmStart: 0,
@@ -136,6 +137,10 @@ const InventoryView: React.FC = () => {
       const distance = fuelForm.kmEnd - fuelForm.kmStart;
       const average = distance / fuelForm.dieselLiters;
       
+      // Calculate Total Cost (Diesel + Arla)
+      // Note: fuelForm.cost is used as Diesel Cost when Street + Arla is active
+      const totalCost = fuelForm.location === 'STREET' ? (fuelForm.cost + (fuelForm.hasArla ? fuelForm.arlaCost : 0)) : 0;
+
       addFuelRecord({
           date: fuelForm.date,
           busId: fuelForm.busId,
@@ -143,7 +148,8 @@ const InventoryView: React.FC = () => {
           arlaLiters: fuelForm.hasArla ? fuelForm.arlaLiters : 0,
           hasArla: fuelForm.hasArla,
           location: fuelForm.location,
-          cost: fuelForm.location === 'STREET' ? fuelForm.cost : 0,
+          cost: totalCost, // Salva o custo total para o financeiro
+          arlaCost: fuelForm.hasArla && fuelForm.location === 'STREET' ? fuelForm.arlaCost : 0, // Salva custo específico
           stationName: fuelForm.location === 'STREET' ? fuelForm.stationName : '',
           loggedBy: currentUser.id,
           // Add new KM fields
@@ -160,6 +166,7 @@ const InventoryView: React.FC = () => {
         arlaLiters: 0,
         location: 'GARAGE',
         cost: 0,
+        arlaCost: 0,
         stationName: '',
         kmStart: 0,
         kmEnd: 0
@@ -576,7 +583,7 @@ const InventoryView: React.FC = () => {
                           />
                       </div>
                       
-                      {/* NEW: Location Toggle */}
+                      {/* Location Toggle */}
                       <div className="grid grid-cols-2 gap-2 p-1 bg-slate-100 rounded-lg">
                           <button
                             type="button"
@@ -655,26 +662,6 @@ const InventoryView: React.FC = () => {
                         )}
                       </div>
 
-                      {fuelForm.location === 'STREET' && (
-                          <div className="bg-orange-50 p-3 rounded border border-orange-100 space-y-3 animate-fade-in">
-                              <div>
-                                  <label className="block text-xs font-bold text-orange-800 mb-1">Valor Pago (R$)</label>
-                                  <input 
-                                    type="number" step="0.01"
-                                    value={fuelForm.cost || ''} onChange={e => setFuelForm({...fuelForm, cost: parseFloat(e.target.value)})}
-                                    className="w-full border p-2 rounded text-sm" placeholder="0.00"
-                                  />
-                              </div>
-                              <div>
-                                  <label className="block text-xs font-bold text-orange-800 mb-1">Nome do Posto</label>
-                                  <input 
-                                    value={fuelForm.stationName} onChange={e => setFuelForm({...fuelForm, stationName: e.target.value})}
-                                    className="w-full border p-2 rounded text-sm" placeholder="Ex: Posto Shell"
-                                  />
-                              </div>
-                          </div>
-                      )}
-
                       <div className="bg-blue-50 p-3 rounded-lg border border-blue-100">
                           <label className="flex items-center justify-between cursor-pointer">
                               <span className="font-bold text-blue-800 text-sm">Abasteceu Arla 32?</span>
@@ -706,6 +693,43 @@ const InventoryView: React.FC = () => {
                           )}
                       </div>
 
+                      {fuelForm.location === 'STREET' && (
+                          <div className="bg-orange-50 p-3 rounded border border-orange-100 space-y-3 animate-fade-in">
+                              <div>
+                                  <label className="block text-xs font-bold text-orange-800 mb-1">
+                                      {fuelForm.hasArla ? 'Valor Diesel (R$)' : 'Valor Pago (R$)'}
+                                  </label>
+                                  <input 
+                                    type="number" step="0.01"
+                                    value={fuelForm.cost || ''} onChange={e => setFuelForm({...fuelForm, cost: parseFloat(e.target.value)})}
+                                    className="w-full border p-2 rounded text-sm" placeholder="0.00"
+                                  />
+                              </div>
+                              
+                              {/* New Arla Cost Input */}
+                              {fuelForm.hasArla && (
+                                  <div>
+                                      <label className="block text-xs font-bold text-blue-800 mb-1">
+                                          Valor Arla (R$)
+                                      </label>
+                                      <input 
+                                        type="number" step="0.01"
+                                        value={fuelForm.arlaCost || ''} onChange={e => setFuelForm({...fuelForm, arlaCost: parseFloat(e.target.value)})}
+                                        className="w-full border border-blue-300 p-2 rounded text-sm text-blue-900 font-bold" placeholder="0.00"
+                                      />
+                                  </div>
+                              )}
+
+                              <div>
+                                  <label className="block text-xs font-bold text-orange-800 mb-1">Nome do Posto</label>
+                                  <input 
+                                    value={fuelForm.stationName} onChange={e => setFuelForm({...fuelForm, stationName: e.target.value})}
+                                    className="w-full border p-2 rounded text-sm" placeholder="Ex: Posto Shell"
+                                  />
+                              </div>
+                          </div>
+                      )}
+
                       <button type="submit" className="w-full bg-slate-800 text-white font-bold py-3 rounded hover:bg-slate-700">
                           Lançar Consumo
                       </button>
@@ -723,13 +747,14 @@ const InventoryView: React.FC = () => {
                                   <th className="p-3">Veículo</th>
                                   <th className="p-3">KM Perc.</th>
                                   <th className="p-3">Diesel</th>
+                                  <th className="p-3">Arla</th>
                                   <th className="p-3">Média</th>
                                   <th className="p-3 text-right">Resp.</th>
                               </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-100">
                               {fuelRecords.length === 0 ? (
-                                  <tr><td colSpan={6} className="p-8 text-center text-slate-500">Nenhum registro de abastecimento.</td></tr>
+                                  <tr><td colSpan={7} className="p-8 text-center text-slate-500">Nenhum registro de abastecimento.</td></tr>
                               ) : (
                                   fuelRecords.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()).map(record => {
                                       const bus = buses.find(b => b.id === record.busId);
@@ -748,6 +773,10 @@ const InventoryView: React.FC = () => {
                                                   {dist > 0 ? `${dist} km` : <span className="text-slate-300">-</span>}
                                               </td>
                                               <td className="p-3 text-sm font-bold text-slate-700">{record.dieselLiters} L</td>
+                                              <td className="p-3 text-sm">
+                                                  {record.hasArla ? <span className="text-blue-600 font-bold">{record.arlaLiters} L</span> : <span className="text-slate-300">-</span>}
+                                                  {record.arlaCost && record.arlaCost > 0 && <span className="block text-[9px] text-blue-400">R$ {record.arlaCost}</span>}
+                                              </td>
                                               <td className="p-3 text-sm font-bold text-blue-600">
                                                   {avg !== '-' ? `${avg} km/l` : '-'}
                                               </td>
