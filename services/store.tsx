@@ -156,7 +156,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         }
     });
 
-    const collectionsToSync = [
+    const collectionsToSync: any[] = [
         { name: 'users', setter: setUsers },
         { name: 'buses', setter: setBuses },
         { name: 'bookings', setter: setBookings },

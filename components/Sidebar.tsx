@@ -33,9 +33,9 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setView, isMobileOpen, s
     { id: 'driver-portal', label: 'Minha Escala', icon: 'steering-wheel', roles: [UserRole.DRIVER, UserRole.DEVELOPER] },
   ];
 
-  const filteredMenu = menuItems.filter(item => item.roles.includes(currentUser.role));
+  const filteredMenu = menuItems.filter(item => item.roles.includes(currentUser.role as UserRole));
 
-  const getRoleLabel = (role: UserRole) => {
+  const getRoleLabel = (role: UserRole | string) => {
     switch (role) {
       case UserRole.DEVELOPER: return 'Desenvolvedor';
       case UserRole.MANAGER: return 'Gerente';
