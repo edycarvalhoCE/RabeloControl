@@ -4,11 +4,16 @@ import { useStore } from '../services/store';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { getFinancialInsight } from '../services/geminiService';
 import { Logo } from './Logo';
+import { Transaction } from '../types';
 
 const Dashboard: React.FC = () => {
   const { bookings, transactions, buses, currentUser, users, timeOffs, updateTimeOffStatus, settings } = useStore();
   const [insight, setInsight] = useState<string>('');
   const [loadingAi, setLoadingAi] = useState(false);
+  
+  // State for "Quick View" modal
+  const [showDueModal, setShowDueModal] = useState(false);
+  const [dueModalFilter, setDueModalFilter] = useState<'TODAY' | 'WEEK'>('TODAY');
 
   // Security check
   if (currentUser.role === 'MOTORISTA' || currentUser.role === 'MECANICO') {
@@ -60,6 +65,20 @@ const Dashboard: React.FC = () => {
   
   const COLORS = ['#10b981', '#3b82f6', '#f59e0b'];
 
+  // --- DUE DATE LOGIC ---
+  const todayStr = new Date().toISOString().split('T')[0];
+  const nextWeek = new Date();
+  nextWeek.setDate(nextWeek.getDate() + 7);
+  const nextWeekStr = nextWeek.toISOString().split('T')[0];
+
+  const pendingTransactions = transactions.filter(t => t.status === 'PENDING');
+
+  const dueTodayList = pendingTransactions.filter(t => t.date === todayStr);
+  const dueWeekList = pendingTransactions.filter(t => t.date > todayStr && t.date <= nextWeekStr);
+
+  const totalDueToday = dueTodayList.reduce((acc, t) => t.type === 'INCOME' ? acc + t.amount : acc - t.amount, 0);
+  const totalDueWeek = dueWeekList.reduce((acc, t) => t.type === 'INCOME' ? acc + t.amount : acc - t.amount, 0);
+
   const handleGetInsight = async () => {
     setLoadingAi(true);
     const summary = `Receita Total: R$${totalRevenue}, Despesas Totais: R$${totalExpenses}, Lucro: R$${profit}. Gastos Específicos: Peças R$${expenseParts}, Combustível R$${expenseFuel}, Avarias R$${expenseAvaria}, Multas R$${expenseMulta}. Frota: ${buses.length} ônibus.`;
@@ -93,7 +112,48 @@ const Dashboard: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-6 animate-fade-in relative">
+      
+      {/* QUICK VIEW MODAL */}
+      {showDueModal && (
+          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+              <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full p-6 animate-fade-in max-h-[90vh] overflow-y-auto">
+                  <div className="flex justify-between items-center mb-4 pb-2 border-b border-slate-100">
+                      <h3 className="text-xl font-bold text-slate-800">
+                          {dueModalFilter === 'TODAY' ? '📅 Vencimentos de Hoje' : '🗓️ Vencimentos Próximos 7 Dias'}
+                      </h3>
+                      <button onClick={() => setShowDueModal(false)} className="text-slate-400 hover:text-slate-800 text-2xl">&times;</button>
+                  </div>
+                  
+                  <div className="space-y-3">
+                      {(dueModalFilter === 'TODAY' ? dueTodayList : dueWeekList).length === 0 ? (
+                          <p className="text-center text-slate-500 py-8">Nenhum vencimento encontrado para este período.</p>
+                      ) : (
+                          (dueModalFilter === 'TODAY' ? dueTodayList : dueWeekList).map(t => (
+                              <div key={t.id} className="flex justify-between items-center p-3 rounded-lg border border-slate-100 hover:bg-slate-50">
+                                  <div>
+                                      <p className="font-bold text-slate-800">{t.description}</p>
+                                      <p className="text-xs text-slate-500">
+                                          {t.category} • {formatDateString(t.date)}
+                                          {t.installment && ` (${t.installment.current}/${t.installment.total})`}
+                                      </p>
+                                  </div>
+                                  <div className="text-right">
+                                      <span className={`font-bold ${t.type === 'INCOME' ? 'text-green-600' : 'text-red-600'}`}>
+                                          {t.type === 'INCOME' ? '+' : '-'} {formatCurrency(t.amount)}
+                                      </span>
+                                      <p className="text-[10px] text-slate-400 uppercase font-bold">{t.type === 'INCOME' ? 'A Receber' : 'A Pagar'}</p>
+                                  </div>
+                              </div>
+                          ))
+                      )}
+                  </div>
+                  
+                  <button onClick={() => setShowDueModal(false)} className="w-full mt-6 bg-slate-800 text-white py-2 rounded-lg font-bold">Fechar</button>
+              </div>
+          </div>
+      )}
+
       <div className="flex justify-between items-center bg-white p-6 rounded-xl shadow-sm border border-slate-200">
         <div>
             <h2 className="text-3xl font-bold text-slate-800">Visão Geral</h2>
@@ -142,8 +202,73 @@ const Dashboard: React.FC = () => {
         </div>
       </div>
 
+      {/* DUE DATES SECTION (NEW) */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* VENCE HOJE */}
+          <div className="bg-white rounded-xl shadow-sm border border-l-4 border-l-orange-500 border-slate-200 p-4">
+              <div className="flex justify-between items-start mb-3">
+                  <div>
+                      <h3 className="font-bold text-slate-800 flex items-center gap-2">
+                          <span className="bg-orange-100 text-orange-600 p-1 rounded text-xs">📅</span>
+                          Vence Hoje
+                      </h3>
+                      <p className="text-xs text-slate-500">Contas agendadas para {new Date().toLocaleDateString()}</p>
+                  </div>
+                  <button 
+                    onClick={() => { setDueModalFilter('TODAY'); setShowDueModal(true); }}
+                    className="text-xs bg-slate-100 hover:bg-slate-200 px-2 py-1 rounded text-slate-600 font-bold"
+                  >
+                      Ver Detalhes &rarr;
+                  </button>
+              </div>
+              <div className="flex justify-between items-end">
+                  <div>
+                      <p className="text-2xl font-bold text-slate-800">{dueTodayList.length}</p>
+                      <p className="text-[10px] text-slate-400 uppercase">Itens Pendentes</p>
+                  </div>
+                  <div className="text-right">
+                      <p className={`text-lg font-bold ${totalDueToday >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                          {totalDueToday >= 0 ? '+' : ''} {formatCurrency(totalDueToday)}
+                      </p>
+                      <p className="text-[10px] text-slate-400 uppercase">Balanço do Dia</p>
+                  </div>
+              </div>
+          </div>
+
+          {/* VENCE EM 7 DIAS */}
+          <div className="bg-white rounded-xl shadow-sm border border-l-4 border-l-blue-500 border-slate-200 p-4">
+              <div className="flex justify-between items-start mb-3">
+                  <div>
+                      <h3 className="font-bold text-slate-800 flex items-center gap-2">
+                          <span className="bg-blue-100 text-blue-600 p-1 rounded text-xs">🗓️</span>
+                          Próximos 7 Dias
+                      </h3>
+                      <p className="text-xs text-slate-500">Previsão para a semana</p>
+                  </div>
+                  <button 
+                    onClick={() => { setDueModalFilter('WEEK'); setShowDueModal(true); }}
+                    className="text-xs bg-slate-100 hover:bg-slate-200 px-2 py-1 rounded text-slate-600 font-bold"
+                  >
+                      Ver Detalhes &rarr;
+                  </button>
+              </div>
+              <div className="flex justify-between items-end">
+                  <div>
+                      <p className="text-2xl font-bold text-slate-800">{dueWeekList.length}</p>
+                      <p className="text-[10px] text-slate-400 uppercase">Itens Futuros</p>
+                  </div>
+                  <div className="text-right">
+                      <p className={`text-lg font-bold ${totalDueWeek >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                          {totalDueWeek >= 0 ? '+' : ''} {formatCurrency(totalDueWeek)}
+                      </p>
+                      <p className="text-[10px] text-slate-400 uppercase">Balanço Previsto</p>
+                  </div>
+              </div>
+          </div>
+      </div>
+
       {/* EXPENSE BREAKDOWN CARDS */}
-      <h3 className="text-lg font-bold text-slate-700 mt-2">Detalhamento de Gastos</h3>
+      <h3 className="text-lg font-bold text-slate-700 mt-2">Detalhamento de Gastos (Total)</h3>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="bg-slate-50 p-5 rounded-xl border border-slate-200">
               <div className="flex items-center gap-2 mb-2">
