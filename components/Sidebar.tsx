@@ -25,7 +25,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setView, isMobileOpen, s
     { id: 'charter', label: 'Fretamento', icon: '🏭', roles: [UserRole.MANAGER, UserRole.DEVELOPER] },
     { id: 'vehicles', label: 'Veículos / Frota', icon: '🚐', roles: [UserRole.MANAGER, UserRole.DEVELOPER] },
     { id: 'maintenance', label: 'Manutenção', icon: '🛠️', roles: [UserRole.MANAGER, UserRole.MECHANIC, UserRole.DEVELOPER] },
-    { id: 'inventory', label: 'Estoque de Peças', icon: '🔧', roles: [UserRole.MANAGER, UserRole.MECHANIC, UserRole.DEVELOPER] },
+    { id: 'inventory', label: 'Estoque de Peças', icon: '🔧', roles: [UserRole.MANAGER, UserRole.MECHANIC, UserRole.FINANCE, UserRole.DEVELOPER] },
     { id: 'documents', label: 'Documentos', icon: '📂', roles: [UserRole.MANAGER, UserRole.DEVELOPER] },
     { id: 'finance', label: 'Financeiro (Caixa)', icon: '💰', roles: [UserRole.MANAGER, UserRole.FINANCE, UserRole.DEVELOPER] },
     { id: 'users', label: 'Usuários', icon: '👥', roles: [UserRole.MANAGER, UserRole.DEVELOPER] },

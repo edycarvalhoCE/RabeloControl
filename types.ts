@@ -87,6 +87,8 @@ export interface Part {
   quantity: number;
   minQuantity: number;
   price: number;
+  lastSupplier?: string; // Fornecedor da última compra
+  lastNfe?: string;      // Nota Fiscal da última compra
 }
 
 export interface Transaction {

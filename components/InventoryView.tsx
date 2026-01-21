@@ -1,12 +1,15 @@
 
 import React, { useState } from 'react';
 import { useStore } from '../services/store';
-import { UserRole } from '../types';
+import { UserRole, Part } from '../types';
 
 const InventoryView: React.FC = () => {
-  const { parts, updateStock, addPart, currentUser, purchaseRequests, users, buses, updatePurchaseRequestStatus, addFuelRecord, fuelRecords, fuelSupplies, addFuelSupply, fuelStockLevel } = useStore();
+  const { parts, updateStock, addPart, currentUser, purchaseRequests, users, buses, updatePurchaseRequestStatus, addFuelRecord, fuelRecords, fuelSupplies, addFuelSupply, fuelStockLevel, restockPart } = useStore();
   const [showAddForm, setShowAddForm] = useState(false);
-  const [newPart, setNewPart] = useState({ name: '', quantity: 0, minQuantity: 5, price: 0 });
+  
+  // New Item State (Added supplier/nfe fields)
+  const [newPart, setNewPart] = useState({ name: '', quantity: 0, minQuantity: 5, price: 0, lastSupplier: '', lastNfe: '' });
+  
   const [viewMode, setViewMode] = useState<'STOCK' | 'REQUESTS' | 'FUEL_CONSUMPTION' | 'FUEL_SUPPLY'>('STOCK');
 
   // Search State
@@ -37,20 +40,61 @@ const InventoryView: React.FC = () => {
   const [supplyFilterStart, setSupplyFilterStart] = useState('');
   const [supplyFilterEnd, setSupplyFilterEnd] = useState('');
 
+  // RESTOCK MODAL STATE
+  const [restockItem, setRestockItem] = useState<Part | null>(null);
+  const [restockForm, setRestockForm] = useState({
+      quantity: 1,
+      unitCost: 0,
+      supplier: '',
+      nfe: ''
+  });
+
   const isMechanic = currentUser.role === UserRole.MECHANIC;
+  // Finance user is treated like manager here
+  const canManageStock = currentUser.role === UserRole.MANAGER || currentUser.role === UserRole.DEVELOPER || currentUser.role === UserRole.FINANCE;
 
   const handleAddPart = (e: React.FormEvent) => {
     e.preventDefault();
     addPart(newPart);
     setShowAddForm(false);
-    setNewPart({ name: '', quantity: 0, minQuantity: 5, price: 0 });
+    setNewPart({ name: '', quantity: 0, minQuantity: 5, price: 0, lastSupplier: '', lastNfe: '' });
   };
 
-  const handlePriceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePriceChange = (e: React.ChangeEvent<HTMLInputElement>, setter: any) => {
     const value = e.target.value;
     const digits = value.replace(/\D/g, "");
     const realValue = Number(digits) / 100;
-    setNewPart(prev => ({ ...prev, price: realValue }));
+    setter((prev: any) => ({ ...prev, price: realValue }));
+  };
+
+  const handleRestockPriceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    const digits = value.replace(/\D/g, "");
+    const realValue = Number(digits) / 100;
+    setRestockForm(prev => ({ ...prev, unitCost: realValue }));
+  };
+
+  const handleOpenRestock = (part: Part) => {
+      setRestockItem(part);
+      setRestockForm({
+          quantity: 1,
+          unitCost: part.price || 0,
+          supplier: part.lastSupplier || '',
+          nfe: ''
+      });
+  };
+
+  const handleRestockSubmit = async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!restockItem) return;
+      if (restockForm.quantity <= 0) {
+          alert("Quantidade inválida.");
+          return;
+      }
+
+      await restockPart(restockItem.id, restockForm.quantity, restockForm.unitCost, restockForm.supplier, restockForm.nfe);
+      alert("Entrada registrada com sucesso!");
+      setRestockItem(null);
   };
 
   const handleFuelConsumptionSubmit = (e: React.FormEvent) => {
@@ -60,7 +104,6 @@ const InventoryView: React.FC = () => {
           return;
       }
       
-      // Arla Mandatory Check
       if (fuelForm.hasArla && (fuelForm.arlaLiters <= 0 || !fuelForm.arlaLiters)) {
          alert("⚠️ Atenção: Você marcou que abasteceu Arla.\nÉ obrigatório informar a quantidade de litros de Arla.");
          return;
@@ -100,7 +143,7 @@ const InventoryView: React.FC = () => {
           cost: supplyForm.cost,
           receiverName: supplyForm.receiverName,
           registeredInFinance: supplyForm.registeredInFinance,
-          type: 'DIESEL' // Defaulting to Diesel for now as per main requirement
+          type: 'DIESEL' 
       });
 
       alert("Entrada de combustível registrada!");
@@ -113,12 +156,10 @@ const InventoryView: React.FC = () => {
       });
   };
 
-  // Filter Parts Logic
   const filteredParts = parts.filter(p => 
       p.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // Filter Supplies Logic
   const filteredSupplies = fuelSupplies.filter(s => {
       if(supplyFilterStart && new Date(s.date) < new Date(supplyFilterStart)) return false;
       if(supplyFilterEnd && new Date(s.date) > new Date(supplyFilterEnd)) return false;
@@ -126,7 +167,69 @@ const InventoryView: React.FC = () => {
   }).sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-6 animate-fade-in relative">
+      
+      {/* RESTOCK MODAL */}
+      {restockItem && (
+          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+              <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6 animate-fade-in">
+                  <h3 className="font-bold text-lg mb-4 text-slate-800 flex items-center gap-2">
+                      <span className="bg-green-100 text-green-600 p-1.5 rounded text-sm">📦</span>
+                      Entrada de Estoque: {restockItem.name}
+                  </h3>
+                  <form onSubmit={handleRestockSubmit} className="space-y-3">
+                      <div>
+                          <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Quantidade (Entrada)</label>
+                          <input 
+                              type="number" min="1" required
+                              value={restockForm.quantity} 
+                              onChange={e => setRestockForm({...restockForm, quantity: parseInt(e.target.value)})}
+                              className="w-full border p-2 rounded text-lg font-bold text-slate-800"
+                          />
+                      </div>
+                      <div>
+                          <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Custo Unitário (R$)</label>
+                          <input 
+                              type="text" inputMode="numeric" required
+                              value={restockForm.unitCost.toLocaleString('pt-BR', {minimumFractionDigits: 2})} 
+                              onChange={handleRestockPriceChange}
+                              className="w-full border p-2 rounded"
+                          />
+                      </div>
+                      <div>
+                          <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Fornecedor</label>
+                          <input 
+                              required
+                              value={restockForm.supplier} 
+                              onChange={e => setRestockForm({...restockForm, supplier: e.target.value})}
+                              className="w-full border p-2 rounded"
+                              placeholder="Ex: Auto Peças Silva"
+                          />
+                      </div>
+                      <div>
+                          <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Número Nota Fiscal</label>
+                          <input 
+                              required
+                              value={restockForm.nfe} 
+                              onChange={e => setRestockForm({...restockForm, nfe: e.target.value})}
+                              className="w-full border p-2 rounded"
+                              placeholder="Ex: 12345"
+                          />
+                      </div>
+                      
+                      <div className="bg-yellow-50 p-2 rounded text-xs text-yellow-800 border border-yellow-200 mt-2">
+                          Esta operação criará automaticamente uma despesa no financeiro.
+                      </div>
+
+                      <div className="flex gap-2 pt-2">
+                          <button type="button" onClick={() => setRestockItem(null)} className="flex-1 bg-slate-200 text-slate-700 py-2 rounded font-bold">Cancelar</button>
+                          <button type="submit" className="flex-1 bg-green-600 text-white py-2 rounded font-bold hover:bg-green-700">Confirmar Entrada</button>
+                      </div>
+                  </form>
+              </div>
+          </div>
+      )}
+
       <div className="flex flex-col md:flex-row justify-between items-center gap-4">
         <h2 className="text-2xl font-bold text-slate-800">Controle de Estoque</h2>
         
@@ -173,7 +276,7 @@ const InventoryView: React.FC = () => {
                         </span>
                     )}
                 </button>
-                {!isMechanic && viewMode === 'STOCK' && (
+                {canManageStock && viewMode === 'STOCK' && (
                     <button 
                     onClick={() => setShowAddForm(!showAddForm)}
                     className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg font-medium transition-colors ml-1 text-xs"
@@ -187,24 +290,24 @@ const InventoryView: React.FC = () => {
 
       {viewMode === 'STOCK' && (
           <>
-            {showAddForm && !isMechanic && (
+            {showAddForm && canManageStock && (
                 <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 mb-6">
                 <h3 className="font-bold text-lg mb-4">Cadastrar Novo Item</h3>
                 <form onSubmit={handleAddPart} className="grid grid-cols-1 md:grid-cols-4 gap-4">
                     <input 
-                    placeholder="Nome da Peça" required
-                    value={newPart.name} onChange={e => setNewPart({...newPart, name: e.target.value})}
-                    className="border p-2 rounded"
+                        placeholder="Nome da Peça" required
+                        value={newPart.name} onChange={e => setNewPart({...newPart, name: e.target.value})}
+                        className="border p-2 rounded"
                     />
                     <input 
-                    type="number" placeholder="Quantidade Inicial" required
-                    value={newPart.quantity || ''} onChange={e => setNewPart({...newPart, quantity: parseInt(e.target.value)})}
-                    className="border p-2 rounded"
+                        type="number" placeholder="Qtd. Inicial" required
+                        value={newPart.quantity || ''} onChange={e => setNewPart({...newPart, quantity: parseInt(e.target.value)})}
+                        className="border p-2 rounded"
                     />
                     <input 
-                    type="number" placeholder="Estoque Mínimo" required
-                    value={newPart.minQuantity || ''} onChange={e => setNewPart({...newPart, minQuantity: parseInt(e.target.value)})}
-                    className="border p-2 rounded"
+                        type="number" placeholder="Estoque Mínimo" required
+                        value={newPart.minQuantity || ''} onChange={e => setNewPart({...newPart, minQuantity: parseInt(e.target.value)})}
+                        className="border p-2 rounded"
                     />
                     
                     <div className="flex items-center border border-slate-300 rounded overflow-hidden bg-white focus-within:ring-2 focus-within:ring-blue-500">
@@ -214,13 +317,27 @@ const InventoryView: React.FC = () => {
                             inputMode="numeric"
                             required 
                             value={newPart.price.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} 
-                            onChange={handlePriceChange}
+                            onChange={(e) => handlePriceChange(e, setNewPart)}
                             className="w-full p-2 outline-none text-right font-bold text-slate-800"
-                            placeholder="0,00"
+                            placeholder="Custo Unit."
                         />
                     </div>
 
-                    <button type="submit" className="md:col-span-4 bg-green-600 text-white py-2 rounded hover:bg-green-700">Salvar Item</button>
+                    {/* Additional fields for initial record */}
+                    <input 
+                        placeholder="Fornecedor Inicial" 
+                        value={newPart.lastSupplier} onChange={e => setNewPart({...newPart, lastSupplier: e.target.value})}
+                        className="border p-2 rounded"
+                    />
+                    <input 
+                        placeholder="Nº Nota Fiscal" 
+                        value={newPart.lastNfe} onChange={e => setNewPart({...newPart, lastNfe: e.target.value})}
+                        className="border p-2 rounded"
+                    />
+
+                    <button type="submit" className="md:col-span-4 bg-green-600 text-white py-2 rounded hover:bg-green-700 font-bold">
+                        Salvar Item no Estoque
+                    </button>
                 </form>
                 </div>
             )}
@@ -230,7 +347,7 @@ const InventoryView: React.FC = () => {
                 <thead className="bg-slate-50 text-slate-600 text-sm uppercase font-semibold">
                     <tr>
                     <th className="p-4">Item</th>
-                    <th className="p-4">Preço Unit.</th>
+                    <th className="p-4">Último Custo</th>
                     <th className="p-4 text-center">Quantidade</th>
                     <th className="p-4 text-center">Status</th>
                     {!isMechanic && <th className="p-4 text-right">Ações</th>}
@@ -242,7 +359,12 @@ const InventoryView: React.FC = () => {
                     ) : (
                         filteredParts.map(part => (
                         <tr key={part.id} className="hover:bg-slate-50">
-                            <td className="p-4 font-medium text-slate-800">{part.name}</td>
+                            <td className="p-4 font-medium text-slate-800">
+                                {part.name}
+                                {part.lastSupplier && (
+                                    <span className="block text-[10px] text-slate-400 font-normal">Forn: {part.lastSupplier}</span>
+                                )}
+                            </td>
                             <td className="p-4 text-slate-600">{part.price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
                             <td className="p-4 text-center">
                             <span className="font-bold text-lg">{part.quantity}</span>
@@ -260,14 +382,14 @@ const InventoryView: React.FC = () => {
                                 <button 
                                     onClick={() => updateStock(part.id, -1)}
                                     className="w-8 h-8 rounded-full bg-red-50 text-red-600 hover:bg-red-100 border border-red-200"
-                                    title="Registrar Saída"
+                                    title="Registrar Saída Rápida"
                                 >
                                     -
                                 </button>
                                 <button 
-                                    onClick={() => updateStock(part.id, 1)}
+                                    onClick={() => handleOpenRestock(part)}
                                     className="w-8 h-8 rounded-full bg-green-50 text-green-600 hover:bg-green-100 border border-green-200"
-                                    title="Registrar Entrada"
+                                    title="Registrar Entrada (Compra)"
                                 >
                                     +
                                 </button>

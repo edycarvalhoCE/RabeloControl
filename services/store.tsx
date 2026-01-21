@@ -54,6 +54,7 @@ interface StoreContextType {
   updateBookingStatus: (id: string, status: Booking['status']) => void;
   addPart: (part: Omit<Part, 'id'>) => void;
   updateStock: (id: string, quantityDelta: number) => void;
+  restockPart: (id: string, quantity: number, unitCost: number, supplier: string, nfe: string) => Promise<void>; // Nova função de entrada
   addTransaction: (transaction: Omit<Transaction, 'id'>) => void;
   addTimeOff: (timeOff: Omit<TimeOff, 'id' | 'status'>) => void;
   updateTimeOffStatus: (id: string, status: 'APPROVED' | 'REJECTED') => void;
@@ -386,7 +387,39 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
   const updateBookingStatus = async (id: string, status: Booking['status']) => { if (isConfigured) await updateDoc(doc(db, 'bookings', id), { status }); };
   const addPart = async (part: Omit<Part, 'id'>) => { if (isConfigured) await addDoc(collection(db, 'parts'), part); };
+  
   const updateStock = async (id: string, quantityDelta: number) => { if (isConfigured) { const part = parts.find(p => p.id === id); if (part) await updateDoc(doc(db, 'parts', id), { quantity: Math.max(0, part.quantity + quantityDelta) }); } };
+  
+  // NEW: Robust Restock Function (Update Stock + Update History + Create Financial Record)
+  const restockPart = async (id: string, quantity: number, unitCost: number, supplier: string, nfe: string) => {
+      if (!isConfigured) return;
+      const part = parts.find(p => p.id === id);
+      if (!part) return;
+
+      // 1. Update Part (Quantity + History)
+      const newQuantity = part.quantity + quantity;
+      await updateDoc(doc(db, 'parts', id), { 
+          quantity: newQuantity,
+          price: unitCost, // Update last cost price
+          lastSupplier: supplier,
+          lastNfe: nfe
+      });
+
+      // 2. Create Financial Transaction (Expense)
+      const totalCost = quantity * unitCost;
+      if (totalCost > 0) {
+          await addDoc(collection(db, 'transactions'), {
+              type: 'EXPENSE',
+              status: 'COMPLETED',
+              category: 'Compra de Peças',
+              amount: totalCost,
+              date: new Date().toISOString().split('T')[0],
+              description: `Compra: ${part.name} (${quantity} un) - Fornecedor: ${supplier}`,
+              nfe: nfe
+          });
+      }
+  };
+
   const addTransaction = async (transaction: Omit<Transaction, 'id'>) => { if (isConfigured) await addDoc(collection(db, 'transactions'), transaction); };
   
   const addTimeOff = async (timeOff: Omit<TimeOff, 'id' | 'status'>) => { 
@@ -726,7 +759,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       login, logout, register, updateSettings, seedDatabase,
       addQuote, updateQuote, convertQuoteToBooking, deleteQuote,
       addPriceRoute, updatePriceRoute, deletePriceRoute, importDefaultPrices, clearPriceTable,
-      addDriverFee, payDriverFee, deleteDriverFee
+      addDriverFee, payDriverFee, deleteDriverFee, restockPart
     }}>
       {children}
     </StoreContext.Provider>
