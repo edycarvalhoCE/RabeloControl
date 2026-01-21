@@ -6,7 +6,7 @@ import { Booking } from '../types';
 import { Logo } from './Logo';
 
 const DriverPortal: React.FC = () => {
-  const { currentUser, bookings, timeOffs, addTimeOff, documents, buses, addMaintenanceReport, maintenanceReports, addFuelRecord, driverLiabilities, charterContracts, driverFees } = useStore();
+  const { currentUser, bookings, timeOffs, addTimeOff, documents, buses, addMaintenanceReport, maintenanceReports, addFuelRecord, driverLiabilities, charterContracts, driverFees, fuelRecords } = useStore();
   
   // Request State
   const [requestType, setRequestType] = useState<'FOLGA' | 'FERIAS'>('FOLGA');
@@ -121,6 +121,29 @@ const DriverPortal: React.FC = () => {
           alert('Problema reportado ao mecânico!');
           setReportForm({ ...reportForm, description: '', busId: '' });
       }
+  };
+
+  // Lógica para preencher KM Inicial automaticamente
+  const handleBusChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+      const selectedBusId = e.target.value;
+      let lastKm = 0;
+
+      if (selectedBusId) {
+          // Filtra registros deste ônibus
+          const busRecords = fuelRecords.filter(r => r.busId === selectedBusId);
+          if (busRecords.length > 0) {
+              // Ordena pelo maior KM Final registrado
+              busRecords.sort((a, b) => (b.kmEnd || 0) - (a.kmEnd || 0));
+              lastKm = busRecords[0].kmEnd || 0;
+          }
+      }
+
+      setFuelForm(prev => ({
+          ...prev,
+          busId: selectedBusId,
+          kmStart: lastKm, // Preenche automaticamente
+          kmEnd: 0 // Reseta o final para evitar confusão
+      }));
   };
 
   const handleFuelSubmit = (e: React.FormEvent) => {
@@ -342,7 +365,7 @@ const DriverPortal: React.FC = () => {
                             <label className="block text-sm font-medium text-slate-700 mb-1">Veículo</label>
                             <select 
                                 required value={fuelForm.busId}
-                                onChange={e => setFuelForm({...fuelForm, busId: e.target.value})}
+                                onChange={handleBusChange} // Lógica para auto-preencher KM
                                 className="w-full border p-3 rounded-lg focus:ring-2 focus:ring-green-500 outline-none bg-slate-50"
                             >
                                 <option value="">Selecione o ônibus...</option>

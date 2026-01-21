@@ -115,6 +115,29 @@ const InventoryView: React.FC = () => {
       setRestockItem(null);
   };
 
+  // Lógica para preencher KM Inicial automaticamente
+  const handleBusChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+      const selectedBusId = e.target.value;
+      let lastKm = 0;
+
+      if (selectedBusId) {
+          // Filtra registros deste ônibus
+          const busRecords = fuelRecords.filter(r => r.busId === selectedBusId);
+          if (busRecords.length > 0) {
+              // Ordena pelo maior KM Final registrado
+              busRecords.sort((a, b) => (b.kmEnd || 0) - (a.kmEnd || 0));
+              lastKm = busRecords[0].kmEnd || 0;
+          }
+      }
+
+      setFuelForm(prev => ({
+          ...prev,
+          busId: selectedBusId,
+          kmStart: lastKm, // Preenche automaticamente
+          kmEnd: 0 // Reseta o final para evitar confusão
+      }));
+  };
+
   const handleFuelConsumptionSubmit = (e: React.FormEvent) => {
       e.preventDefault();
       if (!fuelForm.busId || fuelForm.dieselLiters <= 0) {
@@ -606,7 +629,7 @@ const InventoryView: React.FC = () => {
                           <select 
                               required 
                               value={fuelForm.busId} 
-                              onChange={e => setFuelForm({...fuelForm, busId: e.target.value})}
+                              onChange={handleBusChange} // Lógica para auto-preencher KM
                               className="w-full border p-2 rounded bg-slate-50"
                           >
                               <option value="">Selecione o ônibus...</option>
