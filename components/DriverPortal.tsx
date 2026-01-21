@@ -114,19 +114,28 @@ const DriverPortal: React.FC = () => {
 
   const handleFuelSubmit = (e: React.FormEvent) => {
       e.preventDefault();
+      
+      // Basic Validation
       if (!fuelForm.busId || fuelForm.dieselLiters <= 0) {
-          alert('Preencha os dados corretamente.');
+          alert('Por favor, selecione o ônibus e informe a quantidade de Diesel.');
+          return;
+      }
+
+      // Arla Mandatory Validation
+      if (fuelForm.hasArla && (fuelForm.arlaLiters <= 0 || isNaN(fuelForm.arlaLiters))) {
+          alert('⚠️ Atenção: Você marcou que abasteceu Arla.\nÉ obrigatório informar a quantidade de litros de Arla.');
           return;
       }
       
       addFuelRecord({
           ...fuelForm,
+          arlaLiters: fuelForm.hasArla ? fuelForm.arlaLiters : 0, // Ensure clean data
           cost: fuelForm.location === 'STREET' ? fuelForm.cost : 0,
           stationName: fuelForm.location === 'STREET' ? fuelForm.stationName : '',
           loggedBy: currentUser.id
       });
       
-      alert('Abastecimento registrado!');
+      alert('Abastecimento registrado com sucesso!');
       setFuelForm({
         date: new Date().toISOString().split('T')[0],
         busId: '',
@@ -351,29 +360,37 @@ const DriverPortal: React.FC = () => {
                         </div>
                     )}
 
-                    <div className="flex items-center gap-3 pt-2">
-                        <input 
-                            type="checkbox" 
-                            id="driverHasArla"
-                            checked={fuelForm.hasArla}
-                            onChange={e => setFuelForm({...fuelForm, hasArla: e.target.checked})}
-                            className="w-5 h-5 text-green-600 rounded focus:ring-green-500"
-                        />
-                        <label htmlFor="driverHasArla" className="text-sm font-medium text-slate-700">Abasteceu Arla 32 também?</label>
+                    {/* Arla Switch Component */}
+                    <div className="bg-blue-50 p-4 rounded-xl border border-blue-100 transition-all">
+                        <label className="flex items-center justify-between cursor-pointer select-none">
+                            <span className="font-bold text-blue-800 text-sm">Abasteceu Arla 32?</span>
+                            <div className={`w-12 h-6 flex items-center rounded-full p-1 transition-colors ${fuelForm.hasArla ? 'bg-blue-600' : 'bg-gray-300'}`}>
+                                <input 
+                                    type="checkbox" 
+                                    className="hidden" 
+                                    checked={fuelForm.hasArla}
+                                    onChange={e => setFuelForm({...fuelForm, hasArla: e.target.checked})}
+                                />
+                                <div className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform duration-200 ${fuelForm.hasArla ? 'translate-x-6' : ''}`}></div>
+                            </div>
+                        </label>
+                        
+                        {fuelForm.hasArla && (
+                            <div className="mt-4 animate-fade-in">
+                                <label className="block text-xs font-bold text-blue-700 mb-1 uppercase">Quantidade Obrigatória (Litros)</label>
+                                <div className="flex items-center border-2 border-blue-200 rounded-lg overflow-hidden bg-white focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-200 transition-all">
+                                    <input 
+                                        type="number" step="0.1" min="0" required
+                                        value={fuelForm.arlaLiters || ''} 
+                                        onChange={e => setFuelForm({...fuelForm, arlaLiters: parseFloat(e.target.value)})}
+                                        className="w-full p-2 outline-none text-blue-900 font-bold text-lg"
+                                        placeholder="0.0"
+                                    />
+                                    <span className="bg-blue-100 text-blue-700 px-4 py-3 font-bold border-l border-blue-200 text-sm">L</span>
+                                </div>
+                            </div>
+                        )}
                     </div>
-
-                    {fuelForm.hasArla && (
-                        <div className="animate-fade-in pl-8">
-                             <label className="block text-xs font-bold text-slate-600 mb-1">Qtd. Arla (Litros)</label>
-                             <input 
-                                type="number" step="0.1" min="0"
-                                value={fuelForm.arlaLiters || ''} 
-                                onChange={e => setFuelForm({...fuelForm, arlaLiters: parseFloat(e.target.value)})}
-                                className="w-full border p-2 rounded outline-none"
-                                placeholder="0.0 L"
-                            />
-                        </div>
-                    )}
 
                     <button type="submit" className="w-full bg-green-600 text-white font-bold py-4 rounded-xl hover:bg-green-700 shadow-lg transform active:scale-95 transition-all">
                         Confirmar Abastecimento

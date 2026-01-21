@@ -60,6 +60,12 @@ const InventoryView: React.FC = () => {
           return;
       }
       
+      // Arla Mandatory Check
+      if (fuelForm.hasArla && (fuelForm.arlaLiters <= 0 || !fuelForm.arlaLiters)) {
+         alert("⚠️ Atenção: Você marcou que abasteceu Arla.\nÉ obrigatório informar a quantidade de litros de Arla.");
+         return;
+      }
+      
       addFuelRecord({
           date: fuelForm.date,
           busId: fuelForm.busId,
@@ -500,13 +506,13 @@ const InventoryView: React.FC = () => {
                           
                           {fuelForm.hasArla && (
                               <div className="mt-3 animate-fade-in">
-                                  <label className="block text-xs font-bold text-blue-700 mb-1">Qtd. Arla (Litros)</label>
+                                  <label className="block text-xs font-bold text-blue-700 mb-1">Qtd. Arla (Litros) *</label>
                                   <div className="flex items-center border border-blue-200 rounded overflow-hidden bg-white">
                                       <input 
                                           type="number" step="0.1" min="0" required
                                           value={fuelForm.arlaLiters || ''} 
                                           onChange={e => setFuelForm({...fuelForm, arlaLiters: parseFloat(e.target.value)})}
-                                          className="w-full p-2 outline-none text-blue-900"
+                                          className="w-full p-2 outline-none text-blue-900 font-bold"
                                           placeholder="0.0"
                                       />
                                       <span className="bg-blue-100 text-blue-600 px-3 py-2 font-bold border-l border-blue-200 text-xs">L</span>
