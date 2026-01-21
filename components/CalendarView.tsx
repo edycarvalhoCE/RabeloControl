@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useStore } from '../services/store';
 import { UserRole, Booking, TimeOff, CharterContract } from '../types';
@@ -102,7 +101,8 @@ const CalendarView: React.FC<CalendarViewProps> = ({ onEventClick }) => {
     addTimeOff(payload);
     setShowModal(false);
     // Reset only some fields, keep date for convenience
-    setNewTimeOff(prev => ({ ...prev, driverId: '', type: 'FOLGA', startTime: '', endTime: '', endDate: '' }));
+    setNewTimeOff(prev => ({ ...prev, driverId: canManage ? '' : currentUser.id, type: 'FOLGA', startTime: '', endTime: '', endDate: '' }));
+    alert(canManage ? "Evento lançado com sucesso!" : "Solicitação enviada com sucesso!");
   };
 
   const handleDeleteTimeOff = (id: string, name: string) => {
@@ -118,10 +118,18 @@ const CalendarView: React.FC<CalendarViewProps> = ({ onEventClick }) => {
 
   // NEW: Handle day click to open modal
   const handleDayClick = (day: number) => {
-      if (!canManage) return;
-      
       const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-      setNewTimeOff(prev => ({ ...prev, date: dateStr, endDate: '' }));
+      
+      // If regular user, pre-fill their ID
+      const initialDriverId = canManage ? '' : currentUser.id;
+      
+      setNewTimeOff(prev => ({ 
+          ...prev, 
+          date: dateStr, 
+          endDate: '', 
+          driverId: initialDriverId,
+          type: 'FOLGA'
+      }));
       setShowModal(true);
   };
 
@@ -262,7 +270,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ onEventClick }) => {
                     <div 
                         key={day} 
                         onClick={() => handleDayClick(day)}
-                        className={`bg-white min-h-[100px] p-2 transition-colors ${canManage ? 'cursor-pointer hover:bg-blue-50' : ''} ${isToday ? 'bg-blue-50/30' : ''}`}
+                        className={`bg-white min-h-[100px] p-2 transition-colors cursor-pointer hover:bg-blue-50 ${isToday ? 'bg-blue-50/30' : ''}`}
                     >
                         <span className={`text-sm font-semibold ${isToday ? 'bg-blue-600 text-white w-6 h-6 flex items-center justify-center rounded-full shadow-sm' : 'text-slate-700'}`}>
                             {day}
@@ -562,17 +570,24 @@ const CalendarView: React.FC<CalendarViewProps> = ({ onEventClick }) => {
             </div>
       )}
 
-      {/* Modal for adding Time Off / Shift / Vacation (Manager Only) */}
+      {/* Modal for adding Time Off / Shift / Vacation (Managers & Drivers) */}
       {showModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100] p-4">
             <div className="bg-white p-6 rounded-xl w-full max-w-md shadow-2xl relative z-[101]">
-                <h3 className="text-xl font-bold mb-4 text-slate-800">Lançar Evento na Escala</h3>
+                <h3 className="text-xl font-bold mb-4 text-slate-800">
+                    {canManage ? 'Lançar Evento na Escala' : 'Solicitar Evento / Folga'}
+                </h3>
                 <form onSubmit={handleAddFolga} className="space-y-4">
                     <div>
                         <label className="block text-sm font-medium text-slate-700 mb-1">Tipo de Evento</label>
                         <div className="flex gap-2">
                             <button type="button" onClick={() => setNewTimeOff({...newTimeOff, type: 'FOLGA'})} className={`flex-1 py-2 text-sm font-bold rounded border ${newTimeOff.type === 'FOLGA' ? 'bg-yellow-100 text-yellow-800 border-yellow-300' : 'bg-white border-slate-200 text-slate-500'}`}>Folga</button>
-                            <button type="button" onClick={() => setNewTimeOff({...newTimeOff, type: 'PLANTAO'})} className={`flex-1 py-2 text-sm font-bold rounded border ${newTimeOff.type === 'PLANTAO' ? 'bg-purple-100 text-purple-800 border-purple-300' : 'bg-white border-slate-200 text-slate-500'}`}>Plantão</button>
+                            
+                            {/* Plantão might be Manager only, but let's allow it if desired, or restrict it visually if needed. Assuming everyone for now or just restrict behavior. */}
+                            {canManage && (
+                                <button type="button" onClick={() => setNewTimeOff({...newTimeOff, type: 'PLANTAO'})} className={`flex-1 py-2 text-sm font-bold rounded border ${newTimeOff.type === 'PLANTAO' ? 'bg-purple-100 text-purple-800 border-purple-300' : 'bg-white border-slate-200 text-slate-500'}`}>Plantão</button>
+                            )}
+                            
                             <button type="button" onClick={() => setNewTimeOff({...newTimeOff, type: 'FERIAS'})} className={`flex-1 py-2 text-sm font-bold rounded border ${newTimeOff.type === 'FERIAS' ? 'bg-green-100 text-green-800 border-green-300' : 'bg-white border-slate-200 text-slate-500'}`}>Férias</button>
                         </div>
                     </div>
@@ -580,10 +595,11 @@ const CalendarView: React.FC<CalendarViewProps> = ({ onEventClick }) => {
                     <div>
                         <label className="block text-sm font-medium text-slate-700 mb-1">Motorista</label>
                         <select 
-                            className="w-full border p-2 rounded"
+                            className={`w-full border p-2 rounded ${!canManage ? 'bg-slate-100' : ''}`}
                             value={newTimeOff.driverId}
                             onChange={(e) => setNewTimeOff({...newTimeOff, driverId: e.target.value})}
                             required
+                            disabled={!canManage} // Disable for non-managers
                         >
                             <option value="">Selecione...</option>
                             {drivers.map(d => (
@@ -653,7 +669,9 @@ const CalendarView: React.FC<CalendarViewProps> = ({ onEventClick }) => {
 
                     <div className="flex gap-2 pt-2">
                         <button type="button" onClick={() => setShowModal(false)} className="flex-1 bg-gray-200 text-gray-800 py-2 rounded hover:bg-gray-300 font-medium">Cancelar</button>
-                        <button type="submit" className="flex-1 bg-slate-800 text-white py-2 rounded hover:bg-slate-700 font-bold">Salvar Evento</button>
+                        <button type="submit" className="flex-1 bg-slate-800 text-white py-2 rounded hover:bg-slate-700 font-bold">
+                            {canManage ? 'Salvar Evento' : 'Enviar Solicitação'}
+                        </button>
                     </div>
                 </form>
             </div>

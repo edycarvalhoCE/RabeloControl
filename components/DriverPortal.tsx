@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useStore } from '../services/store';
 import CalendarView from './CalendarView';
@@ -6,7 +5,7 @@ import { Booking } from '../types';
 import { Logo } from './Logo';
 
 const DriverPortal: React.FC = () => {
-  const { currentUser, bookings, timeOffs, addTimeOff, documents, buses, addMaintenanceReport, maintenanceReports, addFuelRecord, driverLiabilities, charterContracts, driverFees, fuelRecords } = useStore();
+  const { currentUser, bookings, timeOffs, addTimeOff, documents, buses, addMaintenanceReport, maintenanceReports, addFuelRecord, driverLiabilities, charterContracts, driverFees, fuelRecords, users } = useStore();
   
   // Request State
   const [requestType, setRequestType] = useState<'FOLGA' | 'FERIAS'>('FOLGA');
@@ -767,6 +766,81 @@ const DriverPortal: React.FC = () => {
         )}
 
       </div>
+
+      {/* TRIP DETAILS MODAL - For Cards Click */}
+      {selectedBooking && (
+            <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[100] p-4" onClick={() => setSelectedBooking(null)}>
+                <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full overflow-hidden animate-fade-in relative z-[101]" onClick={e => e.stopPropagation()}>
+                    <div className="bg-slate-800 p-4 flex justify-between items-center text-white">
+                        <h3 className="font-bold text-lg">Detalhes da Viagem</h3>
+                        <button onClick={() => setSelectedBooking(null)} className="text-slate-400 hover:text-white font-bold text-xl">&times;</button>
+                    </div>
+                    <div className="p-6 space-y-4">
+                        <div className="flex items-start gap-4 mb-2">
+                            <div className="bg-blue-100 p-3 rounded-lg">
+                                <span className="text-2xl">🚌</span>
+                            </div>
+                            <div>
+                                <h2 className="text-2xl font-bold text-slate-800">{selectedBooking.destination}</h2>
+                                {(() => {
+                                    const bus = buses.find(b => b.id === selectedBooking.busId);
+                                    return bus ? <p className="text-slate-600 font-medium">{bus.plate} - {bus.model}</p> : null;
+                                })()}
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4 bg-slate-50 p-3 rounded-lg border border-slate-100">
+                            <div>
+                                <p className="text-xs text-slate-500 font-bold uppercase">Saída</p>
+                                <p className="text-sm font-semibold text-slate-800">{formatDateTime(selectedBooking.startTime)}</p>
+                            </div>
+                            <div>
+                                <p className="text-xs text-slate-500 font-bold uppercase">Retorno</p>
+                                <p className="text-sm font-semibold text-slate-800">{formatDateTime(selectedBooking.endTime)}</p>
+                            </div>
+                            <div className="col-span-2">
+                                <p className="text-xs text-slate-500 font-bold uppercase">Local de Apresentação</p>
+                                <p className="text-sm text-slate-800">{selectedBooking.presentationTime ? formatDateTime(selectedBooking.presentationTime) : formatDateTime(selectedBooking.startTime)} - {selectedBooking.departureLocation || 'Garagem'}</p>
+                            </div>
+                        </div>
+
+                        <div className="space-y-3">
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <p className="text-xs text-slate-500 font-bold uppercase">Cliente / Contratante</p>
+                                    <p className="text-sm font-medium">{selectedBooking.clientName}</p>
+                                    {selectedBooking.clientPhone && <p className="text-sm text-blue-600">{selectedBooking.clientPhone}</p>}
+                                </div>
+                                <div>
+                                    <p className="text-xs text-slate-500 font-bold uppercase">Motorista</p>
+                                    <p className="text-sm font-medium">
+                                        {selectedBooking.driverId 
+                                            ? users.find(u => u.id === selectedBooking.driverId)?.name 
+                                            : selectedBooking.freelanceDriverName 
+                                                ? `${selectedBooking.freelanceDriverName} (Freelance)` 
+                                                : 'Não atribuído'}
+                                    </p>
+                                </div>
+                            </div>
+                            
+                            {selectedBooking.observations && (
+                                <div className="bg-yellow-50 p-3 rounded border border-yellow-100">
+                                    <p className="text-xs text-yellow-700 font-bold uppercase mb-1">Observações / Instruções</p>
+                                    <p className="text-sm text-slate-700 whitespace-pre-wrap">{selectedBooking.observations}</p>
+                                </div>
+                            )}
+                        </div>
+
+                        <button 
+                            onClick={() => setSelectedBooking(null)}
+                            className="w-full bg-slate-800 text-white py-3 rounded-lg font-bold hover:bg-slate-700 mt-2"
+                        >
+                            Fechar Detalhes
+                        </button>
+                    </div>
+                </div>
+            </div>
+      )}
     </div>
   );
 };
