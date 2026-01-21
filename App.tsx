@@ -26,36 +26,36 @@ const MainContent = () => {
   const [currentView, setCurrentViewInternal] = useState('dashboard');
   const [isMobileOpen, setIsMobileOpen] = useState(false);
 
-  // --- NAVIGATION LOGIC (Fix for "O sistema não volta") ---
-  // Updates the URL Hash, creating a history entry in the browser
+  // --- LÓGICA DE NAVEGAÇÃO (Correção para "O sistema não volta") ---
+  // Atualiza o Hash da URL (#), criando histórico no navegador
   const setView = (viewId: string) => {
       window.location.hash = viewId;
   };
 
   useEffect(() => {
       const handleHashChange = () => {
-          // Get hash without the '#' character
+          // Pega o hash sem o caractere '#'
           const hash = window.location.hash.replace('#', '');
           
           if (hash) {
               setCurrentViewInternal(hash);
           } else if (isAuthenticated && currentUser) {
-              // Default routing based on role if no hash is present
+              // Roteamento padrão baseado no cargo se não houver hash
               let def = 'dashboard';
               if (currentUser.role === 'MOTORISTA') def = 'driver-portal';
               if (currentUser.role === 'MECANICO') def = 'maintenance';
               
-              // Only redirect if we aren't already there (avoids loops)
+              // Redireciona apenas se já não estiver lá (evita loops)
               if (currentView !== def) {
                   window.location.hash = def;
               }
           }
       };
 
-      // Listen for browser Back/Forward buttons
+      // Ouve os botões Voltar/Avançar do navegador
       window.addEventListener('hashchange', handleHashChange);
       
-      // Trigger once on mount to handle bookmarks or reloads
+      // Dispara uma vez na montagem para lidar com favoritos ou recarregamentos
       handleHashChange();
 
       return () => window.removeEventListener('hashchange', handleHashChange);
@@ -66,7 +66,7 @@ const MainContent = () => {
       return <LoginView />;
   }
 
-  // Prevent crash if authenticated but user profile not yet loaded from Firestore
+  // Previne erro se autenticado mas perfil não carregado do Firestore
   if (!currentUser) {
       return (
           <div className="min-h-screen flex items-center justify-center bg-slate-900">
@@ -78,7 +78,7 @@ const MainContent = () => {
       );
   }
 
-  // --- SYSTEM LOCK CHECK ---
+  // --- BLOQUEIO DO SISTEMA ---
   if (settings.subscriptionStatus === 'LOCKED' && currentUser.role !== UserRole.DEVELOPER) {
       return (
           <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-4 text-center">
@@ -106,7 +106,7 @@ const MainContent = () => {
       );
   }
 
-  // PENDING APPROVAL SCREEN
+  // TELA DE APROVAÇÃO PENDENTE
   if (currentUser.status === 'PENDING') {
       return (
           <div className="min-h-screen flex items-center justify-center bg-slate-900 p-4">
@@ -144,7 +144,7 @@ const MainContent = () => {
       case 'travel-packages': return <TravelPackagesView />;
       case 'vehicles': return <VehiclesView />;
       case 'charter': return <CharterView />;
-      case 'inventory': return <InventoryView />; // System for parts input/output
+      case 'inventory': return <InventoryView />; // Sistema de entrada/saída de peças
       case 'documents': return <DocumentsView />;
       case 'finance': return <FinanceView />;
       case 'driver-portal': return <DriverPortal />;
@@ -179,7 +179,7 @@ const MainContent = () => {
                 Rabelo<span className="text-blue-500">Tour</span>
             </div>
             <div className="flex gap-2">
-                {/* Mobile Back Button (Now works with browser history) */}
+                {/* Botão Voltar Mobile (Agora funciona com o histórico do navegador) */}
                 <button onClick={() => window.history.back()} className="p-2 text-slate-300 hover:text-white">
                     <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
                 </button>

@@ -162,7 +162,7 @@ const InventoryView: React.FC = () => {
                     onClick={() => setViewMode('STOCK')}
                     className={`px-3 py-2 rounded-lg font-medium text-xs transition-colors ${viewMode === 'STOCK' ? 'bg-slate-800 text-white' : 'bg-white border text-slate-600'}`}
                 >
-                    Peças
+                    Peças (Entrada/Saída)
                 </button>
                 <button 
                     onClick={() => setViewMode('FUEL_SUPPLY')}
@@ -247,7 +247,7 @@ const InventoryView: React.FC = () => {
                     <th className="p-4">Preço Unit.</th>
                     <th className="p-4 text-center">Quantidade</th>
                     <th className="p-4 text-center">Status</th>
-                    {!isMechanic && <th className="p-4 text-right">Ações</th>}
+                    {!isMechanic && <th className="p-4 text-center">Registrar Movimentação</th>}
                     </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -270,21 +270,23 @@ const InventoryView: React.FC = () => {
                             )}
                             </td>
                             {!isMechanic && (
-                                <td className="p-4 text-right space-x-2">
-                                <button 
-                                    onClick={() => updateStock(part.id, -1)}
-                                    className="w-8 h-8 rounded-full bg-red-50 text-red-600 hover:bg-red-100 border border-red-200"
-                                    title="Registrar Saída"
-                                >
-                                    -
-                                </button>
-                                <button 
-                                    onClick={() => updateStock(part.id, 1)}
-                                    className="w-8 h-8 rounded-full bg-green-50 text-green-600 hover:bg-green-100 border border-green-200"
-                                    title="Registrar Entrada"
-                                >
-                                    +
-                                </button>
+                                <td className="p-4 text-center">
+                                    <div className="flex items-center justify-center gap-2">
+                                        <button 
+                                            onClick={() => updateStock(part.id, -1)}
+                                            className="px-3 py-1 text-xs rounded bg-red-50 text-red-600 hover:bg-red-100 border border-red-200 font-bold"
+                                            title="Registrar Saída"
+                                        >
+                                            - Saída
+                                        </button>
+                                        <button 
+                                            onClick={() => updateStock(part.id, 1)}
+                                            className="px-3 py-1 text-xs rounded bg-green-50 text-green-600 hover:bg-green-100 border border-green-200 font-bold"
+                                            title="Registrar Entrada"
+                                        >
+                                            + Entrada
+                                        </button>
+                                    </div>
                                 </td>
                             )}
                         </tr>
