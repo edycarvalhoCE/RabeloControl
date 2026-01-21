@@ -4,11 +4,9 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <!-- Cor Azul da Marca Rabelo Tour para a barra do navegador -->
     <meta name="theme-color" content="#2e2e77" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <!-- Favicon usando a mesma logo -->
     <link rel="icon" type="image/png" href="./logo.png" />
     <title>RabeloTour - Sistema Integrado</title>
     <script src="https://cdn.tailwindcss.com"></script>
@@ -23,8 +21,8 @@
             },
             colors: {
               brand: {
-                blue: '#2e2e77', // Cor azul exata da logo
-                yellow: '#ffec00', // Cor amarela do globo
+                blue: '#2e2e77',
+                yellow: '#ffec00',
               },
               slate: {
                 850: '#1e293b', 
@@ -37,42 +35,36 @@
     </script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Great+Vibes&display=swap" rel="stylesheet">
     <style>
-      :root {
-        color-scheme: light; /* Força modo claro nos controles do navegador */
-      }
+      :root { color-scheme: light; }
       body { 
         font-family: 'Inter', sans-serif; 
         background-color: #f8fafc !important; 
         color: #0f172a !important; 
       }
-      /* Inputs com fundo branco para contraste */
-      input, select, textarea {
-        background-color: #ffffff;
-        color: #1e293b;
-      }
-      /* Scrollbar personalizada */
+      input, select, textarea { background-color: #ffffff; color: #1e293b; }
       ::-webkit-scrollbar { width: 8px; }
       ::-webkit-scrollbar-track { background: #f1f1f1; }
       ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
       ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
     </style>
-<script type="importmap">
+    <!-- IMPORT MAP LIMPO E SEM DUPLICATAS -->
+    <script type="importmap">
 {
   "imports": {
-    "react": "https://esm.sh/react@18.3.1",
-    "react-dom/client": "https://esm.sh/react-dom@18.3.1/client",
+    "react": "https://esm.sh/react@18.2.0",
+    "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
     "@google/genai": "https://esm.sh/@google/genai@0.1.1",
-    "firebase/app": "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js",
-    "firebase/auth": "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js",
-    "firebase/firestore": "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js",
-    "recharts": "https://esm.sh/recharts@2.12.7",
+    "firebase/app": "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js",
+    "firebase/auth": "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js",
+    "firebase/firestore": "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js",
+    "recharts": "https://esm.sh/recharts@2.12.0",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
     "react/": "https://esm.sh/react@^19.2.3/",
-    "firebase/": "https://esm.sh/firebase@^12.8.0/",
-    "react-dom/": "https://esm.sh/react-dom@^19.2.3/"
+    "firebase/": "https://esm.sh/firebase@^12.8.0/"
   }
 }
 </script>
-</head>
+  </head>
   <body class="bg-slate-50 text-slate-900">
     <div id="root"></div>
     <script type="module" src="./index.tsx"></script>
