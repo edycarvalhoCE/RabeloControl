@@ -1,10 +1,10 @@
 
 import React, { useState } from 'react';
 import { useStore } from '../services/store';
-import { UserRole, Part } from '../types';
+import { UserRole, Part, FuelRecord } from '../types';
 
 const InventoryView: React.FC = () => {
-  const { parts, updateStock, addPart, currentUser, purchaseRequests, users, buses, updatePurchaseRequestStatus, addFuelRecord, fuelRecords, fuelSupplies, addFuelSupply, fuelStockLevel, restockPart } = useStore();
+  const { parts, updateStock, addPart, currentUser, purchaseRequests, users, buses, updatePurchaseRequestStatus, addFuelRecord, fuelRecords, fuelSupplies, addFuelSupply, fuelStockLevel, restockPart, updateFuelRecord, deleteFuelRecord } = useStore();
   const [showAddForm, setShowAddForm] = useState(false);
   
   // Helper to get local date string YYYY-MM-DD
@@ -44,6 +44,10 @@ const InventoryView: React.FC = () => {
       kmStart: 0,
       kmEnd: 0
   });
+
+  // Fuel EDIT Form State
+  const [editingFuel, setEditingFuel] = useState<FuelRecord | null>(null);
+  const [editFuelForm, setEditFuelForm] = useState<any>({});
 
   // Fuel SUPPLY Form State
   const [supplyForm, setSupplyForm] = useState({
@@ -196,6 +200,44 @@ const InventoryView: React.FC = () => {
       });
   };
 
+  const handleEditFuelClick = (record: FuelRecord) => {
+      setEditingFuel(record);
+      setEditFuelForm({
+          date: record.date,
+          busId: record.busId,
+          dieselLiters: record.dieselLiters,
+          hasArla: record.hasArla,
+          arlaLiters: record.arlaLiters,
+          location: record.location,
+          cost: record.cost,
+          arlaCost: record.arlaCost || 0,
+          stationName: record.stationName || '',
+          kmStart: record.kmStart || 0,
+          kmEnd: record.kmEnd || 0
+      });
+  };
+
+  const handleUpdateFuel = async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!editingFuel) return;
+      
+      const distance = editFuelForm.kmEnd - editFuelForm.kmStart;
+      const average = distance / editFuelForm.dieselLiters;
+
+      await updateFuelRecord(editingFuel.id, {
+          ...editFuelForm,
+          averageConsumption: average
+      });
+      setEditingFuel(null);
+      alert("Registro atualizado!");
+  };
+
+  const handleDeleteFuel = async (id: string) => {
+      if (confirm("Tem certeza que deseja excluir este abastecimento? Esta ação não pode ser desfeita.")) {
+          await deleteFuelRecord(id);
+      }
+  };
+
   const handleFuelSupplySubmit = (e: React.FormEvent) => {
       e.preventDefault();
       if (supplyForm.liters <= 0 || !supplyForm.receiverName) return;
@@ -287,6 +329,153 @@ const InventoryView: React.FC = () => {
                       <div className="flex gap-2 pt-2">
                           <button type="button" onClick={() => setRestockItem(null)} className="flex-1 bg-slate-200 text-slate-700 py-2 rounded font-bold">Cancelar</button>
                           <button type="submit" className="flex-1 bg-green-600 text-white py-2 rounded font-bold hover:bg-green-700">Confirmar Entrada</button>
+                      </div>
+                  </form>
+              </div>
+          </div>
+      )}
+
+      {/* EDIT FUEL MODAL */}
+      {editingFuel && (
+          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+              <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full p-6 animate-fade-in max-h-[90vh] overflow-y-auto">
+                  <div className="flex justify-between items-center mb-4">
+                      <h3 className="font-bold text-lg text-slate-800">Editar Abastecimento</h3>
+                      <button onClick={() => setEditingFuel(null)} className="text-slate-400 hover:text-slate-800 text-xl font-bold">&times;</button>
+                  </div>
+                  
+                  <form onSubmit={handleUpdateFuel} className="space-y-4">
+                      <div className="grid grid-cols-2 gap-4">
+                          <div>
+                              <label className="block text-xs font-bold text-slate-500 mb-1">Data</label>
+                              <input 
+                                  type="date" required 
+                                  value={editFuelForm.date} 
+                                  onChange={e => setEditFuelForm({...editFuelForm, date: e.target.value})}
+                                  className="w-full border p-2 rounded"
+                              />
+                          </div>
+                          <div>
+                              <label className="block text-xs font-bold text-slate-500 mb-1">Veículo</label>
+                              <select 
+                                  required 
+                                  value={editFuelForm.busId} 
+                                  onChange={e => setEditFuelForm({...editFuelForm, busId: e.target.value})}
+                                  className="w-full border p-2 rounded"
+                              >
+                                  {buses.map(b => (
+                                      <option key={b.id} value={b.id}>{b.plate} - {b.model}</option>
+                                  ))}
+                              </select>
+                          </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4 bg-slate-50 p-3 rounded">
+                          <div>
+                              <label className="block text-xs font-bold text-slate-500 mb-1">KM Inicial</label>
+                              <input 
+                                  type="number" required 
+                                  value={editFuelForm.kmStart} 
+                                  onChange={e => setEditFuelForm({...editFuelForm, kmStart: parseFloat(e.target.value)})}
+                                  className="w-full border p-2 rounded"
+                              />
+                          </div>
+                          <div>
+                              <label className="block text-xs font-bold text-slate-500 mb-1">KM Final</label>
+                              <input 
+                                  type="number" required 
+                                  value={editFuelForm.kmEnd} 
+                                  onChange={e => setEditFuelForm({...editFuelForm, kmEnd: parseFloat(e.target.value)})}
+                                  className="w-full border p-2 rounded"
+                              />
+                          </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                          <div>
+                              <label className="block text-xs font-bold text-slate-500 mb-1">Diesel (L)</label>
+                              <input 
+                                  type="number" step="0.1" required 
+                                  value={editFuelForm.dieselLiters} 
+                                  onChange={e => setEditFuelForm({...editFuelForm, dieselLiters: parseFloat(e.target.value)})}
+                                  className="w-full border p-2 rounded"
+                              />
+                          </div>
+                          <div>
+                              <label className="block text-xs font-bold text-slate-500 mb-1">Local</label>
+                              <select 
+                                  value={editFuelForm.location} 
+                                  onChange={e => setEditFuelForm({...editFuelForm, location: e.target.value})}
+                                  className="w-full border p-2 rounded"
+                              >
+                                  <option value="GARAGE">Garagem</option>
+                                  <option value="STREET">Rua</option>
+                              </select>
+                          </div>
+                      </div>
+
+                      <div className="bg-blue-50 p-3 rounded border border-blue-100">
+                          <label className="flex items-center space-x-2 mb-2">
+                              <input 
+                                  type="checkbox" 
+                                  checked={editFuelForm.hasArla} 
+                                  onChange={e => setEditFuelForm({...editFuelForm, hasArla: e.target.checked})}
+                              />
+                              <span className="text-sm font-bold text-blue-800">Com Arla 32?</span>
+                          </label>
+                          {editFuelForm.hasArla && (
+                              <div className="grid grid-cols-2 gap-2">
+                                  <div>
+                                      <label className="block text-xs text-blue-700">Qtd (L)</label>
+                                      <input 
+                                          type="number" step="0.1"
+                                          value={editFuelForm.arlaLiters} 
+                                          onChange={e => setEditFuelForm({...editFuelForm, arlaLiters: parseFloat(e.target.value)})}
+                                          className="w-full border p-1 rounded"
+                                      />
+                                  </div>
+                                  {editFuelForm.location === 'STREET' && (
+                                      <div>
+                                          <label className="block text-xs text-blue-700">Custo Arla (R$)</label>
+                                          <input 
+                                              type="number" step="0.01"
+                                              value={editFuelForm.arlaCost} 
+                                              onChange={e => setEditFuelForm({...editFuelForm, arlaCost: parseFloat(e.target.value)})}
+                                              className="w-full border p-1 rounded"
+                                          />
+                                      </div>
+                                  )}
+                              </div>
+                          )}
+                      </div>
+
+                      {editFuelForm.location === 'STREET' && (
+                          <div className="bg-orange-50 p-3 rounded border border-orange-100">
+                              <div className="grid grid-cols-2 gap-2">
+                                  <div>
+                                      <label className="block text-xs text-orange-800 font-bold mb-1">Custo Diesel (R$)</label>
+                                      <input 
+                                          type="number" step="0.01"
+                                          value={editFuelForm.cost} 
+                                          onChange={e => setEditFuelForm({...editFuelForm, cost: parseFloat(e.target.value)})}
+                                          className="w-full border p-2 rounded"
+                                      />
+                                  </div>
+                                  <div>
+                                      <label className="block text-xs text-orange-800 font-bold mb-1">Posto</label>
+                                      <input 
+                                          value={editFuelForm.stationName} 
+                                          onChange={e => setEditFuelForm({...editFuelForm, stationName: e.target.value})}
+                                          className="w-full border p-2 rounded"
+                                      />
+                                  </div>
+                              </div>
+                          </div>
+                      )}
+
+                      <div className="flex gap-2 pt-2">
+                          <button type="button" onClick={() => setEditingFuel(null)} className="flex-1 bg-slate-200 text-slate-700 py-2 rounded font-bold">Cancelar</button>
+                          <button type="submit" className="flex-1 bg-blue-600 text-white py-2 rounded font-bold hover:bg-blue-700">Salvar Alterações</button>
                       </div>
                   </form>
               </div>
@@ -773,11 +962,12 @@ const InventoryView: React.FC = () => {
                                   <th className="p-3">Arla</th>
                                   <th className="p-3">Média</th>
                                   <th className="p-3 text-right">Resp.</th>
+                                  {canManageStock && <th className="p-3 text-right">Ações</th>}
                               </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-100">
                               {fuelRecords.length === 0 ? (
-                                  <tr><td colSpan={7} className="p-8 text-center text-slate-500">Nenhum registro de abastecimento.</td></tr>
+                                  <tr><td colSpan={canManageStock ? 8 : 7} className="p-8 text-center text-slate-500">Nenhum registro de abastecimento.</td></tr>
                               ) : (
                                   fuelRecords.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()).map(record => {
                                       const bus = buses.find(b => b.id === record.busId);
@@ -804,6 +994,24 @@ const InventoryView: React.FC = () => {
                                                   {avg !== '-' ? `${avg} km/l` : '-'}
                                               </td>
                                               <td className="p-3 text-right text-xs text-slate-500">{user?.name?.split(' ')[0] || 'N/A'}</td>
+                                              {canManageStock && (
+                                                  <td className="p-3 text-right flex justify-end gap-2">
+                                                      <button 
+                                                          onClick={() => handleEditFuelClick(record)}
+                                                          className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded hover:bg-blue-200"
+                                                          title="Editar"
+                                                      >
+                                                          ✎
+                                                      </button>
+                                                      <button 
+                                                          onClick={() => handleDeleteFuel(record.id)}
+                                                          className="text-xs bg-red-100 text-red-700 px-2 py-1 rounded hover:bg-red-200"
+                                                          title="Excluir"
+                                                      >
+                                                          ✕
+                                                      </button>
+                                                  </td>
+                                              )}
                                           </tr>
                                       );
                                   })
