@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { StoreProvider } from './services/store';
 import Sidebar from './components/Sidebar';
 import Dashboard from './components/Dashboard';
@@ -23,24 +23,44 @@ import { UserRole } from './types';
 
 const MainContent = () => {
   const { currentUser, isAuthenticated, logout, settings } = useStore();
-  
-  // Default view logic
-  const getDefaultView = () => {
-    if (!currentUser) return 'dashboard';
-    if (currentUser.role === 'MOTORISTA') return 'driver-portal';
-    if (currentUser.role === 'MECANICO') return 'maintenance';
-    return 'dashboard';
-  };
-
-  const [currentView, setCurrentView] = useState('dashboard');
+  const [currentView, setCurrentViewInternal] = useState('dashboard');
   const [isMobileOpen, setIsMobileOpen] = useState(false);
 
-  // React to auth changes and role changes
-  React.useEffect(() => {
-    if (isAuthenticated && currentUser) {
-        setCurrentView(getDefaultView());
-    }
+  // --- NAVIGATION LOGIC (Fix for "O sistema não volta") ---
+  // Updates the URL Hash, creating a history entry in the browser
+  const setView = (viewId: string) => {
+      window.location.hash = viewId;
+  };
+
+  useEffect(() => {
+      const handleHashChange = () => {
+          // Get hash without the '#' character
+          const hash = window.location.hash.replace('#', '');
+          
+          if (hash) {
+              setCurrentViewInternal(hash);
+          } else if (isAuthenticated && currentUser) {
+              // Default routing based on role if no hash is present
+              let def = 'dashboard';
+              if (currentUser.role === 'MOTORISTA') def = 'driver-portal';
+              if (currentUser.role === 'MECANICO') def = 'maintenance';
+              
+              // Only redirect if we aren't already there (avoids loops)
+              if (currentView !== def) {
+                  window.location.hash = def;
+              }
+          }
+      };
+
+      // Listen for browser Back/Forward buttons
+      window.addEventListener('hashchange', handleHashChange);
+      
+      // Trigger once on mount to handle bookmarks or reloads
+      handleHashChange();
+
+      return () => window.removeEventListener('hashchange', handleHashChange);
   }, [isAuthenticated, currentUser?.role]);
+
 
   if (!isAuthenticated) {
       return <LoginView />;
@@ -59,7 +79,6 @@ const MainContent = () => {
   }
 
   // --- SYSTEM LOCK CHECK ---
-  // Se o status for LOCKED e o usuário NÃO for Desenvolvedor, bloqueia tudo.
   if (settings.subscriptionStatus === 'LOCKED' && currentUser.role !== UserRole.DEVELOPER) {
       return (
           <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-4 text-center">
@@ -125,7 +144,7 @@ const MainContent = () => {
       case 'travel-packages': return <TravelPackagesView />;
       case 'vehicles': return <VehiclesView />;
       case 'charter': return <CharterView />;
-      case 'inventory': return <InventoryView />;
+      case 'inventory': return <InventoryView />; // System for parts input/output
       case 'documents': return <DocumentsView />;
       case 'finance': return <FinanceView />;
       case 'driver-portal': return <DriverPortal />;
@@ -148,20 +167,26 @@ const MainContent = () => {
 
       <Sidebar 
         currentView={currentView} 
-        setView={setCurrentView} 
+        setView={setView} 
         isMobileOpen={isMobileOpen}
         setIsMobileOpen={setIsMobileOpen}
       />
       
       <div className="flex-1 flex flex-col h-full overflow-hidden">
         {/* Mobile Header */}
-        <div className="md:hidden bg-slate-900 text-white p-4 flex justify-between items-center shadow-md shrink-0 pt-8"> {/* Added pt-8 to account for banner if present */}
+        <div className="md:hidden bg-slate-900 text-white p-4 flex justify-between items-center shadow-md shrink-0 pt-8">
             <div className="font-extrabold text-xl">
                 Rabelo<span className="text-blue-500">Tour</span>
             </div>
-            <button onClick={() => setIsMobileOpen(true)} className="p-2">
-                <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16m-7 6h7" /></svg>
-            </button>
+            <div className="flex gap-2">
+                {/* Mobile Back Button (Now works with browser history) */}
+                <button onClick={() => window.history.back()} className="p-2 text-slate-300 hover:text-white">
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
+                </button>
+                <button onClick={() => setIsMobileOpen(true)} className="p-2">
+                    <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16m-7 6h7" /></svg>
+                </button>
+            </div>
         </div>
 
         <main className={`flex-1 overflow-y-auto p-4 md:p-8 ${settings.subscriptionStatus === 'LOCKED' && currentUser.role === UserRole.DEVELOPER ? 'pt-8' : ''}`}>
