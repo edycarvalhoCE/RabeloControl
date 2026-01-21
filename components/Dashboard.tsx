@@ -7,7 +7,7 @@ import { Logo } from './Logo';
 import { Transaction } from '../types';
 
 const Dashboard: React.FC = () => {
-  const { bookings, transactions, buses, currentUser, users, timeOffs, updateTimeOffStatus, settings } = useStore();
+  const { bookings, transactions, buses, currentUser, users, timeOffs, updateTimeOffStatus, settings, fuelRecords } = useStore();
   const [insight, setInsight] = useState<string>('');
   const [loadingAi, setLoadingAi] = useState(false);
   
@@ -64,6 +64,31 @@ const Dashboard: React.FC = () => {
   ];
   
   const COLORS = ['#10b981', '#3b82f6', '#f59e0b'];
+
+  // --- FUEL CONSUMPTION STATS (SIMPLIFIED LIST) ---
+  const busConsumptionMap: {[key: string]: {distance: number, liters: number}} = {};
+  
+  fuelRecords.forEach(record => {
+      if (record.kmStart !== undefined && record.kmEnd !== undefined && record.kmEnd > record.kmStart && record.dieselLiters > 0) {
+          if (!busConsumptionMap[record.busId]) {
+              busConsumptionMap[record.busId] = { distance: 0, liters: 0 };
+          }
+          busConsumptionMap[record.busId].distance += (record.kmEnd - record.kmStart);
+          busConsumptionMap[record.busId].liters += record.dieselLiters;
+      }
+  });
+
+  const fuelConsumptionData = Object.keys(busConsumptionMap).map(busId => {
+      const bus = buses.find(b => b.id === busId);
+      const data = busConsumptionMap[busId];
+      const avg = data.liters > 0 ? (data.distance / data.liters) : 0;
+      return {
+          id: busId,
+          model: bus ? bus.model : 'N/A', // Using Model as Unique Number
+          plate: bus ? bus.plate : '?',
+          average: parseFloat(avg.toFixed(2))
+      };
+  }).filter(d => d.average > 0).sort((a,b) => b.average - a.average);
 
   // --- DUE DATE LOGIC ---
   const todayStr = new Date().toISOString().split('T')[0];
@@ -202,7 +227,7 @@ const Dashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* DUE DATES SECTION (NEW) */}
+      {/* DUE DATES SECTION */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* VENCE HOJE */}
           <div className="bg-white rounded-xl shadow-sm border border-l-4 border-l-orange-500 border-slate-200 p-4">
@@ -264,6 +289,48 @@ const Dashboard: React.FC = () => {
                       <p className="text-[10px] text-slate-400 uppercase">Balanço Previsto</p>
                   </div>
               </div>
+          </div>
+      </div>
+
+      {/* FUEL CONSUMPTION LIST (REPLACED CHART) */}
+      <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+          <h3 className="text-lg font-semibold text-slate-700 mb-4 flex items-center gap-2">
+              <span className="bg-blue-100 p-1 rounded">⛽</span>
+              Média de Consumo da Frota (KM/L)
+          </h3>
+          
+          <div className="overflow-x-auto">
+              {fuelConsumptionData.length > 0 ? (
+                  <table className="w-full text-left">
+                      <thead className="bg-slate-50 text-slate-600 text-xs uppercase font-bold border-b border-slate-200">
+                          <tr>
+                              <th className="p-3">Modelo / Nº Carro</th>
+                              <th className="p-3 text-right">Média (KM/L)</th>
+                              <th className="p-3 text-right">Placa</th>
+                          </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                          {fuelConsumptionData.map((data, idx) => (
+                              <tr key={data.id} className="hover:bg-slate-50">
+                                  <td className="p-3 font-bold text-slate-800 flex items-center gap-2">
+                                      <span className={`w-2 h-2 rounded-full ${data.average > 3.5 ? 'bg-green-500' : data.average > 2.5 ? 'bg-blue-500' : 'bg-red-500'}`}></span>
+                                      {data.model}
+                                  </td>
+                                  <td className={`p-3 text-right font-bold ${data.average > 3.5 ? 'text-green-600' : data.average > 2.5 ? 'text-blue-600' : 'text-red-600'}`}>
+                                      {data.average.toFixed(2)} km/l
+                                  </td>
+                                  <td className="p-3 text-right text-xs text-slate-500">
+                                      {data.plate}
+                                  </td>
+                              </tr>
+                          ))}
+                      </tbody>
+                  </table>
+              ) : (
+                  <div className="h-32 flex items-center justify-center text-slate-400 text-sm italic bg-slate-50 rounded-lg border border-dashed border-slate-200">
+                      Sem dados de quilometragem suficientes para cálculo.
+                  </div>
+              )}
           </div>
       </div>
 

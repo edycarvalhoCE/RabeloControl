@@ -7,6 +7,20 @@ const InventoryView: React.FC = () => {
   const { parts, updateStock, addPart, currentUser, purchaseRequests, users, buses, updatePurchaseRequestStatus, addFuelRecord, fuelRecords, fuelSupplies, addFuelSupply, fuelStockLevel, restockPart } = useStore();
   const [showAddForm, setShowAddForm] = useState(false);
   
+  // Helper to get local date string YYYY-MM-DD
+  const getTodayLocal = () => {
+    const d = new Date();
+    d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+    return d.toISOString().split('T')[0];
+  };
+
+  // Helper for safe date display
+  const formatDate = (dateStr: string) => {
+      if (!dateStr) return '-';
+      const [year, month, day] = dateStr.split('-');
+      return `${day}/${month}/${year}`;
+  };
+  
   // New Item State (Added supplier/nfe fields)
   const [newPart, setNewPart] = useState({ name: '', quantity: 0, minQuantity: 5, price: 0, lastSupplier: '', lastNfe: '' });
   
@@ -17,19 +31,22 @@ const InventoryView: React.FC = () => {
 
   // Fuel CONSUMPTION Form State
   const [fuelForm, setFuelForm] = useState({
-      date: new Date().toISOString().split('T')[0],
+      date: getTodayLocal(),
       busId: '',
       dieselLiters: 0,
       hasArla: false,
       arlaLiters: 0,
       location: 'GARAGE' as 'GARAGE' | 'STREET',
       cost: 0,
-      stationName: ''
+      stationName: '',
+      // NEW KM FIELDS
+      kmStart: 0,
+      kmEnd: 0
   });
 
   // Fuel SUPPLY Form State
   const [supplyForm, setSupplyForm] = useState({
-      date: new Date().toISOString().split('T')[0],
+      date: getTodayLocal(),
       liters: 0,
       cost: 0,
       receiverName: currentUser.name || '',
@@ -108,6 +125,16 @@ const InventoryView: React.FC = () => {
          alert("⚠️ Atenção: Você marcou que abasteceu Arla.\nÉ obrigatório informar a quantidade de litros de Arla.");
          return;
       }
+
+      // KM VALIDATION
+      if (fuelForm.kmEnd <= fuelForm.kmStart) {
+          alert("⚠️ Erro de Quilometragem: O KM Final deve ser MAIOR que o KM Inicial.");
+          return;
+      }
+
+      // Calculate Average (Distance / Liters)
+      const distance = fuelForm.kmEnd - fuelForm.kmStart;
+      const average = distance / fuelForm.dieselLiters;
       
       addFuelRecord({
           date: fuelForm.date,
@@ -118,18 +145,24 @@ const InventoryView: React.FC = () => {
           location: fuelForm.location,
           cost: fuelForm.location === 'STREET' ? fuelForm.cost : 0,
           stationName: fuelForm.location === 'STREET' ? fuelForm.stationName : '',
-          loggedBy: currentUser.id
+          loggedBy: currentUser.id,
+          // Add new KM fields
+          kmStart: fuelForm.kmStart,
+          kmEnd: fuelForm.kmEnd,
+          averageConsumption: average
       });
-      alert("Consumo registrado com sucesso!");
+      alert(`Consumo registrado!\nMédia calculada: ${average.toFixed(2)} km/L`);
       setFuelForm({
-        date: new Date().toISOString().split('T')[0],
+        date: getTodayLocal(),
         busId: '',
         dieselLiters: 0,
         hasArla: false,
         arlaLiters: 0,
         location: 'GARAGE',
         cost: 0,
-        stationName: ''
+        stationName: '',
+        kmStart: 0,
+        kmEnd: 0
       });
   };
 
@@ -148,7 +181,7 @@ const InventoryView: React.FC = () => {
 
       alert("Entrada de combustível registrada!");
       setSupplyForm({
-          date: new Date().toISOString().split('T')[0],
+          date: getTodayLocal(),
           liters: 0,
           cost: 0,
           receiverName: currentUser.name || '',
@@ -288,6 +321,7 @@ const InventoryView: React.FC = () => {
         </div>
       </div>
 
+      {/* ... STOCK VIEW ... */}
       {viewMode === 'STOCK' && (
           <>
             {showAddForm && canManageStock && (
@@ -506,7 +540,7 @@ const InventoryView: React.FC = () => {
                               ) : (
                                   filteredSupplies.map(s => (
                                       <tr key={s.id} className="hover:bg-slate-50">
-                                          <td className="p-3 text-sm text-slate-600">{new Date(s.date).toLocaleDateString()}</td>
+                                          <td className="p-3 text-sm text-slate-600">{formatDate(s.date)}</td>
                                           <td className="p-3 font-bold text-green-700">{s.liters} L</td>
                                           <td className="p-3 text-sm">R$ {s.cost.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
                                           <td className="p-3 text-sm text-slate-700">{s.receiverName}</td>
@@ -575,6 +609,35 @@ const InventoryView: React.FC = () => {
                           </select>
                       </div>
                       
+                      {/* KM CONTROL FIELDS (CRITICAL) */}
+                      <div className="grid grid-cols-2 gap-3 p-3 bg-slate-100 rounded-lg border border-slate-200">
+                          <div>
+                              <label className="block text-xs font-bold text-slate-700 mb-1">KM Inicial</label>
+                              <input 
+                                  type="number" min="0" required
+                                  value={fuelForm.kmStart || ''}
+                                  onChange={e => setFuelForm({...fuelForm, kmStart: parseInt(e.target.value)})}
+                                  className="w-full border p-2 rounded text-sm text-center font-bold text-slate-600"
+                                  placeholder="0"
+                              />
+                          </div>
+                          <div>
+                              <label className="block text-xs font-bold text-slate-700 mb-1">KM Final (Atual)</label>
+                              <input 
+                                  type="number" min="0" required
+                                  value={fuelForm.kmEnd || ''}
+                                  onChange={e => setFuelForm({...fuelForm, kmEnd: parseInt(e.target.value)})}
+                                  className="w-full border p-2 rounded text-sm text-center font-bold text-slate-800"
+                                  placeholder="0"
+                              />
+                          </div>
+                          {fuelForm.kmEnd > fuelForm.kmStart && (
+                              <div className="col-span-2 text-center text-xs text-slate-500">
+                                  Rodado: <strong>{fuelForm.kmEnd - fuelForm.kmStart} km</strong>
+                              </div>
+                          )}
+                      </div>
+
                       <div className="border-t border-slate-100 pt-3">
                         <label className="block text-sm font-bold text-slate-800 mb-2">Diesel</label>
                         <div className="flex items-center border border-slate-300 rounded overflow-hidden bg-white">
@@ -658,9 +721,9 @@ const InventoryView: React.FC = () => {
                               <tr>
                                   <th className="p-3">Data</th>
                                   <th className="p-3">Veículo</th>
-                                  <th className="p-3">Local</th>
+                                  <th className="p-3">KM Perc.</th>
                                   <th className="p-3">Diesel</th>
-                                  <th className="p-3">Arla</th>
+                                  <th className="p-3">Média</th>
                                   <th className="p-3 text-right">Resp.</th>
                               </tr>
                           </thead>
@@ -671,20 +734,22 @@ const InventoryView: React.FC = () => {
                                   fuelRecords.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()).map(record => {
                                       const bus = buses.find(b => b.id === record.busId);
                                       const user = users.find(u => u.id === record.loggedBy);
+                                      // Legacy support: if kmEnd/Start missing, fallback
+                                      const dist = (record.kmEnd && record.kmStart) ? record.kmEnd - record.kmStart : 0;
+                                      const avg = record.averageConsumption ? record.averageConsumption.toFixed(2) : '-';
+
                                       return (
                                           <tr key={record.id} className="hover:bg-slate-50">
-                                              <td className="p-3 text-sm text-slate-600">{new Date(record.date).toLocaleDateString()}</td>
+                                              <td className="p-3 text-sm text-slate-600">{formatDate(record.date)}</td>
                                               <td className="p-3 font-medium text-slate-800">
                                                   {bus?.plate} <span className="text-xs text-slate-500 block">{bus?.model}</span>
                                               </td>
-                                              <td className="p-3">
-                                                  {record.location === 'GARAGE' 
-                                                    ? <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded border border-blue-200 font-bold">Garagem</span> 
-                                                    : <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded border border-orange-200 font-bold">Rua</span>}
+                                              <td className="p-3 text-sm">
+                                                  {dist > 0 ? `${dist} km` : <span className="text-slate-300">-</span>}
                                               </td>
                                               <td className="p-3 text-sm font-bold text-slate-700">{record.dieselLiters} L</td>
-                                              <td className="p-3 text-sm">
-                                                  {record.hasArla ? <span className="text-blue-600 font-bold">{record.arlaLiters} L</span> : <span className="text-slate-300">-</span>}
+                                              <td className="p-3 text-sm font-bold text-blue-600">
+                                                  {avg !== '-' ? `${avg} km/l` : '-'}
                                               </td>
                                               <td className="p-3 text-right text-xs text-slate-500">{user?.name?.split(' ')[0] || 'N/A'}</td>
                                           </tr>
@@ -698,8 +763,10 @@ const InventoryView: React.FC = () => {
           </div>
       )}
 
+      {/* ... REQUESTS VIEW ... */}
       {viewMode === 'REQUESTS' && (
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+              {/* ... Same requests table ... */}
               <div className="p-4 border-b border-slate-200 bg-yellow-50">
                   <h3 className="font-bold text-yellow-800">Solicitações de Compra Pendentes</h3>
                   <p className="text-sm text-yellow-600">Peças solicitadas pela equipe de manutenção</p>
@@ -725,7 +792,7 @@ const InventoryView: React.FC = () => {
                               const relatedBus = buses.find(b => b.id === req.relatedBusId);
                               return (
                                   <tr key={req.id} className="hover:bg-slate-50">
-                                      <td className="p-4 text-sm text-slate-500">{new Date(req.requestDate).toLocaleDateString()}</td>
+                                      <td className="p-4 text-sm text-slate-500">{formatDate(req.requestDate)}</td>
                                       <td className="p-4 font-bold text-slate-800">{req.partName}</td>
                                       <td className="p-4 text-slate-700">{req.quantity}</td>
                                       <td className="p-4 text-sm text-slate-600">{requester?.name || 'Desconhecido'}</td>

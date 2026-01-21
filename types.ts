@@ -276,6 +276,10 @@ export interface FuelRecord {
   cost: number;
   stationName?: string;
   loggedBy: string;
+  // NEW KM FIELDS (Optional to support legacy data)
+  kmStart?: number;
+  kmEnd?: number;
+  averageConsumption?: number; // KM/L
 }
 
 export interface FuelSupply {

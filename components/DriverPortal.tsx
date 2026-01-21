@@ -18,19 +18,28 @@ const DriverPortal: React.FC = () => {
   // Trip Details Modal State
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
 
+  // Helper to get local date string YYYY-MM-DD
+  const getTodayLocal = () => {
+    const d = new Date();
+    d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+    return d.toISOString().split('T')[0];
+  };
+
   // Maintenance Report State
-  const [reportForm, setReportForm] = useState({ busId: '', type: 'MECANICA', description: '', date: new Date().toISOString().split('T')[0] });
+  const [reportForm, setReportForm] = useState({ busId: '', type: 'MECANICA', description: '', date: getTodayLocal() });
 
   // Fuel Form State
   const [fuelForm, setFuelForm] = useState({
-      date: new Date().toISOString().split('T')[0],
+      date: getTodayLocal(),
       busId: '',
       dieselLiters: 0,
       hasArla: false,
       arlaLiters: 0,
       location: 'STREET' as 'GARAGE' | 'STREET',
       cost: 0,
-      stationName: ''
+      stationName: '',
+      kmStart: 0,
+      kmEnd: 0
   });
 
   // --- LOGIC TO MERGE BOOKINGS AND CHARTER SCHEDULE ---
@@ -127,25 +136,41 @@ const DriverPortal: React.FC = () => {
           alert('⚠️ Atenção: Você marcou que abasteceu Arla.\nÉ obrigatório informar a quantidade de litros de Arla.');
           return;
       }
+
+      // KM VALIDATION
+      if (fuelForm.kmEnd <= fuelForm.kmStart) {
+          alert("⚠️ Erro de Quilometragem: O KM Final deve ser MAIOR que o KM Inicial.");
+          return;
+      }
+
+      // Calculate Average (Distance / Liters)
+      const distance = fuelForm.kmEnd - fuelForm.kmStart;
+      const average = distance / fuelForm.dieselLiters;
       
       addFuelRecord({
           ...fuelForm,
           arlaLiters: fuelForm.hasArla ? fuelForm.arlaLiters : 0, // Ensure clean data
           cost: fuelForm.location === 'STREET' ? fuelForm.cost : 0,
           stationName: fuelForm.location === 'STREET' ? fuelForm.stationName : '',
-          loggedBy: currentUser.id
+          loggedBy: currentUser.id,
+          // New Fields
+          kmStart: fuelForm.kmStart,
+          kmEnd: fuelForm.kmEnd,
+          averageConsumption: average
       });
       
-      alert('Abastecimento registrado com sucesso!');
+      alert(`Abastecimento registrado!\nMédia calculada: ${average.toFixed(2)} km/L`);
       setFuelForm({
-        date: new Date().toISOString().split('T')[0],
+        date: getTodayLocal(),
         busId: '',
         dieselLiters: 0,
         hasArla: false,
         arlaLiters: 0,
         location: 'STREET',
         cost: 0,
-        stationName: ''
+        stationName: '',
+        kmStart: 0,
+        kmEnd: 0
       });
   };
 
@@ -329,6 +354,35 @@ const DriverPortal: React.FC = () => {
                         </div>
                     </div>
 
+                    {/* KM CONTROL FIELDS (CRITICAL) */}
+                    <div className="grid grid-cols-2 gap-3 p-3 bg-slate-100 rounded-lg border border-slate-200">
+                        <div>
+                            <label className="block text-xs font-bold text-slate-700 mb-1">KM Inicial</label>
+                            <input 
+                                type="number" min="0" required
+                                value={fuelForm.kmStart || ''}
+                                onChange={e => setFuelForm({...fuelForm, kmStart: parseInt(e.target.value)})}
+                                className="w-full border p-2 rounded text-sm text-center font-bold text-slate-600"
+                                placeholder="0"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold text-slate-700 mb-1">KM Final (Atual)</label>
+                            <input 
+                                type="number" min="0" required
+                                value={fuelForm.kmEnd || ''}
+                                onChange={e => setFuelForm({...fuelForm, kmEnd: parseInt(e.target.value)})}
+                                className="w-full border p-2 rounded text-sm text-center font-bold text-slate-800"
+                                placeholder="0"
+                            />
+                        </div>
+                        {fuelForm.kmEnd > fuelForm.kmStart && (
+                            <div className="col-span-2 text-center text-xs text-slate-500">
+                                Rodado: <strong>{fuelForm.kmEnd - fuelForm.kmStart} km</strong>
+                            </div>
+                        )}
+                    </div>
+
                     <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
                         <label className="block text-sm font-bold text-slate-800 mb-2">Quantidade Diesel (Litros)</label>
                         <input 
@@ -430,11 +484,11 @@ const DriverPortal: React.FC = () => {
                                             </span>
                                         </div>
                                         <div className="flex justify-between text-sm text-slate-600">
-                                            <span>{new Date(fee.date).toLocaleDateString()}</span>
+                                            <span>{formatDateString(fee.date)}</span>
                                             <span className="font-bold">R$ {fee.amount.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
                                         </div>
                                         {fee.paymentDate && (
-                                            <p className="text-xs text-green-600 mt-1 text-right">Recebido em: {new Date(fee.paymentDate).toLocaleDateString()}</p>
+                                            <p className="text-xs text-green-600 mt-1 text-right">Recebido em: {formatDateString(fee.paymentDate)}</p>
                                         )}
                                     </div>
                                 ))
@@ -467,7 +521,7 @@ const DriverPortal: React.FC = () => {
                                                 <span className={`text-xs font-bold px-2 py-1 rounded ${liability.type === 'AVARIA' ? 'bg-orange-100 text-orange-700' : 'bg-red-100 text-red-700'}`}>
                                                     {liability.type}
                                                 </span>
-                                                <span className="text-sm text-slate-500">{new Date(liability.date).toLocaleDateString()}</span>
+                                                <span className="text-sm text-slate-500">{formatDateString(liability.date)}</span>
                                             </div>
                                             <h4 className="font-bold text-slate-800 mb-1">{liability.description}</h4>
                                             <p className="text-2xl font-bold text-red-600 mb-2">
@@ -505,7 +559,7 @@ const DriverPortal: React.FC = () => {
             </div>
         )}
 
-        {/* TRIP DETAILS MODAL */}
+        {/* ... remaining modals ... */}
         {selectedBooking && (
             <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" onClick={() => setSelectedBooking(null)}>
                 <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full overflow-hidden animate-fade-in" onClick={e => e.stopPropagation()}>
@@ -568,7 +622,7 @@ const DriverPortal: React.FC = () => {
             </div>
         )}
 
-        {/* DOCUMENTS TAB */}
+        {/* ... (rest of the file remains unchanged) ... */}
         {activeTab === 'documents' && (
             <div className="space-y-4">
                 <h2 className="text-xl font-bold text-slate-800">Documentos Disponíveis</h2>
@@ -586,7 +640,7 @@ const DriverPortal: React.FC = () => {
                                     </div>
                                     <div>
                                         <h3 className="font-bold text-slate-800">{doc.title}</h3>
-                                        <p className="text-xs text-slate-500">Upload: {new Date(doc.uploadDate).toLocaleDateString()}</p>
+                                        <p className="text-xs text-slate-500">Upload: {formatDateString(doc.uploadDate)}</p>
                                     </div>
                                 </div>
                                 <a 
@@ -603,7 +657,6 @@ const DriverPortal: React.FC = () => {
             </div>
         )}
 
-        {/* REQUESTS TAB */}
         {activeTab === 'requests' && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 h-fit">
@@ -668,7 +721,6 @@ const DriverPortal: React.FC = () => {
             </div>
         )}
 
-        {/* REPORT DEFECT TAB */}
         {activeTab === 'report' && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 h-fit border-l-4 border-l-red-500">
@@ -744,7 +796,7 @@ const DriverPortal: React.FC = () => {
                                         </div>
                                         <p className="text-sm text-slate-600 mb-1">{r.description}</p>
                                         <p className="text-xs text-slate-400">
-                                            {r.type} • {new Date(r.date).toLocaleDateString()}
+                                            {r.type} • {formatDateString(r.date)}
                                         </p>
                                     </div>
                                 );
