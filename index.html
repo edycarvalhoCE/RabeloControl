@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="pt-BR">
   <head>
@@ -46,8 +45,24 @@
       ::-webkit-scrollbar-track { background: #f1f1f1; }
       ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
       ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+      
+      /* Animações */
+      @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+      .animate-fade-in {
+        animation: fadeIn 0.4s ease-out forwards;
+      }
+      @keyframes bounceIn {
+        0% { transform: scale(0.9); opacity: 0; }
+        60% { transform: scale(1.05); opacity: 1; }
+        100% { transform: scale(1); }
+      }
+      .animate-bounce-in {
+        animation: bounceIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      }
     </style>
-    <!-- IMPORT MAP LIMPO E SEM DUPLICATAS -->
     <script type="importmap">
 {
   "imports": {
