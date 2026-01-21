@@ -42,6 +42,11 @@ const FinanceView: React.FC = () => {
       date: new Date().toISOString().split('T')[0],
       description: ''
   });
+  
+  // --- DRIVER FEE FILTER STATE ---
+  const [feeDriverFilter, setFeeDriverFilter] = useState('');
+  const [feeStartDate, setFeeStartDate] = useState(''); // New
+  const [feeEndDate, setFeeEndDate] = useState('');     // New
 
   // --- RECEIVE PAYMENT MODAL STATE ---
   const [paymentModal, setPaymentModal] = useState<{ open: boolean, liability: DriverLiability | null, amount: number }>({ open: false, liability: null, amount: 0 });
@@ -63,6 +68,23 @@ const FinanceView: React.FC = () => {
     .filter(t => t.status === 'PENDING')
     .filter(t => filter === 'ALL' ? true : t.type === filter)
     .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+  // --- FEES FILTER LOGIC ---
+  const filteredFees = driverFees.filter(fee => {
+      const matchDriver = feeDriverFilter ? fee.driverId === feeDriverFilter : true;
+      const matchStart = feeStartDate ? fee.date >= feeStartDate : true;
+      const matchEnd = feeEndDate ? fee.date <= feeEndDate : true;
+      
+      return matchDriver && matchStart && matchEnd;
+  }).sort((a,b) => {
+      // Sort Pending first, then by date descending
+      if (a.status === 'PENDING' && b.status !== 'PENDING') return -1;
+      if (a.status !== 'PENDING' && b.status === 'PENDING') return 1;
+      return new Date(b.date).getTime() - new Date(a.date).getTime();
+  });
+
+  const totalFeesPending = filteredFees.filter(f => f.status === 'PENDING').reduce((acc, f) => acc + f.amount, 0);
+  const totalFeesPaid = filteredFees.filter(f => f.status === 'PAID').reduce((acc, f) => acc + f.amount, 0);
 
   // --- HANDLERS ---
 
@@ -566,6 +588,60 @@ const FinanceView: React.FC = () => {
                 </div>
 
                 <div className="lg:col-span-2">
+                    {/* SUMMARY & FILTER BAR */}
+                    <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 mb-4 flex flex-col md:flex-row justify-between items-center gap-4">
+                        <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+                            <div className="flex flex-col">
+                                <label className="text-[10px] text-slate-500 font-bold uppercase mb-1">Motorista</label>
+                                <select
+                                    value={feeDriverFilter}
+                                    onChange={(e) => setFeeDriverFilter(e.target.value)}
+                                    className="border p-2 rounded text-sm bg-slate-50 focus:bg-white w-full md:w-40"
+                                >
+                                    <option value="">Todos</option>
+                                    {drivers.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                                </select>
+                            </div>
+                            <div className="flex flex-col">
+                                <label className="text-[10px] text-slate-500 font-bold uppercase mb-1">De</label>
+                                <input 
+                                    type="date" 
+                                    value={feeStartDate} 
+                                    onChange={e => setFeeStartDate(e.target.value)}
+                                    className="border p-2 rounded text-sm bg-slate-50 focus:bg-white"
+                                />
+                            </div>
+                            <div className="flex flex-col">
+                                <label className="text-[10px] text-slate-500 font-bold uppercase mb-1">Até</label>
+                                <input 
+                                    type="date" 
+                                    value={feeEndDate} 
+                                    onChange={e => setFeeEndDate(e.target.value)}
+                                    className="border p-2 rounded text-sm bg-slate-50 focus:bg-white"
+                                />
+                            </div>
+                            {(feeDriverFilter || feeStartDate || feeEndDate) && (
+                                <button 
+                                    onClick={() => { setFeeDriverFilter(''); setFeeStartDate(''); setFeeEndDate(''); }}
+                                    className="mt-4 text-xs text-red-500 hover:underline"
+                                >
+                                    Limpar
+                                </button>
+                            )}
+                        </div>
+                        
+                        <div className="flex gap-4 border-t md:border-t-0 md:border-l border-slate-200 pt-3 md:pt-0 pl-0 md:pl-4 mt-2 md:mt-0 w-full md:w-auto justify-end">
+                            <div className="text-right">
+                                <p className="text-xs text-slate-500 font-bold uppercase">Total Pago</p>
+                                <p className="text-lg font-bold text-green-600">R$ {totalFeesPaid.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</p>
+                            </div>
+                            <div className="text-right pl-4 border-l border-slate-200">
+                                <p className="text-xs text-slate-500 font-bold uppercase">Total Pendente</p>
+                                <p className="text-lg font-bold text-blue-700">R$ {totalFeesPending.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</p>
+                            </div>
+                        </div>
+                    </div>
+
                     <h3 className="font-bold text-slate-700 mb-4">Relatório de Diárias (Contas a Pagar)</h3>
                     <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                         <table className="w-full text-left">
@@ -580,10 +656,10 @@ const FinanceView: React.FC = () => {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100">
-                                {driverFees.length === 0 ? (
-                                    <tr><td colSpan={6} className="p-8 text-center text-slate-500">Nenhuma diária registrada.</td></tr>
+                                {filteredFees.length === 0 ? (
+                                    <tr><td colSpan={6} className="p-8 text-center text-slate-500">Nenhuma diária registrada para este filtro.</td></tr>
                                 ) : (
-                                    driverFees.sort((a,b) => (a.status === 'PENDING' ? -1 : 1)).map(fee => {
+                                    filteredFees.map(fee => {
                                         const drv = fee.driverId ? users.find(u => u.id === fee.driverId) : null;
                                         const driverName = drv ? drv.name : (fee.freelanceDriverName ? `${fee.freelanceDriverName} (F)` : 'Desconhecido');
                                         
