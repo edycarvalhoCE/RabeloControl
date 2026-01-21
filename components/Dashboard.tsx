@@ -6,7 +6,7 @@ import { getFinancialInsight } from '../services/geminiService';
 import { Logo } from './Logo';
 
 const Dashboard: React.FC = () => {
-  const { bookings, transactions, buses, parts, currentUser, users, timeOffs, updateTimeOffStatus, settings } = useStore();
+  const { bookings, transactions, buses, currentUser, users, timeOffs, updateTimeOffStatus, settings } = useStore();
   const [insight, setInsight] = useState<string>('');
   const [loadingAi, setLoadingAi] = useState(false);
 
@@ -15,7 +15,7 @@ const Dashboard: React.FC = () => {
     return <div className="p-4 bg-yellow-100 text-yellow-800 rounded-lg">Acesso restrito. Utilize o menu lateral para acessar suas funções.</div>;
   }
 
-  // Calculate Stats
+  // --- FINANCIAL CALCULATIONS ---
   const totalRevenue = transactions
     .filter(t => t.type === 'INCOME')
     .reduce((acc, curr) => acc + curr.amount, 0);
@@ -25,9 +25,27 @@ const Dashboard: React.FC = () => {
     .reduce((acc, curr) => acc + curr.amount, 0);
 
   const profit = totalRevenue - totalExpenses;
+
+  // Specific Expense Categories
+  const expenseParts = transactions
+    .filter(t => t.type === 'EXPENSE' && (t.category === 'Compra de Peças' || t.category === 'Peças'))
+    .reduce((acc, t) => acc + t.amount, 0);
+
+  const expenseFuel = transactions
+    .filter(t => t.type === 'EXPENSE' && (t.category === 'Combustível' || t.category === 'Compra Combustível'))
+    .reduce((acc, t) => acc + t.amount, 0);
+
+  const expenseAvaria = transactions
+    .filter(t => t.type === 'EXPENSE' && (t.category === 'Manutenção (Avaria)' || t.category.includes('Avaria')))
+    .reduce((acc, t) => acc + t.amount, 0);
+
+  const expenseMulta = transactions
+    .filter(t => t.type === 'EXPENSE' && (t.category === 'Multas' || t.category.includes('Multa')))
+    .reduce((acc, t) => acc + t.amount, 0);
+
+  // Operational Stats
   const activeBookings = bookings.filter(b => b.status === 'CONFIRMED').length;
   const maintenanceBuses = buses.filter(b => b.status === 'MAINTENANCE').length;
-  const lowStockParts = parts.filter(p => p.quantity <= p.minQuantity).length;
 
   const chartData = [
     { name: 'Entradas', amount: totalRevenue },
@@ -44,9 +62,8 @@ const Dashboard: React.FC = () => {
 
   const handleGetInsight = async () => {
     setLoadingAi(true);
-    const summary = `Receita Total: R$${totalRevenue}, Despesas Totais: R$${totalExpenses}, Lucro Líquido: R$${profit}. Tamanho da Frota: ${buses.length} ônibus, ${maintenanceBuses} em manutenção. Locações ativas hoje: ${activeBookings}. Peças com estoque baixo: ${lowStockParts} itens.`;
+    const summary = `Receita Total: R$${totalRevenue}, Despesas Totais: R$${totalExpenses}, Lucro: R$${profit}. Gastos Específicos: Peças R$${expenseParts}, Combustível R$${expenseFuel}, Avarias R$${expenseAvaria}, Multas R$${expenseMulta}. Frota: ${buses.length} ônibus.`;
     
-    // Pass key from settings
     const result = await getFinancialInsight(summary, settings?.aiApiKey);
     
     setInsight(result);
@@ -61,10 +78,9 @@ const Dashboard: React.FC = () => {
       return b.status === 'CONFIRMED' && now >= start && now <= end;
   });
 
-  // Recent and Upcoming Time Offs (Approved & Pending)
   const sortedTimeOffs = timeOffs
     .sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-    .slice(0, 10); // Show last 10 records
+    .slice(0, 10);
 
   const formatDateString = (dateStr: string) => {
     if(!dateStr) return '';
@@ -107,30 +123,59 @@ const Dashboard: React.FC = () => {
           </div>
       )}
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      {/* OPERATIONAL CARDS */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 relative overflow-hidden">
           <div className="absolute top-0 right-0 w-16 h-16 bg-green-50 rounded-bl-full -mr-2 -mt-2"></div>
-          <p className="text-slate-500 text-sm font-medium z-10 relative">Saldo em Caixa</p>
-          <p className={`text-2xl font-bold mt-2 z-10 relative ${profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+          <p className="text-slate-500 text-sm font-bold uppercase z-10 relative">Saldo em Caixa</p>
+          <p className={`text-3xl font-bold mt-2 z-10 relative ${profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
             {formatCurrency(profit)}
           </p>
         </div>
         <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-          <p className="text-slate-500 text-sm font-medium">Viagens em Andamento</p>
-          <p className="text-2xl font-bold text-blue-600 mt-2">{currentTrips.length}</p>
+          <p className="text-slate-500 text-sm font-bold uppercase">Viagens Ativas (Agora)</p>
+          <p className="text-3xl font-bold text-blue-600 mt-2">{currentTrips.length}</p>
         </div>
         <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-          <p className="text-slate-500 text-sm font-medium">Em Manutenção</p>
-          <p className="text-2xl font-bold text-orange-500 mt-2">{maintenanceBuses}</p>
-        </div>
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-          <p className="text-slate-500 text-sm font-medium">Alerta de Estoque</p>
-          <p className="text-2xl font-bold text-red-500 mt-2">{lowStockParts} itens</p>
+          <p className="text-slate-500 text-sm font-bold uppercase">Ônibus em Manutenção</p>
+          <p className="text-3xl font-bold text-orange-500 mt-2">{maintenanceBuses}</p>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      {/* EXPENSE BREAKDOWN CARDS */}
+      <h3 className="text-lg font-bold text-slate-700 mt-2">Detalhamento de Gastos</h3>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="bg-slate-50 p-5 rounded-xl border border-slate-200">
+              <div className="flex items-center gap-2 mb-2">
+                  <span className="bg-white p-1.5 rounded shadow-sm text-lg">🔧</span>
+                  <p className="text-slate-500 text-xs font-bold uppercase">Gasto com Peças</p>
+              </div>
+              <p className="text-xl font-bold text-slate-800">{formatCurrency(expenseParts)}</p>
+          </div>
+          <div className="bg-slate-50 p-5 rounded-xl border border-slate-200">
+              <div className="flex items-center gap-2 mb-2">
+                  <span className="bg-white p-1.5 rounded shadow-sm text-lg">⛽</span>
+                  <p className="text-slate-500 text-xs font-bold uppercase">Gasto Combustível</p>
+              </div>
+              <p className="text-xl font-bold text-slate-800">{formatCurrency(expenseFuel)}</p>
+          </div>
+          <div className="bg-red-50 p-5 rounded-xl border border-red-100">
+              <div className="flex items-center gap-2 mb-2">
+                  <span className="bg-white p-1.5 rounded shadow-sm text-lg">💥</span>
+                  <p className="text-red-800 text-xs font-bold uppercase">Gasto Avarias</p>
+              </div>
+              <p className="text-xl font-bold text-red-700">{formatCurrency(expenseAvaria)}</p>
+          </div>
+          <div className="bg-red-50 p-5 rounded-xl border border-red-100">
+              <div className="flex items-center gap-2 mb-2">
+                  <span className="bg-white p-1.5 rounded shadow-sm text-lg">👮</span>
+                  <p className="text-red-800 text-xs font-bold uppercase">Gasto Multas</p>
+              </div>
+              <p className="text-xl font-bold text-red-700">{formatCurrency(expenseMulta)}</p>
+          </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 pt-2">
           
           {/* CHARTS COLUMN */}
           <div className="lg:col-span-2 space-y-6">
@@ -169,7 +214,7 @@ const Dashboard: React.FC = () => {
                 </div>
 
               <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 h-80">
-                  <h3 className="text-lg font-semibold text-slate-700 mb-4">Fluxo de Caixa</h3>
+                  <h3 className="text-lg font-semibold text-slate-700 mb-4">Fluxo de Caixa Global</h3>
                   <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
                           <CartesianGrid strokeDasharray="3 3" vertical={false} />
@@ -177,7 +222,6 @@ const Dashboard: React.FC = () => {
                           <YAxis 
                             axisLine={false} 
                             tickLine={false} 
-                            // Format: R$ 1.000 instead of 1k
                             tickFormatter={(val) => `R$ ${val.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}`} 
                             width={80}
                           />
