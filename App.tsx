@@ -55,8 +55,9 @@ const MainContent = () => {
 
   if (!currentUser) {
       return (
-          <div className="min-h-screen flex items-center justify-center bg-slate-900 text-white">
-              Carregando perfil do usuário...
+          <div className="min-h-screen flex items-center justify-center bg-slate-900 text-white flex-col gap-4">
+              <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+              <p>Carregando perfil do usuário...</p>
           </div>
       );
   }
@@ -68,30 +69,35 @@ const MainContent = () => {
               <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-8 text-center">
                   <h2 className="text-2xl font-bold text-slate-800 mb-2">Acesso Pendente</h2>
                   <p className="text-slate-600 mb-6">Aguarde a aprovação do gerente.</p>
-                  <button onClick={logout} className="bg-slate-800 text-white px-6 py-2 rounded-lg">Sair</button>
+                  <button onClick={logout} className="bg-slate-800 text-white px-6 py-2 rounded-lg hover:bg-slate-700">Sair</button>
               </div>
           </div>
       );
   }
 
   const renderView = () => {
-    switch (currentView) {
-      case 'dashboard': return <Dashboard />;
-      case 'quotes': return <QuotesView />;
-      case 'calendar': return <CalendarView />;
-      case 'new-booking': return <NewBookingView />;
-      case 'bookings': return <BookingsView />;
-      case 'travel-packages': return <TravelPackagesView />;
-      case 'vehicles': return <VehiclesView />;
-      case 'charter': return <CharterView />;
-      case 'inventory': return <InventoryView />;
-      case 'documents': return <DocumentsView />;
-      case 'finance': return <FinanceView />;
-      case 'driver-portal': return <DriverPortal />;
-      case 'maintenance': return <MaintenanceView />;
-      case 'users': return <UsersView />;
-      case 'settings': return <SettingsView />;
-      default: return <Dashboard />;
+    try {
+      switch (currentView) {
+        case 'dashboard': return <Dashboard />;
+        case 'quotes': return <QuotesView />;
+        case 'calendar': return <CalendarView />;
+        case 'new-booking': return <NewBookingView />;
+        case 'bookings': return <BookingsView />;
+        case 'travel-packages': return <TravelPackagesView />;
+        case 'vehicles': return <VehiclesView />;
+        case 'charter': return <CharterView />;
+        case 'inventory': return <InventoryView />;
+        case 'documents': return <DocumentsView />;
+        case 'finance': return <FinanceView />;
+        case 'driver-portal': return <DriverPortal />;
+        case 'maintenance': return <MaintenanceView />;
+        case 'users': return <UsersView />;
+        case 'settings': return <SettingsView />;
+        default: return <Dashboard />;
+      }
+    } catch (error) {
+      console.error("Erro na visualização:", error);
+      return <div className="p-8 text-red-600">Erro ao carregar esta tela. Tente recarregar a página.</div>;
     }
   };
 
