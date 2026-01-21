@@ -606,6 +606,166 @@ const DriverPortal: React.FC = () => {
             </div>
         )}
 
+        {/* DOCUMENTS TAB */}
+        {activeTab === 'documents' && (
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                <h3 className="font-bold text-lg text-slate-800 mb-4">Meus Documentos</h3>
+                {myDocuments.length === 0 ? (
+                    <p className="text-slate-500 text-sm">Nenhum documento arquivado.</p>
+                ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {myDocuments.map(doc => (
+                            <div key={doc.id} className="border p-4 rounded-lg flex justify-between items-center">
+                                <div>
+                                    <p className="font-bold text-slate-700">{doc.title}</p>
+                                    <p className="text-xs text-slate-500">{new Date(doc.uploadDate).toLocaleDateString()}</p>
+                                </div>
+                                <a 
+                                    href={doc.fileContent} 
+                                    download={doc.fileName}
+                                    className="bg-blue-100 text-blue-700 px-3 py-1 rounded text-xs font-bold hover:bg-blue-200"
+                                >
+                                    Baixar
+                                </a>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+        )}
+
+        {/* REQUESTS TAB */}
+        {activeTab === 'requests' && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 h-fit">
+                    <h3 className="font-bold text-lg text-slate-800 mb-4">Solicitar Folga / Férias</h3>
+                    <form onSubmit={handleRequest} className="space-y-4">
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Tipo</label>
+                            <select 
+                                value={requestType} 
+                                onChange={(e) => setRequestType(e.target.value as any)}
+                                className="w-full border p-2 rounded"
+                            >
+                                <option value="FOLGA">Folga</option>
+                                <option value="FERIAS">Férias</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Data Início</label>
+                            <input 
+                                type="date" required 
+                                value={requestDate} 
+                                onChange={(e) => setRequestDate(e.target.value)}
+                                className="w-full border p-2 rounded"
+                            />
+                        </div>
+                        {requestType === 'FERIAS' && (
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-1">Data Fim</label>
+                                <input 
+                                    type="date" required 
+                                    value={requestEndDate} 
+                                    onChange={(e) => setRequestEndDate(e.target.value)}
+                                    className="w-full border p-2 rounded"
+                                />
+                            </div>
+                        )}
+                        <button type="submit" className="w-full bg-slate-800 text-white font-bold py-2 rounded hover:bg-slate-700">
+                            Enviar Solicitação
+                        </button>
+                    </form>
+                </div>
+
+                <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                    <h3 className="font-bold text-lg text-slate-800 mb-4">Minhas Solicitações</h3>
+                    <div className="space-y-3">
+                        {myTimeOffs.length === 0 ? (
+                            <p className="text-slate-500 text-sm">Nenhuma solicitação.</p>
+                        ) : (
+                            myTimeOffs.map(req => (
+                                <div key={req.id} className="border p-3 rounded-lg flex justify-between items-center">
+                                    <div>
+                                        <span className={`text-xs font-bold px-2 py-0.5 rounded ${req.type === 'FERIAS' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
+                                            {req.type}
+                                        </span>
+                                        <p className="text-sm font-medium mt-1">
+                                            {formatDateString(req.date)}
+                                            {req.endDate && ` até ${formatDateString(req.endDate)}`}
+                                        </p>
+                                    </div>
+                                    <div>
+                                        {getStatusBadge(req.status)}
+                                    </div>
+                                </div>
+                            ))
+                        )}
+                    </div>
+                </div>
+            </div>
+        )}
+
+        {/* REPORT TAB */}
+        {activeTab === 'report' && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 h-fit">
+                    <h3 className="font-bold text-lg text-slate-800 mb-4">Reportar Problema no Veículo</h3>
+                    <form onSubmit={handleReportSubmit} className="space-y-4">
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Veículo</label>
+                            <select 
+                                required 
+                                value={reportForm.busId} 
+                                onChange={(e) => setReportForm({...reportForm, busId: e.target.value})}
+                                className="w-full border p-2 rounded"
+                            >
+                                <option value="">Selecione...</option>
+                                {buses.map(b => (
+                                    <option key={b.id} value={b.id}>{b.plate} - {b.model}</option>
+                                ))}
+                            </select>
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Descrição do Problema</label>
+                            <textarea 
+                                required 
+                                value={reportForm.description} 
+                                onChange={(e) => setReportForm({...reportForm, description: e.target.value})}
+                                className="w-full border p-2 rounded h-24"
+                                placeholder="Ex: Ar condicionado não gela, barulho na roda..."
+                            />
+                        </div>
+                        <button type="submit" className="w-full bg-red-600 text-white font-bold py-2 rounded hover:bg-red-700">
+                            Reportar Defeito
+                        </button>
+                    </form>
+                </div>
+
+                <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                    <h3 className="font-bold text-lg text-slate-800 mb-4">Meus Reportes</h3>
+                    <div className="space-y-3">
+                        {myReports.length === 0 ? (
+                            <p className="text-slate-500 text-sm">Nenhum reporte recente.</p>
+                        ) : (
+                            myReports.map(rep => {
+                                const bus = buses.find(b => b.id === rep.busId);
+                                return (
+                                    <div key={rep.id} className="border p-3 rounded-lg">
+                                        <div className="flex justify-between mb-2">
+                                            <span className="font-bold text-slate-700">{bus?.plate}</span>
+                                            {getStatusBadge(rep.status)}
+                                        </div>
+                                        <p className="text-sm text-slate-600 bg-slate-50 p-2 rounded">{rep.description}</p>
+                                        <p className="text-xs text-slate-400 mt-2 text-right">{new Date(rep.date).toLocaleDateString()}</p>
+                                    </div>
+                                );
+                            })
+                        )}
+                    </div>
+                </div>
+            </div>
+        )}
+
       </div>
     </div>
   );
