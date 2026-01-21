@@ -35,7 +35,15 @@ const TravelPackagesView: React.FC = () => {
       qtdAdult: 0,
       qtdChild: 0,
       qtdSenior: 0,
-      discount: 0
+      
+      // Payment & Discount Logic
+      paymentMethod: 'PIX' as 'PIX' | 'MAQUININHA' | 'LINK_PAGAMENTO' | 'LINK_EXTERNO' | 'DINHEIRO',
+      installments: 1,
+      
+      discountType: 'VALUE' as 'VALUE' | 'PERCENT',
+      discountInput: 0, // Raw input (can be % or R$)
+      
+      cardFeeRate: 0, // Taxa da maquininha em %
   });
 
   // Client History Modal
@@ -107,14 +115,20 @@ const TravelPackagesView: React.FC = () => {
           paxList: p.paxList || '',
           cpf: p.titularCpf,
           name: p.titularName,
-          rg: '', // RG not stored in sale usually, client lookup required if needed, or leave blank
-          birthDate: '', // Same for birthdate
-          phone: '', // Same
-          address: '', // Same
+          rg: '', 
+          birthDate: '', 
+          phone: '', 
+          address: '', 
           qtdAdult: p.qtdAdult,
           qtdChild: p.qtdChild,
           qtdSenior: p.qtdSenior,
-          discount: p.discount
+          
+          // Reset calc fields on edit (simple mode)
+          paymentMethod: 'PIX',
+          installments: 1,
+          discountType: 'VALUE',
+          discountInput: p.discount,
+          cardFeeRate: 0
       });
       // Try to find client data to fill remaining fields
       const client = clients.find(c => c.id === p.clientId);
@@ -136,7 +150,8 @@ const TravelPackagesView: React.FC = () => {
       setEditingPassenger(null);
       setSaleForm({ 
           saleType: 'DIRECT', agencyName: '', agencyPhone: '', paxList: '',
-          cpf: '', name: '', rg: '', birthDate: '', phone: '', address: '', qtdAdult: 0, qtdChild: 0, qtdSenior: 0, discount: 0 
+          cpf: '', name: '', rg: '', birthDate: '', phone: '', address: '', qtdAdult: 0, qtdChild: 0, qtdSenior: 0,
+          paymentMethod: 'PIX', installments: 1, discountType: 'VALUE', discountInput: 0, cardFeeRate: 0
       });
   };
 
@@ -156,34 +171,64 @@ const TravelPackagesView: React.FC = () => {
       setNewPkg(prev => ({ ...prev, [field]: realValue }));
   };
 
-  const handleDiscountChange = (valueStr: string) => {
-      const digits = valueStr.replace(/\D/g, "");
-      const realValue = Number(digits) / 100;
-      setSaleForm(prev => ({ ...prev, discount: realValue }));
-  };
-
   const handlePaymentAmountChange = (valueStr: string) => {
       const digits = valueStr.replace(/\D/g, "");
       const realValue = Number(digits) / 100;
       setNewPayment(prev => ({ ...prev, amount: realValue }));
   };
 
+  // PAYMENT LOGIC HANDLERS
+  const handlePaymentMethodChange = (method: string) => {
+      let fee = 0;
+      if (method === 'MAQUININHA') fee = 4.50; // Example default
+      if (method === 'LINK_PAGAMENTO') fee = 5.50; // Example default
+      
+      setSaleForm(prev => ({
+          ...prev,
+          paymentMethod: method as any,
+          cardFeeRate: fee,
+          installments: 1 // Reset installments
+      }));
+  };
+
+  const calculateFinancials = () => {
+      if (!selectedPackage) return { totalGross: 0, discountValue: 0, totalNet: 0, feeValue: 0, finalPrice: 0 };
+
+      const totalGross = (saleForm.qtdAdult * selectedPackage.adultPrice) + 
+                         (saleForm.qtdChild * selectedPackage.childPrice) +
+                         (saleForm.qtdSenior * selectedPackage.seniorPrice);
+
+      let discountValue = 0;
+      if (saleForm.discountType === 'PERCENT') {
+          discountValue = totalGross * (saleForm.discountInput / 100);
+      } else {
+          discountValue = saleForm.discountInput;
+      }
+
+      const finalPrice = Math.max(0, totalGross - discountValue);
+      
+      let feeValue = 0;
+      // Fee applies to Final Price (what is charged on the card)
+      if (saleForm.paymentMethod === 'MAQUININHA' || saleForm.paymentMethod === 'LINK_PAGAMENTO') {
+          feeValue = finalPrice * (saleForm.cardFeeRate / 100);
+      }
+
+      const totalNet = finalPrice - feeValue;
+
+      return { totalGross, discountValue, finalPrice, feeValue, totalNet };
+  };
+
   const handleRegisterSale = async (e: React.FormEvent) => {
       e.preventDefault();
       if(selectedPackage) {
-          // 1. Calculate Total
-          const total = (saleForm.qtdAdult * selectedPackage.adultPrice) + 
-                        (saleForm.qtdChild * selectedPackage.childPrice) +
-                        (saleForm.qtdSenior * selectedPackage.seniorPrice);
+          const { totalGross, discountValue, finalPrice } = calculateFinancials();
           
-          if (total <= 0) {
+          if (totalGross <= 0) {
               alert("Por favor, selecione pelo menos um passageiro.");
               return;
           }
 
-          const finalPrice = Math.max(0, total - saleForm.discount);
-
-          // Calculate Commission
+          // Calculate Commission (Cost for company)
           let commissionRate = 0.01; // Direct
           if (saleForm.saleType === 'AGENCY') commissionRate = 0.12;
           if (saleForm.saleType === 'PROMOTER') commissionRate = 0.10;
@@ -192,7 +237,7 @@ const TravelPackagesView: React.FC = () => {
 
           // Helper: Agency name or Promoter Name
           const thirdPartyName = (saleForm.saleType === 'AGENCY' || saleForm.saleType === 'PROMOTER') ? saleForm.agencyName : '';
-          const thirdPartyPhone = (saleForm.saleType === 'AGENCY') ? saleForm.agencyPhone : ''; // Promoter uses main phone or agency phone field
+          const thirdPartyPhone = (saleForm.saleType === 'AGENCY') ? saleForm.agencyPhone : ''; 
           const paxList = (saleForm.saleType === 'AGENCY') ? saleForm.paxList : '';
 
           if (editingPassenger) {
@@ -203,7 +248,7 @@ const TravelPackagesView: React.FC = () => {
                   qtdAdult: saleForm.qtdAdult,
                   qtdChild: saleForm.qtdChild,
                   qtdSenior: saleForm.qtdSenior,
-                  discount: saleForm.discount,
+                  discount: discountValue,
                   agreedPrice: finalPrice,
                   saleType: saleForm.saleType,
                   agencyName: thirdPartyName,
@@ -215,10 +260,10 @@ const TravelPackagesView: React.FC = () => {
               alert("Venda atualizada com sucesso!");
               setEditingPassenger(null);
           } else {
-              // 2. Check Discount Authorization (Only for new sales usually, but good to keep)
-              if (saleForm.discount > 0) {
+              // 2. Check Discount Authorization
+              if (discountValue > 0) {
                   const authorized = window.confirm(
-                      `ATENÇÃO: Você está aplicando um desconto de R$ ${saleForm.discount.toLocaleString('pt-BR', {minimumFractionDigits: 2})}.\n\n` + 
+                      `ATENÇÃO: Você está aplicando um desconto de R$ ${discountValue.toLocaleString('pt-BR', {minimumFractionDigits: 2})}.\n\n` + 
                       `Todo desconto deve ser AUTORIZADO pelo gestor.\n` + 
                       `Confirma que você possui esta autorização?`
                   );
@@ -228,7 +273,7 @@ const TravelPackagesView: React.FC = () => {
               // 3. Register New
               registerPackageSale(
                   {
-                      name: saleForm.name, // Will be Client Name OR Agency Contact Person
+                      name: saleForm.name,
                       cpf: saleForm.cpf,
                       rg: saleForm.rg,
                       birthDate: saleForm.birthDate,
@@ -240,7 +285,7 @@ const TravelPackagesView: React.FC = () => {
                       qtdAdult: saleForm.qtdAdult,
                       qtdChild: saleForm.qtdChild,
                       qtdSenior: saleForm.qtdSenior,
-                      discount: saleForm.discount,
+                      discount: discountValue,
                       agreedPrice: finalPrice,
                       saleType: saleForm.saleType,
                       agencyName: thirdPartyName || undefined,
@@ -254,7 +299,8 @@ const TravelPackagesView: React.FC = () => {
           // Reset
           setSaleForm({ 
               saleType: 'DIRECT', agencyName: '', agencyPhone: '', paxList: '',
-              cpf: '', name: '', rg: '', birthDate: '', phone: '', address: '', qtdAdult: 0, qtdChild: 0, qtdSenior: 0, discount: 0 
+              cpf: '', name: '', rg: '', birthDate: '', phone: '', address: '', qtdAdult: 0, qtdChild: 0, qtdSenior: 0,
+              paymentMethod: 'PIX', installments: 1, discountType: 'VALUE', discountInput: 0, cardFeeRate: 0
           });
       }
   };
@@ -281,10 +327,9 @@ const TravelPackagesView: React.FC = () => {
       return Math.min(100, (paid / total) * 100);
   };
 
-  // --- PRINT FUNCTIONS --- (Receipt and Contract skipped for brevity as they are unchanged)
-  // Re-using same logic but simplified here for updating view
-  const handlePrintReceipt = (passenger: PackagePassenger) => { /* ... existing code ... */ };
-  const handlePrintContract = (passenger: PackagePassenger) => { /* ... existing code ... */ };
+  // --- PRINT FUNCTIONS --- 
+  const handlePrintReceipt = (passenger: PackagePassenger) => { /* Reuse logic */ };
+  const handlePrintContract = (passenger: PackagePassenger) => { /* Reuse logic */ };
 
   if (selectedPackage) {
       // DETAILS VIEW
@@ -293,18 +338,15 @@ const TravelPackagesView: React.FC = () => {
       const totalRevenueCollected = passengers.reduce((sum, p) => sum + p.paidAmount, 0);
       const totalCommission = passengers.reduce((sum, p) => sum + (p.commissionValue || 0), 0);
 
-      // Calculations for the current form state (Preview)
-      const currentTotal = (saleForm.qtdAdult * selectedPackage.adultPrice) + 
-                           (saleForm.qtdChild * selectedPackage.childPrice) +
-                           (saleForm.qtdSenior * selectedPackage.seniorPrice);
-      const currentFinal = Math.max(0, currentTotal - saleForm.discount);
+      // Current Calculations for Preview
+      const { totalGross, discountValue, finalPrice, feeValue, totalNet } = calculateFinancials();
       
       // Dynamic Commission Estimate for Preview
       let currentRate = 0.01;
       if (saleForm.saleType === 'AGENCY') currentRate = 0.12;
       if (saleForm.saleType === 'PROMOTER') currentRate = 0.10;
       
-      const estimatedCommission = currentFinal * currentRate;
+      const estimatedCommission = finalPrice * currentRate;
 
       return (
           <div className="space-y-6 animate-fade-in">
@@ -350,7 +392,7 @@ const TravelPackagesView: React.FC = () => {
                                   
                                   {/* TYPE OF SALE SELECTION */}
                                   <div className="mb-4 bg-white p-3 rounded border border-slate-200">
-                                      <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Tipo de Venda (Comissão)</label>
+                                      <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Canal de Venda (Comissão)</label>
                                       <div className="flex flex-wrap gap-4">
                                           <label className="flex items-center gap-2 cursor-pointer">
                                               <input 
@@ -384,7 +426,7 @@ const TravelPackagesView: React.FC = () => {
 
                                   <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
                                       <div>
-                                          <label className="text-xs font-bold text-slate-500">CPF / CNPJ (Contratante)</label>
+                                          <label className="text-xs font-bold text-slate-500">CPF / CNPJ</label>
                                           <input 
                                             value={saleForm.cpf} onChange={e => setSaleForm({...saleForm, cpf: e.target.value})}
                                             onBlur={handleCpfBlur}
@@ -393,7 +435,7 @@ const TravelPackagesView: React.FC = () => {
                                       </div>
                                       <div className="md:col-span-2">
                                           <label className="text-xs font-bold text-slate-500">
-                                              {saleForm.saleType === 'AGENCY' ? 'Nome do Contato na Agência' : saleForm.saleType === 'PROMOTER' ? 'Nome do Cliente' : 'Nome Completo Cliente'}
+                                              Nome Completo Cliente
                                           </label>
                                           <input 
                                             value={saleForm.name} onChange={e => setSaleForm({...saleForm, name: e.target.value})}
@@ -426,7 +468,7 @@ const TravelPackagesView: React.FC = () => {
                                               
                                               {saleForm.saleType === 'AGENCY' && (
                                                   <div className="md:col-span-3">
-                                                      <label className="text-xs font-bold text-slate-500">Lista de Passageiros (Nome e Telefone)</label>
+                                                      <label className="text-xs font-bold text-slate-500">Lista de Passageiros (Agência)</label>
                                                       <textarea 
                                                         value={saleForm.paxList} onChange={e => setSaleForm({...saleForm, paxList: e.target.value})}
                                                         className="w-full border p-2 rounded text-sm h-20"
@@ -439,7 +481,7 @@ const TravelPackagesView: React.FC = () => {
 
                                       {/* COMMON FIELDS */}
                                       <div>
-                                          <label className="text-xs font-bold text-slate-500">RG (Responsável)</label>
+                                          <label className="text-xs font-bold text-slate-500">RG</label>
                                           <input 
                                             value={saleForm.rg} onChange={e => setSaleForm({...saleForm, rg: e.target.value})}
                                             className="w-full border p-2 rounded text-sm"
@@ -469,53 +511,142 @@ const TravelPackagesView: React.FC = () => {
                                       </div>
                                   </div>
 
-                                  <div className="bg-white p-3 rounded border border-slate-200 mb-4">
-                                      <h5 className="text-xs font-bold text-slate-500 mb-2 uppercase">Quantidades e Valores</h5>
-                                      <div className="grid grid-cols-3 gap-4 mb-3">
+                                  <div className="bg-white p-4 rounded-lg border border-slate-200 mb-4 shadow-sm">
+                                      <h5 className="text-sm font-bold text-slate-700 mb-3 flex items-center gap-2">
+                                          <span>💸</span> Forma de Pagamento e Valores
+                                      </h5>
+                                      
+                                      {/* QTY SELECTORS */}
+                                      <div className="grid grid-cols-3 gap-4 mb-4 bg-slate-50 p-2 rounded border border-slate-100">
                                           <div className="text-center">
-                                              <label className="block text-xs text-slate-500">Adultos</label>
-                                              <input type="number" min="0" className="border p-1 rounded w-full text-center" 
+                                              <label className="block text-xs font-bold text-slate-500 mb-1">Adultos</label>
+                                              <input type="number" min="0" className="border p-1 rounded w-full text-center font-bold" 
                                                 value={saleForm.qtdAdult} onChange={e => setSaleForm({...saleForm, qtdAdult: parseInt(e.target.value) || 0})}
                                               />
                                           </div>
                                           <div className="text-center">
-                                              <label className="block text-xs text-slate-500">Crianças</label>
-                                              <input type="number" min="0" className="border p-1 rounded w-full text-center" 
+                                              <label className="block text-xs font-bold text-slate-500 mb-1">Crianças</label>
+                                              <input type="number" min="0" className="border p-1 rounded w-full text-center font-bold" 
                                                 value={saleForm.qtdChild} onChange={e => setSaleForm({...saleForm, qtdChild: parseInt(e.target.value) || 0})}
                                               />
                                           </div>
                                           <div className="text-center">
-                                              <label className="block text-xs text-slate-500">Melhor Idade</label>
-                                              <input type="number" min="0" className="border p-1 rounded w-full text-center" 
+                                              <label className="block text-xs font-bold text-slate-500 mb-1">Idosos</label>
+                                              <input type="number" min="0" className="border p-1 rounded w-full text-center font-bold" 
                                                 value={saleForm.qtdSenior} onChange={e => setSaleForm({...saleForm, qtdSenior: parseInt(e.target.value) || 0})}
                                               />
                                           </div>
                                       </div>
-                                      <div className="flex justify-between items-center border-t border-slate-100 pt-2">
-                                          <div className="flex flex-col">
-                                              <label className="text-xs font-bold text-slate-500 mr-2">Desconto (R$)</label>
-                                              <div className="flex items-center border border-slate-300 rounded overflow-hidden bg-white focus-within:ring-2 focus-within:ring-emerald-500 w-32">
-                                                  <span className="bg-slate-100 text-slate-600 px-2 py-1 font-bold border-r border-slate-300 text-xs">R$</span>
-                                                  <input 
-                                                    type="text" 
-                                                    inputMode="numeric"
-                                                    className="p-1 outline-none text-right font-medium text-red-600 w-full" 
-                                                    value={saleForm.discount.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
-                                                    onChange={e => handleDiscountChange(e.target.value)}
-                                                    placeholder="0,00"
-                                                  />
+
+                                      {/* PAYMENT METHOD SELECTOR */}
+                                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                                          <div>
+                                              <label className="block text-xs font-bold text-slate-500 mb-1">Método de Pagamento</label>
+                                              <select 
+                                                  value={saleForm.paymentMethod}
+                                                  onChange={(e) => handlePaymentMethodChange(e.target.value)}
+                                                  className="w-full border border-blue-300 p-2 rounded text-sm bg-blue-50 focus:ring-2 focus:ring-blue-500 font-bold text-blue-900 outline-none"
+                                              >
+                                                  <option value="PIX">PIX (Com Desconto)</option>
+                                                  <option value="DINHEIRO">Dinheiro (Espécie)</option>
+                                                  <option value="MAQUININHA">Cartão (Maquininha)</option>
+                                                  <option value="LINK_PAGAMENTO">Link de Pagamento (Cartão)</option>
+                                                  <option value="LINK_EXTERNO">Link Externo (Sem Taxa)</option>
+                                              </select>
+                                          </div>
+
+                                          {/* CONDITIONAL INPUTS */}
+                                          {saleForm.paymentMethod === 'PIX' || saleForm.paymentMethod === 'DINHEIRO' ? (
+                                              <div className="flex gap-2">
+                                                  <div className="w-1/2">
+                                                      <label className="block text-xs font-bold text-slate-500 mb-1">Tipo Desconto</label>
+                                                      <select 
+                                                          value={saleForm.discountType}
+                                                          onChange={(e) => setSaleForm({...saleForm, discountType: e.target.value as any})}
+                                                          className="w-full border p-2 rounded text-sm bg-white"
+                                                      >
+                                                          <option value="VALUE">Valor R$</option>
+                                                          <option value="PERCENT">Porcentagem %</option>
+                                                      </select>
+                                                  </div>
+                                                  <div className="w-1/2">
+                                                      <label className="block text-xs font-bold text-slate-500 mb-1">
+                                                          {saleForm.discountType === 'VALUE' ? 'Valor Desconto' : '% Desconto'}
+                                                      </label>
+                                                      <input 
+                                                          type="number"
+                                                          min="0"
+                                                          step={saleForm.discountType === 'VALUE' ? '0.01' : '1'}
+                                                          value={saleForm.discountInput}
+                                                          onChange={(e) => setSaleForm({...saleForm, discountInput: parseFloat(e.target.value) || 0})}
+                                                          className="w-full border p-2 rounded text-sm text-red-600 font-bold text-right"
+                                                          placeholder="0"
+                                                      />
+                                                  </div>
                                               </div>
+                                          ) : null}
+
+                                          {(saleForm.paymentMethod === 'MAQUININHA' || saleForm.paymentMethod === 'LINK_PAGAMENTO') && (
+                                              <div className="flex gap-2">
+                                                  <div className="w-1/2">
+                                                      <label className="block text-xs font-bold text-slate-500 mb-1">Parcelas</label>
+                                                      <select 
+                                                          value={saleForm.installments}
+                                                          onChange={(e) => setSaleForm({...saleForm, installments: parseInt(e.target.value)})}
+                                                          className="w-full border p-2 rounded text-sm"
+                                                      >
+                                                          {[1,2,3,4,5,6,7,8,9,10,11,12].map(i => <option key={i} value={i}>{i}x</option>)}
+                                                      </select>
+                                                  </div>
+                                                  <div className="w-1/2">
+                                                      <label className="block text-xs font-bold text-slate-500 mb-1">Taxa Máquina (%)</label>
+                                                      <input 
+                                                          type="number"
+                                                          step="0.01"
+                                                          value={saleForm.cardFeeRate}
+                                                          onChange={(e) => setSaleForm({...saleForm, cardFeeRate: parseFloat(e.target.value) || 0})}
+                                                          className="w-full border p-2 rounded text-sm text-right"
+                                                      />
+                                                  </div>
+                                              </div>
+                                          )}
+                                      </div>
+
+                                      {/* FINANCIAL SIMULATION */}
+                                      <div className="bg-slate-100 p-3 rounded text-sm space-y-1 border border-slate-200">
+                                          <div className="flex justify-between">
+                                              <span className="text-slate-500">Valor Bruto:</span>
+                                              <span className="font-bold">R$ {totalGross.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
                                           </div>
-                                          <div className="text-right">
-                                              <span className="text-xs text-slate-500 block">Total a Pagar</span>
-                                              <span className="text-lg font-bold text-emerald-600">R$ {currentFinal.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
-                                              <span className="text-xs text-slate-400 block mt-1">Comissão Estimada: R$ {estimatedCommission.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                                          {discountValue > 0 && (
+                                              <div className="flex justify-between text-red-600">
+                                                  <span>Desconto:</span>
+                                                  <span>- R$ {discountValue.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                                              </div>
+                                          )}
+                                          <div className="flex justify-between border-t border-slate-300 pt-1 mt-1">
+                                              <span className="font-bold text-slate-700">Valor a Cobrar (Cliente):</span>
+                                              <span className="font-bold text-lg text-emerald-700">R$ {finalPrice.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
                                           </div>
+                                          
+                                          {/* FEES DISPLAY */}
+                                          {(saleForm.paymentMethod === 'MAQUININHA' || saleForm.paymentMethod === 'LINK_PAGAMENTO') && (
+                                              <>
+                                                  <div className="flex justify-between text-xs text-orange-600 mt-2 pt-2 border-t border-slate-200 border-dashed">
+                                                      <span>Taxa Cartão ({saleForm.cardFeeRate}%):</span>
+                                                      <span>- R$ {feeValue.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                                                  </div>
+                                                  <div className="flex justify-between font-bold text-blue-800 bg-blue-50 p-1 rounded mt-1">
+                                                      <span>Valor Líquido (Você Recebe):</span>
+                                                      <span>R$ {totalNet.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                                                  </div>
+                                              </>
+                                          )}
                                       </div>
                                   </div>
 
                                   <button type="submit" className={`w-full text-white px-4 py-3 rounded font-bold text-sm shadow-md transition-colors ${editingPassenger ? 'bg-blue-600 hover:bg-blue-700' : 'bg-slate-800 hover:bg-slate-700'}`}>
-                                      {editingPassenger ? 'Salvar Alterações' : 'Registrar Venda'}
+                                      {editingPassenger ? 'Salvar Alterações' : 'Confirmar Venda'}
                                   </button>
                               </form>
                           </div>
