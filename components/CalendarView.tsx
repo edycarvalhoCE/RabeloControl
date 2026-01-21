@@ -116,6 +116,15 @@ const CalendarView: React.FC<CalendarViewProps> = ({ onEventClick }) => {
       setNewTimeOff({ ...newTimeOff, startTime: start, endTime: end });
   };
 
+  // NEW: Handle day click to open modal
+  const handleDayClick = (day: number) => {
+      if (!canManage) return;
+      
+      const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      setNewTimeOff(prev => ({ ...prev, date: dateStr, endDate: '' }));
+      setShowModal(true);
+  };
+
   return (
     <div className="space-y-6 animate-fade-in relative">
       <div className="flex flex-col md:flex-row justify-between items-center gap-4">
@@ -250,7 +259,11 @@ const CalendarView: React.FC<CalendarViewProps> = ({ onEventClick }) => {
                 const isToday = new Date().getDate() === day && new Date().getMonth() === month && new Date().getFullYear() === year;
 
                 return (
-                    <div key={day} className={`bg-white min-h-[100px] p-2 hover:bg-slate-50 transition-colors ${isToday ? 'bg-blue-50/30' : ''}`}>
+                    <div 
+                        key={day} 
+                        onClick={() => handleDayClick(day)}
+                        className={`bg-white min-h-[100px] p-2 transition-colors ${canManage ? 'cursor-pointer hover:bg-blue-50' : ''} ${isToday ? 'bg-blue-50/30' : ''}`}
+                    >
                         <span className={`text-sm font-semibold ${isToday ? 'bg-blue-600 text-white w-6 h-6 flex items-center justify-center rounded-full shadow-sm' : 'text-slate-700'}`}>
                             {day}
                         </span>
