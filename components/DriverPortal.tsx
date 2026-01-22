@@ -8,35 +8,27 @@ import { Logo } from './Logo';
 const DriverPortal: React.FC = () => {
   const { currentUser, bookings, timeOffs, addTimeOff, documents, buses, addMaintenanceReport, maintenanceReports, addFuelRecord, driverLiabilities, charterContracts, driverFees, fuelRecords, users } = useStore();
   
-  // Check if Garage Aux
   const isAux = currentUser.role === UserRole.GARAGE_AUX;
 
-  // Request State
   const [requestType, setRequestType] = useState<'FOLGA' | 'FERIAS'>('FOLGA');
   const [requestDate, setRequestDate] = useState('');
   const [requestEndDate, setRequestEndDate] = useState('');
 
   const [activeTab, setActiveTab] = useState<'schedule' | 'documents' | 'requests' | 'report' | 'fuel' | 'finance'>('schedule');
-  const [showMoreMenu, setShowMoreMenu] = useState(false); // Mobile "More" menu state
+  const [showMoreMenu, setShowMoreMenu] = useState(false);
 
-  // Fee Filter State (New)
   const [feeStartDate, setFeeStartDate] = useState('');
   const [feeEndDate, setFeeEndDate] = useState('');
-
-  // Trip Details Modal State
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
 
-  // Helper to get local date string YYYY-MM-DD
   const getTodayLocal = () => {
     const d = new Date();
     d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
     return d.toISOString().split('T')[0];
   };
 
-  // Maintenance Report State
   const [reportForm, setReportForm] = useState({ busId: '', type: 'MECANICA', description: '', date: getTodayLocal() });
 
-  // Fuel Form State
   const [fuelForm, setFuelForm] = useState({
       date: getTodayLocal(),
       busId: '',
@@ -44,19 +36,16 @@ const DriverPortal: React.FC = () => {
       hasArla: false,
       arlaLiters: 0,
       location: 'STREET' as 'GARAGE' | 'STREET',
-      cost: 0, // This is Diesel Cost or Total if Arla not separated
+      cost: 0,
       arlaCost: 0,
       stationName: '',
       kmStart: 0,
       kmEnd: 0
   });
 
-  // --- LOGIC TO MERGE BOOKINGS AND CHARTER SCHEDULE ---
-  
-  // 1. Regular Bookings
   const scheduleFilter = (b: Booking) => {
       if (b.status === 'CANCELLED') return false;
-      if (isAux) return true; // Garage sees all
+      if (isAux) return true;
       return b.driverId === currentUser.id;
   };
 
@@ -64,7 +53,6 @@ const DriverPortal: React.FC = () => {
     .filter(scheduleFilter)
     .map(b => ({ ...b, isCharter: false, sortTime: new Date(b.startTime).getTime() }));
 
-  // 2. Generate Charter Occurrences for next 15 days
   const myCharterOccurrences: any[] = [];
   
   const myContracts = charterContracts.filter(c => {
@@ -77,18 +65,17 @@ const DriverPortal: React.FC = () => {
       const today = new Date();
       today.setHours(0,0,0,0);
 
-      // Look ahead 15 days
       for (let i = 0; i < 15; i++) {
           const d = new Date(today);
           d.setDate(today.getDate() + i);
           const dStr = d.toISOString().split('T')[0];
-          const dayOfWeek = d.getDay(); // 0=Sun, 1=Mon...
+          const dayOfWeek = d.getDay();
 
           myContracts.forEach(c => {
               if (dStr >= c.startDate && dStr <= c.endDate && c.weekDays.includes(dayOfWeek)) {
                   myCharterOccurrences.push({
-                      id: `${c.id}_${dStr}`, // Unique temp ID
-                      destination: `${c.clientName} (Fretamento)`, // Display Route/Client
+                      id: `${c.id}_${dStr}`,
+                      destination: `${c.clientName} (Fretamento)`,
                       clientName: c.clientName,
                       startTime: `${dStr}T${c.morningDeparture}`,
                       endTime: `${dStr}T${c.afternoonDeparture}`,
@@ -104,7 +91,6 @@ const DriverPortal: React.FC = () => {
       }
   }
 
-  // 3. Merge and Sort
   const combinedSchedule = [...myRegularBookings, ...myCharterOccurrences].sort((a, b) => a.sortTime - b.sortTime);
 
   const myTimeOffs = timeOffs.filter(t => t.driverId === currentUser.id);
@@ -112,7 +98,6 @@ const DriverPortal: React.FC = () => {
   const myReports = maintenanceReports.filter(r => r.driverId === currentUser.id).sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   const myLiabilities = driverLiabilities.filter(l => l.driverId === currentUser.id).sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   
-  // FEES FILTERING LOGIC
   const myFees = driverFees.filter(f => f.driverId === currentUser.id);
   const filteredFees = myFees.filter(f => {
       if (feeStartDate && f.date < feeStartDate) return false;
@@ -250,6 +235,11 @@ const DriverPortal: React.FC = () => {
   return (
     <div className="space-y-6 animate-fade-in max-w-6xl mx-auto pb-32 md:pb-0">
       
+      {/* INDICADOR DE VERSÃO - VISÍVEL PARA CONFIRMAR ATUALIZAÇÃO */}
+      <div className="bg-green-600 text-white text-xs text-center py-1 font-bold md:hidden">
+          SISTEMA ATUALIZADO - PRONTO PARA APRESENTAÇÃO
+      </div>
+
       {/* HEADER: Hidden on Mobile */}
       <div className="hidden md:flex justify-between items-center bg-gradient-to-r from-blue-700 to-slate-800 rounded-2xl p-8 text-white shadow-xl relative overflow-hidden">
         <div className="z-10 relative">
@@ -276,8 +266,8 @@ const DriverPortal: React.FC = () => {
         {activeTab === 'schedule' && (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <div className="lg:col-span-2">
-                     {/* Calendar View - Visible on mobile */}
-                     <div className="block w-full mb-4">
+                     {/* Calendar View - Explicitly visible on mobile with z-index checks */}
+                     <div className="block w-full mb-4 relative z-0">
                         <CalendarView onEventClick={handleBookingClick} />
                      </div>
                 </div>
@@ -791,8 +781,8 @@ const DriverPortal: React.FC = () => {
 
       </div>
 
-      {/* MOBILE BOTTOM NAVIGATION - APP FEEL (FORCED VISIBILITY) */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 z-[100] pb-safe h-16 shadow-[0_-2px_10px_rgba(0,0,0,0.1)]">
+      {/* MOBILE BOTTOM NAVIGATION - FORCED TO BE VISIBLE AND FIXED */}
+      <div className="md:hidden !fixed !bottom-0 !left-0 !right-0 bg-white border-t border-slate-200 !z-[999] pb-safe h-16 shadow-[0_-2px_10px_rgba(0,0,0,0.1)]">
           <div className="flex justify-around items-center h-full">
               <button 
                   onClick={() => { setActiveTab('schedule'); setShowMoreMenu(false); }}
@@ -832,7 +822,7 @@ const DriverPortal: React.FC = () => {
 
       {/* MOBILE MORE MENU (DRAWER) */}
       {showMoreMenu && (
-          <div className="md:hidden fixed inset-0 z-40 bg-black/50" onClick={() => setShowMoreMenu(false)}>
+          <div className="md:hidden fixed inset-0 z-[998] bg-black/50" onClick={() => setShowMoreMenu(false)}>
               <div className="absolute bottom-16 left-0 right-0 bg-white rounded-t-xl overflow-hidden p-4 space-y-2 animate-slide-up shadow-2xl" onClick={e => e.stopPropagation()}>
                   <button 
                       onClick={() => { setActiveTab('documents'); setShowMoreMenu(false); }}

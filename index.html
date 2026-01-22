@@ -44,17 +44,17 @@
         font-family: 'Inter', sans-serif; 
         background-color: #f8fafc !important; 
         color: #0f172a !important; 
+        overscroll-behavior-y: none; /* Previne o efeito de elástico no iOS */
       }
       /* Inputs com fundo branco para contraste */
       input, select, textarea {
         background-color: #ffffff;
         color: #1e293b;
       }
-      /* Scrollbar personalizada */
-      ::-webkit-scrollbar { width: 8px; }
-      ::-webkit-scrollbar-track { background: #f1f1f1; }
-      ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
-      ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+      /* Safe area padding for mobile adjustments */
+      .pb-safe {
+        padding-bottom: env(safe-area-inset-bottom);
+      }
     </style>
 <script type="importmap">
 {
@@ -77,7 +77,6 @@
 </head>
   <body class="bg-slate-50 text-slate-900">
     <div id="root"></div>
-    <script type="module" src="./index.tsx"></script>
-  <script type="module" src="/index.tsx"></script>
+    <script type="module" src="/index.tsx"></script>
 </body>
 </html>
