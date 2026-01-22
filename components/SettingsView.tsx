@@ -5,7 +5,7 @@ import { UserRole } from '../types';
 
 const SettingsView: React.FC = () => {
   const { 
-      settings, updateSettings, currentUser,
+      settings, updateSettings, currentUser, restoreDatabase,
       // Destructure all data collections for Backup
       users, buses, bookings, parts, transactions, timeOffs, documents, 
       maintenanceRecords, purchaseRequests, maintenanceReports, charterContracts, 
@@ -22,6 +22,7 @@ const SettingsView: React.FC = () => {
       aiApiKey: ''
   });
   const [uploading, setUploading] = useState(false);
+  const [restoring, setRestoring] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
 
   useEffect(() => {
@@ -114,6 +115,42 @@ const SettingsView: React.FC = () => {
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
+  };
+
+  const handleRestoreBackup = async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+
+      if (!confirm("⚠️ ATENÇÃO: Esta ação irá SOBRESCREVER os dados atuais com os dados do backup.\n\nIsso é útil caso o sistema tenha sido apagado ou corrompido.\n\nTem certeza absoluta que deseja restaurar?")) {
+          e.target.value = ''; 
+          return;
+      }
+
+      setRestoring(true);
+      const reader = new FileReader();
+      
+      reader.onload = async (evt) => {
+          try {
+              const content = evt.target?.result as string;
+              const jsonData = JSON.parse(content);
+              
+              const result = await restoreDatabase(jsonData);
+              
+              if (result.success) {
+                  alert(result.message);
+                  window.location.reload(); // Recarregar para garantir sincronia
+              } else {
+                  alert("Erro: " + result.message);
+              }
+          } catch (err: any) {
+              alert("Erro ao processar arquivo de backup: " + err.message);
+          } finally {
+              setRestoring(false);
+              e.target.value = '';
+          }
+      };
+      
+      reader.readAsText(file);
   };
 
   return (
@@ -215,16 +252,24 @@ const SettingsView: React.FC = () => {
 
                         <div className="border-t border-slate-100 pt-4">
                             <p className="text-sm text-slate-600 mb-3">
-                                Faça o download de uma cópia de segurança de todos os dados do sistema. Mantenha este arquivo em local seguro.
+                                Gerenciamento dos dados do sistema. O arquivo JSON contém todas as informações cadastradas.
                             </p>
-                            <button 
-                                type="button" 
-                                onClick={handleSystemBackup}
-                                className="flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2 px-4 rounded border border-slate-300 transition-colors text-sm"
-                            >
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-                                Baixar Backup Completo (.JSON)
-                            </button>
+                            <div className="flex flex-col md:flex-row gap-3">
+                                <button 
+                                    type="button" 
+                                    onClick={handleSystemBackup}
+                                    className="flex items-center justify-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2 px-4 rounded border border-slate-300 transition-colors text-sm flex-1"
+                                >
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                                    Baixar Backup (.JSON)
+                                </button>
+
+                                <label className={`flex items-center justify-center gap-2 bg-orange-100 hover:bg-orange-200 text-orange-800 font-bold py-2 px-4 rounded border border-orange-200 transition-colors text-sm flex-1 cursor-pointer ${restoring ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
+                                    {restoring ? 'Restaurando...' : 'Restaurar Backup (.JSON)'}
+                                    <input type="file" accept=".json" onChange={handleRestoreBackup} disabled={restoring} className="hidden" />
+                                </label>
+                            </div>
                         </div>
                     </div>
                 </div>

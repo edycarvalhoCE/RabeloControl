@@ -110,6 +110,7 @@ interface StoreContextType {
   clearPriceTable: () => Promise<{ success: boolean; message: string }>;
 
   seedDatabase: () => Promise<void>;
+  restoreDatabase: (jsonContent: any) => Promise<{ success: boolean; message: string }>;
 }
 
 const StoreContext = createContext<StoreContextType | undefined>(undefined);
@@ -767,11 +768,84 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       await batch.commit(); 
   };
 
+  // RESTORE DATABASE FROM JSON
+  const restoreDatabase = async (jsonData: any) => {
+      if (!isConfigured) return { success: false, message: "Não conectado" };
+      
+      const backupData = jsonData.data || jsonData; // Handle { version, data } vs direct data
+      const batchSize = 500;
+      let batch = writeBatch(db);
+      let count = 0;
+      let totalRestored = 0;
+
+      // Map JSON keys to Firestore Collection Names
+      const collectionMap: {[key: string]: string} = {
+          users: 'users',
+          buses: 'buses',
+          bookings: 'bookings',
+          parts: 'parts',
+          transactions: 'transactions',
+          timeOffs: 'timeOffs',
+          documents: 'documents',
+          maintenanceRecords: 'maintenanceRecords',
+          purchaseRequests: 'purchaseRequests',
+          maintenanceReports: 'maintenanceReports',
+          charterContracts: 'charterContracts',
+          travelPackages: 'travelPackages',
+          packagePassengers: 'packagePassengers',
+          packagePayments: 'packagePayments',
+          packageLeads: 'packageLeads',
+          clients: 'clients',
+          fuelRecords: 'fuelRecords',
+          fuelSupplies: 'fuelSupplies',
+          driverLiabilities: 'driverLiabilities',
+          driverFees: 'driverFees',
+          quotes: 'quotes',
+          priceRoutes: 'priceRoutes',
+      };
+
+      try {
+          for (const [jsonKey, collectionName] of Object.entries(collectionMap)) {
+              if (Array.isArray(backupData[jsonKey])) {
+                  for (const item of backupData[jsonKey]) {
+                      if (item.id) {
+                          const ref = doc(db, collectionName, item.id);
+                          batch.set(ref, item); // Upsert (Overwrite/Create)
+                          count++;
+                          totalRestored++;
+
+                          if (count >= batchSize) {
+                              await batch.commit();
+                              batch = writeBatch(db);
+                              count = 0;
+                          }
+                      }
+                  }
+              }
+          }
+          
+          // Commit final batch
+          if (count > 0) {
+              await batch.commit();
+          }
+
+          // Restore settings if present
+          if (backupData.settings) {
+              await setDoc(doc(db, 'settings', 'general'), backupData.settings);
+          }
+
+          return { success: true, message: `${totalRestored} registros restaurados com sucesso!` };
+      } catch (e: any) {
+          console.error("Erro na restauração:", e);
+          return { success: false, message: "Erro ao restaurar: " + e.message };
+      }
+  };
+
   return (
     <StoreContext.Provider value={{
       currentUser: currentUser!, isAuthenticated, settings, users, buses, bookings, parts, transactions, timeOffs, documents, maintenanceRecords, purchaseRequests, maintenanceReports, charterContracts, travelPackages, packagePassengers, packagePayments, clients, packageLeads, fuelRecords, fuelSupplies, fuelStockLevel, driverLiabilities, quotes, priceRoutes, driverFees,
       switchUser, addUser, updateUser, deleteUser, addBooking, updateBooking, updateBookingStatus, addPart, updateStock, addTransaction, addTimeOff, updateTimeOffStatus, deleteTimeOff, addDocument, deleteDocument, addMaintenanceRecord, addPurchaseRequest, updatePurchaseRequestStatus, addMaintenanceReport, updateMaintenanceReportStatus, addBus, updateBusStatus, addCharterContract, addTravelPackage, registerPackageSale, updatePackagePassenger, deletePackagePassenger, addPackagePayment, addPackageLead, updatePackageLead, deletePackageLead, addFuelRecord, updateFuelRecord, deleteFuelRecord, addFuelSupply, addDriverLiability, payDriverLiability,
-      login, logout, register, updateSettings, seedDatabase,
+      login, logout, register, updateSettings, seedDatabase, restoreDatabase,
       addQuote, updateQuote, convertQuoteToBooking, deleteQuote,
       addPriceRoute, updatePriceRoute, deletePriceRoute, importDefaultPrices, clearPriceTable,
       addDriverFee, payDriverFee, deleteDriverFee, restockPart,
