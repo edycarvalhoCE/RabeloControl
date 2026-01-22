@@ -17,7 +17,7 @@ const DriverPortal: React.FC = () => {
   const [requestEndDate, setRequestEndDate] = useState('');
 
   const [activeTab, setActiveTab] = useState<'schedule' | 'documents' | 'requests' | 'report' | 'fuel' | 'finance'>('schedule');
-  const [showMoreMenu, setShowMoreMenu] = useState(false); // Mobile "More" menu
+  const [showMoreMenu, setShowMoreMenu] = useState(false); // Mobile "More" menu state
 
   // Fee Filter State (New)
   const [feeStartDate, setFeeStartDate] = useState('');
