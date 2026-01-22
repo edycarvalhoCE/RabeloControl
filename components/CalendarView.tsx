@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useStore } from '../services/store';
 import { UserRole, Booking, TimeOff, CharterContract } from '../types';
@@ -37,6 +38,10 @@ const CalendarView: React.FC<CalendarViewProps> = ({ onEventClick }) => {
 
   const drivers = users.filter(u => u.role === UserRole.DRIVER);
   const canManage = currentUser.role === UserRole.MANAGER || currentUser.role === UserRole.DEVELOPER;
+  const isAux = currentUser.role === UserRole.GARAGE_AUX;
+  
+  // Permission helper: Manager OR Garage Aux can see full schedule
+  const canViewAllSchedule = canManage || isAux;
   
   // Get pending time offs
   const pendingTimeOffs = timeOffs.filter(t => t.status === 'PENDING').sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
@@ -254,15 +259,15 @@ const CalendarView: React.FC<CalendarViewProps> = ({ onEventClick }) => {
                     // Check status
                     if (c.status !== 'ACTIVE') return false;
                     
-                    // Privacy Check (Manager sees all, Driver sees own)
+                    // Privacy Check (Manager/Aux sees all, Driver sees own)
                     const isOwner = c.driverId === currentUser.id;
-                    if (!canManage && !isOwner) return false;
+                    if (!canViewAllSchedule && !isOwner) return false;
 
                     return true;
                 });
 
-                // Privacy for bookings
-                const visibleBookings = canManage ? dayBookings : dayBookings.filter(b => b.driverId === currentUser.id);
+                // Privacy for bookings (Manager/Aux sees all, Driver sees own)
+                const visibleBookings = canViewAllSchedule ? dayBookings : dayBookings.filter(b => b.driverId === currentUser.id);
 
                 const isToday = new Date().getDate() === day && new Date().getMonth() === month && new Date().getFullYear() === year;
 
@@ -343,7 +348,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ onEventClick }) => {
                                         className="text-[10px] px-2 py-1 rounded truncate font-medium border bg-orange-100 text-orange-900 border-orange-300 cursor-pointer hover:bg-orange-200" 
                                         title={`Fretamento: ${c.clientName}`}
                                     >
-                                        🏭 {canManage ? `${c.route.substring(0,12)}.. (${driverName.split(' ')[0]})` : c.route}
+                                        🏭 {canViewAllSchedule ? `${c.route.substring(0,12)}.. (${driverName.split(' ')[0]})` : c.route}
                                     </div>
                                 )
                             })}
@@ -369,7 +374,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ onEventClick }) => {
                                         }`} 
                                         title={`${b.destination} - ${driver?.name || 'S/ Motorista'}`}
                                     >
-                                        🚌 {canManage ? `${b.destination} (${driver?.name?.split(' ')[0] || '?'})` : b.destination}
+                                        🚌 {canViewAllSchedule ? `${b.destination} (${driver?.name?.split(' ')[0] || '?'})` : b.destination}
                                     </div>
                                 );
                             })}
