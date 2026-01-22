@@ -296,7 +296,8 @@ const DriverPortal: React.FC = () => {
         {/* SCHEDULE TAB */}
         {activeTab === 'schedule' && (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div className="lg:col-span-2 hidden md:block">
+                <div className="lg:col-span-2">
+                     {/* Calendar View - Visible on mobile now */}
                      <CalendarView onEventClick={handleBookingClick} />
                 </div>
                 <div className="space-y-4">
