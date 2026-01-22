@@ -540,7 +540,9 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
           clientId = existingClient.id; 
           await updateDoc(doc(db, 'clients', clientId), { ...clientData }); 
       } else { 
-          const ref = await addDoc(collection(db, 'clients'), { ...clientData, type: 'PF' }); // Default to PF for package sales
+          // FIX: Use provided type or default to PF if missing
+          const clientType = clientData.type || 'PF';
+          const ref = await addDoc(collection(db, 'clients'), { ...clientData, type: clientType }); 
           clientId = ref.id; 
       }
       let commissionRate = saleData.saleType === 'AGENCY' ? 0.12 : 0.01;

@@ -4,6 +4,12 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    
+    <!-- FORÇAR LIMPEZA DE CACHE -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
+    
     <!-- Cor Azul da Marca Rabelo Tour para a barra do navegador -->
     <meta name="theme-color" content="#2e2e77" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -77,6 +83,7 @@
 </head>
   <body class="bg-slate-50 text-slate-900">
     <div id="root"></div>
-    <script type="module" src="/index.tsx"></script>
+    <!-- Adicionei ?v=3 para forçar o navegador a baixar o arquivo novo -->
+    <script type="module" src="/index.tsx?v=3"></script>
 </body>
 </html>
