@@ -4,8 +4,6 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    
-    <!-- FORÇAR LIMPEZA DE CACHE -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
@@ -17,6 +15,27 @@
     <!-- Favicon usando a mesma logo -->
     <link rel="icon" type="image/png" href="./logo.png" />
     <title>RabeloTour - Sistema Integrado</title>
+    
+    <!-- SCRIPT DE EMERGÊNCIA: LIMPEZA DE CACHE -->
+    <script>
+      // Força a remoção de qualquer Service Worker que esteja segurando versões antigas
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then(function(registrations) {
+          for(let registration of registrations) {
+            registration.unregister();
+            console.log('Service Worker antigo removido.');
+          }
+        });
+      }
+      // Limpeza de cache de sessão
+      try {
+        if (!sessionStorage.getItem('version_reset_v4')) {
+           sessionStorage.clear();
+           sessionStorage.setItem('version_reset_v4', 'true');
+        }
+      } catch(e) {}
+    </script>
+
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
       tailwind.config = {
