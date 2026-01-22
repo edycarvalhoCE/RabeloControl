@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useStore } from '../services/store';
 import CalendarView from './CalendarView';
@@ -16,6 +17,7 @@ const DriverPortal: React.FC = () => {
   const [requestEndDate, setRequestEndDate] = useState('');
 
   const [activeTab, setActiveTab] = useState<'schedule' | 'documents' | 'requests' | 'report' | 'fuel' | 'finance'>('schedule');
+  const [showMoreMenu, setShowMoreMenu] = useState(false); // Mobile "More" menu
 
   // Fee Filter State (New)
   const [feeStartDate, setFeeStartDate] = useState('');
@@ -265,8 +267,10 @@ const DriverPortal: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6 animate-fade-in max-w-6xl mx-auto">
-      <div className="flex justify-between items-center bg-gradient-to-r from-blue-700 to-slate-800 rounded-2xl p-8 text-white shadow-xl relative overflow-hidden">
+    <div className="space-y-6 animate-fade-in max-w-6xl mx-auto pb-24 md:pb-0">
+      
+      {/* HEADER: Hidden on Mobile to save space, user sees bottom nav */}
+      <div className="hidden md:flex justify-between items-center bg-gradient-to-r from-blue-700 to-slate-800 rounded-2xl p-8 text-white shadow-xl relative overflow-hidden">
         <div className="z-10 relative">
           <h1 className="text-3xl font-bold mb-2">Portal {isAux ? 'da Garagem' : 'do Motorista'}</h1>
           <p className="opacity-80">Bem-vindo, {currentUser.name}. {isAux ? 'Acompanhe a escala da frota.' : 'Gerencie sua escala e documentos.'}</p>
@@ -274,77 +278,37 @@ const DriverPortal: React.FC = () => {
         <div className="hidden md:block bg-white/10 p-2 rounded-lg z-10 relative backdrop-blur-sm">
              <Logo variant="light" size="sm" showGlobe={false} />
         </div>
-        {/* Abstract shapes */}
         <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-5 rounded-full -mr-16 -mt-16"></div>
         <div className="absolute bottom-0 left-0 w-32 h-32 bg-blue-500 opacity-20 rounded-full -ml-8 -mb-8"></div>
       </div>
 
-      {/* Tabs */}
-      <div className="flex border-b border-slate-300 space-x-4 overflow-x-auto">
-        <button 
-            onClick={() => setActiveTab('schedule')}
-            className={`pb-2 px-1 font-medium text-sm transition-colors whitespace-nowrap ${activeTab === 'schedule' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}
-        >
-            📅 {isAux ? 'Escala Geral' : 'Minha Escala'}
-        </button>
-        
-        {/* HIDE FUEL FOR AUX */}
-        {!isAux && (
-            <button 
-                onClick={() => setActiveTab('fuel')}
-                className={`pb-2 px-1 font-medium text-sm transition-colors whitespace-nowrap ${activeTab === 'fuel' ? 'border-b-2 border-green-600 text-green-600' : 'text-slate-500 hover:text-slate-700'}`}
-            >
-                ⛽ Abastecer
-            </button>
-        )}
-
-        {/* HIDE FINANCE FOR AUX */}
-        {!isAux && (
-            <button 
-                onClick={() => setActiveTab('finance')}
-                className={`pb-2 px-1 font-medium text-sm transition-colors whitespace-nowrap ${activeTab === 'finance' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}
-            >
-                💰 Diárias e Descontos
-            </button>
-        )}
-
-        <button 
-            onClick={() => setActiveTab('documents')}
-            className={`pb-2 px-1 font-medium text-sm transition-colors whitespace-nowrap ${activeTab === 'documents' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}
-        >
-            📂 Meus Documentos
-        </button>
-        <button 
-            onClick={() => setActiveTab('requests')}
-            className={`pb-2 px-1 font-medium text-sm transition-colors whitespace-nowrap ${activeTab === 'requests' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}
-        >
-            📝 Folgas e Férias
-        </button>
-        <button 
-            onClick={() => setActiveTab('report')}
-            className={`pb-2 px-1 font-medium text-sm transition-colors whitespace-nowrap ${activeTab === 'report' ? 'border-b-2 border-red-600 text-red-600' : 'text-slate-500 hover:text-slate-700'}`}
-        >
-            ⚠️ Reportar Defeito
-        </button>
+      {/* DESKTOP TABS (Hidden on Mobile) */}
+      <div className="hidden md:flex border-b border-slate-300 space-x-4 overflow-x-auto">
+        <button onClick={() => setActiveTab('schedule')} className={`pb-2 px-1 font-medium text-sm transition-colors whitespace-nowrap ${activeTab === 'schedule' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}>📅 {isAux ? 'Escala Geral' : 'Minha Escala'}</button>
+        {!isAux && <button onClick={() => setActiveTab('fuel')} className={`pb-2 px-1 font-medium text-sm transition-colors whitespace-nowrap ${activeTab === 'fuel' ? 'border-b-2 border-green-600 text-green-600' : 'text-slate-500 hover:text-slate-700'}`}>⛽ Abastecer</button>}
+        {!isAux && <button onClick={() => setActiveTab('finance')} className={`pb-2 px-1 font-medium text-sm transition-colors whitespace-nowrap ${activeTab === 'finance' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}>💰 Diárias e Descontos</button>}
+        <button onClick={() => setActiveTab('documents')} className={`pb-2 px-1 font-medium text-sm transition-colors whitespace-nowrap ${activeTab === 'documents' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}>📂 Documentos</button>
+        <button onClick={() => setActiveTab('requests')} className={`pb-2 px-1 font-medium text-sm transition-colors whitespace-nowrap ${activeTab === 'requests' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}>📝 Folgas</button>
+        <button onClick={() => setActiveTab('report')} className={`pb-2 px-1 font-medium text-sm transition-colors whitespace-nowrap ${activeTab === 'report' ? 'border-b-2 border-red-600 text-red-600' : 'text-slate-500 hover:text-slate-700'}`}>⚠️ Reportar Defeito</button>
       </div>
 
-      <div className="mt-6">
+      <div className="mt-4">
         {/* SCHEDULE TAB */}
         {activeTab === 'schedule' && (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div className="lg:col-span-2">
+                <div className="lg:col-span-2 hidden md:block">
                      <CalendarView onEventClick={handleBookingClick} />
                 </div>
                 <div className="space-y-4">
-                    <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                    <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2 px-2 md:px-0 mt-2 md:mt-0">
                         <span className="bg-blue-100 text-blue-600 p-2 rounded-lg text-sm">🚌</span>
-                        {isAux ? 'Escala Geral de Viagens' : 'Próximas Viagens'}
+                        {isAux ? 'Escala Geral' : 'Minha Escala'}
                     </h2>
-                    <div className="space-y-3 max-h-[600px] overflow-y-auto pr-1">
+                    <div className="space-y-3 max-h-[75vh] md:max-h-[600px] overflow-y-auto px-2 md:px-0 pb-20 md:pb-0">
                         {combinedSchedule.length === 0 ? (
-                            <p className="text-slate-500 italic">Nenhuma viagem agendada para os próximos 15 dias.</p>
+                            <p className="text-slate-500 italic text-center mt-10">Nenhuma viagem agendada para os próximos 15 dias.</p>
                         ) : (
-                            combinedSchedule.slice(0, 10).map((booking: any) => {
+                            combinedSchedule.slice(0, 15).map((booking: any) => {
                                 // For aux view, get bus details clearly
                                 const bus = buses.find(b => b.id === booking.busId);
                                 
@@ -352,26 +316,29 @@ const DriverPortal: React.FC = () => {
                                     <div 
                                         key={booking.id} 
                                         onClick={() => handleBookingClick(booking)}
-                                        className={`p-4 rounded-xl shadow-sm border cursor-pointer hover:shadow-md transition-shadow relative overflow-hidden ${
+                                        className={`p-4 rounded-xl shadow-sm border cursor-pointer active:scale-95 transition-all relative overflow-hidden ${
                                             booking.isCharter 
                                             ? 'bg-orange-50 border-orange-200 border-l-4 border-l-orange-500' 
-                                            : 'bg-white border-slate-200 border-l-4 border-l-blue-500'
+                                            : 'bg-white border-slate-200 border-l-4 border-l-blue-600'
                                         }`}
                                     >
                                         <div className="flex justify-between items-start mb-2">
-                                            <h3 className="font-bold text-base text-slate-800">{booking.destination}</h3>
-                                            <span className={`text-[10px] font-bold px-2 py-1 rounded ${booking.isCharter ? 'bg-orange-200 text-orange-800' : 'bg-blue-100 text-blue-600'}`}>
+                                            <h3 className="font-bold text-base text-slate-900">{booking.destination}</h3>
+                                            <span className={`text-[10px] font-bold px-2 py-1 rounded ${booking.isCharter ? 'bg-orange-200 text-orange-900' : 'bg-blue-100 text-blue-800'}`}>
                                                 {booking.isCharter ? 'FRETAMENTO' : 'LOCAÇÃO'}
                                             </span>
                                         </div>
-                                        <div className="text-xs text-slate-600 space-y-1">
+                                        <div className="text-sm text-slate-700 space-y-1">
                                             {isAux && (
-                                                <p className="font-bold text-slate-700 bg-slate-100 p-1 rounded inline-block mb-1">
-                                                    VEÍCULO: {bus?.plate} - {bus?.model}
+                                                <p className="font-bold text-slate-800 bg-slate-200 p-1 rounded inline-block mb-1 text-xs">
+                                                    {bus?.plate} - {bus?.model}
                                                 </p>
                                             )}
-                                            <p className="font-semibold">📅 {new Date(booking.startTime).toLocaleDateString()} • {new Date(booking.startTime).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</p>
-                                            {!booking.isCharter && <p>🏁 Retorno: {new Date(booking.endTime).toLocaleDateString()}</p>}
+                                            <p className="font-semibold flex items-center gap-2">
+                                                <span>📅 {new Date(booking.startTime).toLocaleDateString()}</span>
+                                                <span>⏰ {new Date(booking.startTime).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span>
+                                            </p>
+                                            {!booking.isCharter && <p className="text-xs text-slate-500">Retorno: {new Date(booking.endTime).toLocaleDateString()}</p>}
                                         </div>
                                     </div>
                                 );
@@ -594,8 +561,7 @@ const DriverPortal: React.FC = () => {
                         <div className="p-4 bg-blue-50 border-b border-blue-100 flex justify-between items-center">
                             <span className="text-sm font-bold text-blue-900">Total Pendente</span>
                             <span className="text-lg font-bold text-blue-700">
-                                R$ {totalPendingInPeriod.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
-                            </span>
+                                R$ {totalPendingInPeriod.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</p>
                         </div>
                         <div className="divide-y divide-slate-100 max-h-96 overflow-y-auto">
                             {filteredFees.length === 0 ? (
@@ -690,7 +656,7 @@ const DriverPortal: React.FC = () => {
             <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
                 <h3 className="font-bold text-lg text-slate-800 mb-4">Meus Documentos</h3>
                 {myDocuments.length === 0 ? (
-                    <p className="text-slate-500 text-sm">Nenhum documento arquivado.</p>
+                    <p className="text-slate-500 text-sm text-center py-10">Nenhum documento arquivado.</p>
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {myDocuments.map(doc => (
@@ -760,7 +726,7 @@ const DriverPortal: React.FC = () => {
                     <h3 className="font-bold text-lg text-slate-800 mb-4">Minhas Solicitações</h3>
                     <div className="space-y-3">
                         {myTimeOffs.length === 0 ? (
-                            <p className="text-slate-500 text-sm">Nenhuma solicitação.</p>
+                            <p className="text-slate-500 text-sm text-center py-4">Nenhuma solicitação.</p>
                         ) : (
                             myTimeOffs.map(req => (
                                 <div key={req.id} className="border p-3 rounded-lg flex justify-between items-center">
@@ -827,7 +793,7 @@ const DriverPortal: React.FC = () => {
                     <h3 className="font-bold text-lg text-slate-800 mb-4">Meus Reportes</h3>
                     <div className="space-y-3">
                         {myReports.length === 0 ? (
-                            <p className="text-slate-500 text-sm">Nenhum reporte recente.</p>
+                            <p className="text-slate-500 text-sm text-center py-4">Nenhum reporte recente.</p>
                         ) : (
                             myReports.map(rep => {
                                 const bus = buses.find(b => b.id === rep.busId);
@@ -849,6 +815,80 @@ const DriverPortal: React.FC = () => {
         )}
 
       </div>
+
+      {/* MOBILE BOTTOM NAVIGATION - APP FEEL */}
+      <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 z-50 pb-safe">
+          <div className="flex justify-around items-center h-16">
+              <button 
+                  onClick={() => { setActiveTab('schedule'); setShowMoreMenu(false); }}
+                  className={`flex flex-col items-center justify-center w-full h-full space-y-1 ${activeTab === 'schedule' ? 'text-blue-600' : 'text-slate-400'}`}
+              >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                  <span className="text-[10px] font-bold">Escala</span>
+              </button>
+              
+              {!isAux && (
+                  <button 
+                      onClick={() => { setActiveTab('fuel'); setShowMoreMenu(false); }}
+                      className={`flex flex-col items-center justify-center w-full h-full space-y-1 ${activeTab === 'fuel' ? 'text-green-600' : 'text-slate-400'}`}
+                  >
+                      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" /></svg>
+                      <span className="text-[10px] font-bold">Abastecer</span>
+                  </button>
+              )}
+
+              <button 
+                  onClick={() => { setActiveTab('report'); setShowMoreMenu(false); }}
+                  className={`flex flex-col items-center justify-center w-full h-full space-y-1 ${activeTab === 'report' ? 'text-red-600' : 'text-slate-400'}`}
+              >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                  <span className="text-[10px] font-bold">Defeito</span>
+              </button>
+
+              <button 
+                  onClick={() => setShowMoreMenu(!showMoreMenu)}
+                  className={`flex flex-col items-center justify-center w-full h-full space-y-1 ${showMoreMenu ? 'text-slate-800' : 'text-slate-400'}`}
+              >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16m-7 6h7" /></svg>
+                  <span className="text-[10px] font-bold">Mais</span>
+              </button>
+          </div>
+      </div>
+
+      {/* MOBILE MORE MENU (DRAWER) */}
+      {showMoreMenu && (
+          <div className="md:hidden fixed inset-0 z-40 bg-black/50" onClick={() => setShowMoreMenu(false)}>
+              <div className="absolute bottom-16 left-0 right-0 bg-white rounded-t-xl overflow-hidden p-4 space-y-2 animate-slide-up" onClick={e => e.stopPropagation()}>
+                  <button 
+                      onClick={() => { setActiveTab('documents'); setShowMoreMenu(false); }}
+                      className="w-full text-left p-3 rounded-lg hover:bg-slate-50 flex items-center gap-3 text-slate-700 font-medium"
+                  >
+                      <span className="bg-blue-100 p-2 rounded text-blue-600">📂</span> Meus Documentos
+                  </button>
+                  <button 
+                      onClick={() => { setActiveTab('requests'); setShowMoreMenu(false); }}
+                      className="w-full text-left p-3 rounded-lg hover:bg-slate-50 flex items-center gap-3 text-slate-700 font-medium"
+                  >
+                      <span className="bg-purple-100 p-2 rounded text-purple-600">📝</span> Folgas e Férias
+                  </button>
+                  {!isAux && (
+                      <button 
+                          onClick={() => { setActiveTab('finance'); setShowMoreMenu(false); }}
+                          className="w-full text-left p-3 rounded-lg hover:bg-slate-50 flex items-center gap-3 text-slate-700 font-medium"
+                      >
+                          <span className="bg-green-100 p-2 rounded text-green-600">💰</span> Diárias e Finanças
+                      </button>
+                  )}
+                  <div className="border-t border-slate-100 my-2"></div>
+                  <button 
+                      onClick={() => setShowMoreMenu(false)}
+                      className="w-full text-center p-3 text-slate-500 font-bold"
+                  >
+                      Fechar
+                  </button>
+              </div>
+          </div>
+      )}
 
       {/* TRIP DETAILS MODAL - For Cards Click */}
       {selectedBooking && (
