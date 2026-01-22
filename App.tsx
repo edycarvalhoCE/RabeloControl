@@ -15,6 +15,7 @@ import UsersView from './components/UsersView';
 import VehiclesView from './components/VehiclesView';
 import CharterView from './components/CharterView';
 import TravelPackagesView from './components/TravelPackagesView';
+import ClientsView from './components/ClientsView'; // Import
 import LoginView from './components/LoginView';
 import SettingsView from './components/SettingsView';
 import QuotesView from './components/QuotesView';
@@ -93,6 +94,7 @@ const MainContent = () => {
       case 'new-booking': return <NewBookingView />;
       case 'bookings': return <BookingsView />;
       case 'travel-packages': return <TravelPackagesView />;
+      case 'clients': return <ClientsView />; // Nova Rota
       case 'vehicles': return <VehiclesView />;
       case 'charter': return <CharterView />;
       case 'inventory': return <InventoryView />;

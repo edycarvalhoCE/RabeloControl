@@ -213,12 +213,16 @@ export interface TravelPackage {
 
 export interface Client {
   id: string;
+  code?: string; // Código manual da planilha
+  type: 'PF' | 'PJ';
   name: string;
-  cpf: string;
+  cpf: string; // CPF ou CNPJ
   rg?: string;
   birthDate?: string;
   phone?: string;
+  email?: string;
   address?: string;
+  observations?: string;
 }
 
 export interface PackagePassenger {

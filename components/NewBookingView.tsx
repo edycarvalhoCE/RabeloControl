@@ -1,10 +1,10 @@
 
 import React, { useState, useEffect } from 'react';
 import { useStore } from '../services/store';
-import { UserRole } from '../types';
+import { UserRole, Client } from '../types';
 
 const NewBookingView: React.FC = () => {
-  const { buses, users, addBooking } = useStore();
+  const { buses, users, addBooking, clients } = useStore();
   const [msg, setMsg] = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
   const [formData, setFormData] = useState({
@@ -24,6 +24,10 @@ const NewBookingView: React.FC = () => {
     presentationTime: '',
     observations: ''
   });
+
+  // Client Search State
+  const [clientSearchTerm, setClientSearchTerm] = useState('');
+  const [showClientSuggestions, setShowClientSuggestions] = useState(false);
 
   // Driver Fee State
   const [driverDailyValue, setDriverDailyValue] = useState(0);
@@ -99,6 +103,21 @@ const NewBookingView: React.FC = () => {
     const digits = value.replace(/\D/g, "");
     const realValue = Number(digits) / 100;
     setDriverDailyValue(realValue);
+  };
+
+  // --- CLIENT SELECTION LOGIC ---
+  const filteredClients = clientSearchTerm 
+    ? clients.filter(c => c.name.toLowerCase().includes(clientSearchTerm.toLowerCase()) || c.cpf.includes(clientSearchTerm))
+    : [];
+
+  const handleSelectClient = (client: Client) => {
+      setFormData(prev => ({
+          ...prev,
+          clientName: client.name,
+          clientPhone: client.phone || ''
+      }));
+      setClientSearchTerm('');
+      setShowClientSuggestions(false);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -177,9 +196,49 @@ const NewBookingView: React.FC = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-4">
                     <h3 className="font-bold text-slate-700 border-b pb-2">Dados do Cliente</h3>
-                    <div>
+                    <div className="relative">
                         <label className="block text-sm font-medium text-slate-700 mb-1">Nome do Cliente *</label>
-                        <input name="clientName" value={formData.clientName} onChange={handleChange} placeholder="Ex: Igreja Batista" className="w-full border p-2 rounded" required />
+                        <div className="flex gap-2">
+                            <input 
+                                name="clientName" 
+                                value={formData.clientName} 
+                                onChange={handleChange} 
+                                placeholder="Ex: Igreja Batista" 
+                                className="w-full border p-2 rounded focus:ring-2 focus:ring-blue-500 outline-none" 
+                                required 
+                            />
+                            <button 
+                                type="button" 
+                                onClick={() => setShowClientSuggestions(!showClientSuggestions)}
+                                className="bg-blue-100 text-blue-600 p-2 rounded hover:bg-blue-200 transition-colors"
+                                title="Buscar Cliente Cadastrado"
+                            >
+                                🔍
+                            </button>
+                        </div>
+                        {/* Client Autocomplete Dropdown */}
+                        {showClientSuggestions && (
+                            <div className="absolute z-10 w-full bg-white border border-slate-300 rounded shadow-lg mt-1 p-2">
+                                <input 
+                                    autoFocus
+                                    placeholder="Digite para buscar..." 
+                                    className="w-full border p-1 rounded text-sm mb-2"
+                                    value={clientSearchTerm}
+                                    onChange={e => setClientSearchTerm(e.target.value)}
+                                />
+                                <div className="max-h-40 overflow-y-auto">
+                                    {filteredClients.length > 0 ? filteredClients.map(c => (
+                                        <div 
+                                            key={c.id} 
+                                            onClick={() => handleSelectClient(c)}
+                                            className="p-2 hover:bg-blue-50 cursor-pointer text-sm border-b border-slate-50 last:border-0"
+                                        >
+                                            <strong>{c.name}</strong> <span className="text-xs text-slate-500">({c.phone})</span>
+                                        </div>
+                                    )) : <p className="text-xs text-slate-400 p-2">Nenhum cliente encontrado.</p>}
+                                </div>
+                            </div>
+                        )}
                     </div>
                     <div>
                         <label className="block text-sm font-medium text-slate-700 mb-1">Telefone / Contato</label>

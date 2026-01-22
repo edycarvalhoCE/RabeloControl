@@ -17,9 +17,10 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setView, isMobileOpen, s
 
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: '📊', roles: [UserRole.MANAGER, UserRole.FINANCE, UserRole.DEVELOPER] },
-    { id: 'quotes', label: 'Orçamentos (CRM)', icon: '💬', roles: [UserRole.MANAGER, UserRole.FINANCE, UserRole.DEVELOPER] }, // Added FINANCE
+    { id: 'quotes', label: 'Orçamentos (CRM)', icon: '💬', roles: [UserRole.MANAGER, UserRole.FINANCE, UserRole.DEVELOPER] },
     { id: 'new-booking', label: 'Nova Locação', icon: '➕', roles: [UserRole.MANAGER, UserRole.DEVELOPER] },
     { id: 'bookings', label: 'Listar Locações', icon: '🚌', roles: [UserRole.MANAGER, UserRole.DEVELOPER] },
+    { id: 'clients', label: 'Clientes', icon: '👥', roles: [UserRole.MANAGER, UserRole.FINANCE, UserRole.DEVELOPER] }, // Novo Item
     { id: 'calendar', label: 'Calendário (Escala)', icon: '📅', roles: [UserRole.MANAGER, UserRole.DEVELOPER] },
     { id: 'travel-packages', label: 'Pacotes de Viagem', icon: '🏖️', roles: [UserRole.MANAGER, UserRole.FINANCE, UserRole.DEVELOPER] },
     { id: 'charter', label: 'Fretamento', icon: '🏭', roles: [UserRole.MANAGER, UserRole.DEVELOPER] },
@@ -28,7 +29,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setView, isMobileOpen, s
     { id: 'inventory', label: 'Estoque de Peças', icon: '🔧', roles: [UserRole.MANAGER, UserRole.MECHANIC, UserRole.FINANCE, UserRole.DEVELOPER] },
     { id: 'documents', label: 'Documentos', icon: '📂', roles: [UserRole.MANAGER, UserRole.DEVELOPER] },
     { id: 'finance', label: 'Financeiro (Caixa)', icon: '💰', roles: [UserRole.MANAGER, UserRole.FINANCE, UserRole.DEVELOPER] },
-    { id: 'users', label: 'Usuários', icon: '👥', roles: [UserRole.MANAGER, UserRole.DEVELOPER] },
+    { id: 'users', label: 'Usuários', icon: '👤', roles: [UserRole.MANAGER, UserRole.DEVELOPER] },
     { id: 'settings', label: 'Configurações', icon: '⚙️', roles: [UserRole.MANAGER, UserRole.DEVELOPER] },
     { id: 'driver-portal', label: 'Portal do Colaborador', icon: 'steering-wheel', roles: [UserRole.DRIVER, UserRole.GARAGE_AUX, UserRole.DEVELOPER] },
   ];

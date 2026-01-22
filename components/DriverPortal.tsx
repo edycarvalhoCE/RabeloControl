@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useStore } from '../services/store';
 import CalendarView from './CalendarView';
@@ -17,6 +16,10 @@ const DriverPortal: React.FC = () => {
   const [requestEndDate, setRequestEndDate] = useState('');
 
   const [activeTab, setActiveTab] = useState<'schedule' | 'documents' | 'requests' | 'report' | 'fuel' | 'finance'>('schedule');
+
+  // Fee Filter State (New)
+  const [feeStartDate, setFeeStartDate] = useState('');
+  const [feeEndDate, setFeeEndDate] = useState('');
 
   // Trip Details Modal State
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
@@ -111,7 +114,17 @@ const DriverPortal: React.FC = () => {
   const myDocuments = documents.filter(d => d.driverId === currentUser.id);
   const myReports = maintenanceReports.filter(r => r.driverId === currentUser.id).sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   const myLiabilities = driverLiabilities.filter(l => l.driverId === currentUser.id).sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  const myFees = driverFees.filter(f => f.driverId === currentUser.id).sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  
+  // FEES FILTERING LOGIC
+  const myFees = driverFees.filter(f => f.driverId === currentUser.id);
+  const filteredFees = myFees.filter(f => {
+      if (feeStartDate && f.date < feeStartDate) return false;
+      if (feeEndDate && f.date > feeEndDate) return false;
+      return true;
+  }).sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+  // Calculate totals based on filtered fees
+  const totalPendingInPeriod = filteredFees.filter(f => f.status === 'PENDING').reduce((acc, f) => acc + f.amount, 0);
 
   const handleRequest = (e: React.FormEvent) => {
     e.preventDefault();
@@ -547,18 +560,48 @@ const DriverPortal: React.FC = () => {
                         Diárias a Receber
                     </h3>
                     
+                    {/* Date Filter Inputs */}
+                    <div className="flex gap-2 mb-4 bg-slate-50 p-3 rounded-lg border border-slate-200">
+                        <div className="flex-1">
+                            <label className="text-[10px] uppercase font-bold text-slate-500">De</label>
+                            <input 
+                                type="date" 
+                                value={feeStartDate} 
+                                onChange={e => setFeeStartDate(e.target.value)}
+                                className="w-full border p-1 rounded text-sm bg-white"
+                            />
+                        </div>
+                        <div className="flex-1">
+                            <label className="text-[10px] uppercase font-bold text-slate-500">Até</label>
+                            <input 
+                                type="date" 
+                                value={feeEndDate} 
+                                onChange={e => setFeeEndDate(e.target.value)}
+                                className="w-full border p-1 rounded text-sm bg-white"
+                            />
+                        </div>
+                        {(feeStartDate || feeEndDate) && (
+                            <button 
+                                onClick={() => { setFeeStartDate(''); setFeeEndDate(''); }}
+                                className="self-end mb-1 text-xs text-red-500 hover:underline font-medium"
+                            >
+                                Limpar
+                            </button>
+                        )}
+                    </div>
+
                     <div className="bg-white rounded-xl shadow-sm border border-blue-100 overflow-hidden">
                         <div className="p-4 bg-blue-50 border-b border-blue-100 flex justify-between items-center">
                             <span className="text-sm font-bold text-blue-900">Total Pendente</span>
                             <span className="text-lg font-bold text-blue-700">
-                                R$ {myFees.filter(f => f.status === 'PENDING').reduce((acc, f) => acc + f.amount, 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}
+                                R$ {totalPendingInPeriod.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
                             </span>
                         </div>
                         <div className="divide-y divide-slate-100 max-h-96 overflow-y-auto">
-                            {myFees.length === 0 ? (
-                                <p className="p-6 text-center text-slate-500 text-sm">Nenhuma diária registrada.</p>
+                            {filteredFees.length === 0 ? (
+                                <p className="p-6 text-center text-slate-500 text-sm">Nenhuma diária encontrada para o período.</p>
                             ) : (
-                                myFees.map(fee => (
+                                filteredFees.map(fee => (
                                     <div key={fee.id} className="p-4 hover:bg-slate-50">
                                         <div className="flex justify-between items-start mb-1">
                                             <span className="font-bold text-slate-800">{fee.description}</span>
