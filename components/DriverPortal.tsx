@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useStore } from '../services/store';
 import CalendarView from './CalendarView';
@@ -53,8 +54,6 @@ const DriverPortal: React.FC = () => {
   // --- LOGIC TO MERGE BOOKINGS AND CHARTER SCHEDULE ---
   
   // 1. Regular Bookings
-  // IF AUX: Show ALL active bookings
-  // IF DRIVER: Show ONLY my bookings
   const scheduleFilter = (b: Booking) => {
       if (b.status === 'CANCELLED') return false;
       if (isAux) return true; // Garage sees all
@@ -68,7 +67,6 @@ const DriverPortal: React.FC = () => {
   // 2. Generate Charter Occurrences for next 15 days
   const myCharterOccurrences: any[] = [];
   
-  // Same logic for Charters
   const myContracts = charterContracts.filter(c => {
       if (c.status !== 'ACTIVE') return false;
       if (isAux) return true;
@@ -87,9 +85,7 @@ const DriverPortal: React.FC = () => {
           const dayOfWeek = d.getDay(); // 0=Sun, 1=Mon...
 
           myContracts.forEach(c => {
-              // Check range and weekday
               if (dStr >= c.startDate && dStr <= c.endDate && c.weekDays.includes(dayOfWeek)) {
-                  // Create a fake booking object for display
                   myCharterOccurrences.push({
                       id: `${c.id}_${dStr}`, // Unique temp ID
                       destination: `${c.clientName} (Fretamento)`, // Display Route/Client
@@ -124,7 +120,6 @@ const DriverPortal: React.FC = () => {
       return true;
   }).sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
-  // Calculate totals based on filtered fees
   const totalPendingInPeriod = filteredFees.filter(f => f.status === 'PENDING').reduce((acc, f) => acc + f.amount, 0);
 
   const handleRequest = (e: React.FormEvent) => {
@@ -154,16 +149,13 @@ const DriverPortal: React.FC = () => {
       }
   };
 
-  // Lógica para preencher KM Inicial automaticamente
   const handleBusChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
       const selectedBusId = e.target.value;
       let lastKm = 0;
 
       if (selectedBusId) {
-          // Filtra registros deste ônibus
           const busRecords = fuelRecords.filter(r => r.busId === selectedBusId);
           if (busRecords.length > 0) {
-              // Ordena pelo maior KM Final registrado
               busRecords.sort((a, b) => (b.kmEnd || 0) - (a.kmEnd || 0));
               lastKm = busRecords[0].kmEnd || 0;
           }
@@ -172,48 +164,40 @@ const DriverPortal: React.FC = () => {
       setFuelForm(prev => ({
           ...prev,
           busId: selectedBusId,
-          kmStart: lastKm, // Preenche automaticamente
-          kmEnd: 0 // Reseta o final para evitar confusão
+          kmStart: lastKm,
+          kmEnd: 0
       }));
   };
 
   const handleFuelSubmit = (e: React.FormEvent) => {
       e.preventDefault();
       
-      // Basic Validation
       if (!fuelForm.busId || fuelForm.dieselLiters <= 0) {
           alert('Por favor, selecione o ônibus e informe a quantidade de Diesel.');
           return;
       }
 
-      // Arla Mandatory Validation
       if (fuelForm.hasArla && (fuelForm.arlaLiters <= 0 || isNaN(fuelForm.arlaLiters))) {
           alert('⚠️ Atenção: Você marcou que abasteceu Arla.\nÉ obrigatório informar a quantidade de litros de Arla.');
           return;
       }
 
-      // KM VALIDATION
       if (fuelForm.kmEnd <= fuelForm.kmStart) {
           alert("⚠️ Erro de Quilometragem: O KM Final deve ser MAIOR que o KM Inicial.");
           return;
       }
 
-      // Calculate Average (Distance / Liters)
       const distance = fuelForm.kmEnd - fuelForm.kmStart;
       const average = distance / fuelForm.dieselLiters;
-      
-      // Calculate Total Cost
-      // If STREET + Arla, we sum both for the main financial record
       const totalCost = fuelForm.location === 'STREET' ? (fuelForm.cost + (fuelForm.hasArla ? fuelForm.arlaCost : 0)) : 0;
 
       addFuelRecord({
           ...fuelForm,
-          arlaLiters: fuelForm.hasArla ? fuelForm.arlaLiters : 0, // Ensure clean data
+          arlaLiters: fuelForm.hasArla ? fuelForm.arlaLiters : 0,
           cost: totalCost,
           arlaCost: fuelForm.hasArla && fuelForm.location === 'STREET' ? fuelForm.arlaCost : 0,
           stationName: fuelForm.location === 'STREET' ? fuelForm.stationName : '',
           loggedBy: currentUser.id,
-          // New Fields
           kmStart: fuelForm.kmStart,
           kmEnd: fuelForm.kmEnd,
           averageConsumption: average
@@ -239,14 +223,12 @@ const DriverPortal: React.FC = () => {
       setSelectedBooking(booking);
   };
 
-  // HELPER: Format date string YYYY-MM-DD to DD/MM/YYYY manually to avoid timezone bugs
   const formatDateString = (dateStr: string) => {
       if(!dateStr) return '';
       const [year, month, day] = dateStr.split('-');
       return `${day}/${month}/${year}`;
   };
 
-  // Helper for DateTime display
   const formatDateTime = (isoString: string) => {
       if (!isoString) return 'N/A';
       try {
@@ -268,7 +250,7 @@ const DriverPortal: React.FC = () => {
   return (
     <div className="space-y-6 animate-fade-in max-w-6xl mx-auto pb-24 md:pb-0">
       
-      {/* HEADER: Hidden on Mobile to save space, user sees bottom nav */}
+      {/* HEADER: Hidden on Mobile */}
       <div className="hidden md:flex justify-between items-center bg-gradient-to-r from-blue-700 to-slate-800 rounded-2xl p-8 text-white shadow-xl relative overflow-hidden">
         <div className="z-10 relative">
           <h1 className="text-3xl font-bold mb-2">Portal {isAux ? 'da Garagem' : 'do Motorista'}</h1>
@@ -277,8 +259,6 @@ const DriverPortal: React.FC = () => {
         <div className="hidden md:block bg-white/10 p-2 rounded-lg z-10 relative backdrop-blur-sm">
              <Logo variant="light" size="sm" showGlobe={false} />
         </div>
-        <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-5 rounded-full -mr-16 -mt-16"></div>
-        <div className="absolute bottom-0 left-0 w-32 h-32 bg-blue-500 opacity-20 rounded-full -ml-8 -mb-8"></div>
       </div>
 
       {/* DESKTOP TABS (Hidden on Mobile) */}
@@ -296,11 +276,13 @@ const DriverPortal: React.FC = () => {
         {activeTab === 'schedule' && (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <div className="lg:col-span-2">
-                     {/* Calendar View - Visible on mobile now */}
-                     <CalendarView onEventClick={handleBookingClick} />
+                     {/* Calendar View - Explicitly visible on mobile */}
+                     <div className="block mb-4">
+                        <CalendarView onEventClick={handleBookingClick} />
+                     </div>
                 </div>
                 <div className="space-y-4">
-                    <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2 px-2 md:px-0 mt-2 md:mt-0">
+                    <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2 px-2 md:px-0">
                         <span className="bg-blue-100 text-blue-600 p-2 rounded-lg text-sm">🚌</span>
                         {isAux ? 'Escala Geral' : 'Minha Escala'}
                     </h2>
@@ -309,9 +291,7 @@ const DriverPortal: React.FC = () => {
                             <p className="text-slate-500 italic text-center mt-10">Nenhuma viagem agendada para os próximos 15 dias.</p>
                         ) : (
                             combinedSchedule.slice(0, 15).map((booking: any) => {
-                                // For aux view, get bus details clearly
                                 const bus = buses.find(b => b.id === booking.busId);
-                                
                                 return (
                                     <div 
                                         key={booking.id} 
@@ -349,7 +329,7 @@ const DriverPortal: React.FC = () => {
             </div>
         )}
 
-        {/* FUEL TAB (HIDDEN FOR AUX) */}
+        {/* FUEL TAB */}
         {activeTab === 'fuel' && !isAux && (
             <div className="max-w-2xl mx-auto bg-white p-6 rounded-xl shadow-sm border border-slate-200">
                 <h2 className="text-xl font-bold text-slate-800 mb-6 flex items-center gap-2">
@@ -381,7 +361,7 @@ const DriverPortal: React.FC = () => {
                             <label className="block text-sm font-medium text-slate-700 mb-1">Veículo</label>
                             <select 
                                 required value={fuelForm.busId}
-                                onChange={handleBusChange} // Lógica para auto-preencher KM
+                                onChange={handleBusChange} 
                                 className="w-full border p-3 rounded-lg focus:ring-2 focus:ring-green-500 outline-none bg-slate-50"
                             >
                                 <option value="">Selecione o ônibus...</option>
@@ -400,7 +380,7 @@ const DriverPortal: React.FC = () => {
                         </div>
                     </div>
 
-                    {/* KM CONTROL FIELDS (CRITICAL) */}
+                    {/* KM CONTROL FIELDS */}
                     <div className="grid grid-cols-2 gap-3 p-3 bg-slate-100 rounded-lg border border-slate-200">
                         <div>
                             <label className="block text-xs font-bold text-slate-700 mb-1">KM Inicial</label>
@@ -454,7 +434,6 @@ const DriverPortal: React.FC = () => {
                                 />
                             </div>
 
-                            {/* Arla Cost Input */}
                             {fuelForm.hasArla && (
                                 <div>
                                     <label className="block text-xs font-bold text-blue-800 mb-1">
@@ -478,7 +457,6 @@ const DriverPortal: React.FC = () => {
                         </div>
                     )}
 
-                    {/* Arla Switch Component */}
                     <div className="bg-blue-50 p-4 rounded-xl border border-blue-100 transition-all">
                         <label className="flex items-center justify-between cursor-pointer select-none">
                             <span className="font-bold text-blue-800 text-sm">Abasteceu Arla 32?</span>
@@ -517,17 +495,15 @@ const DriverPortal: React.FC = () => {
             </div>
         )}
 
-        {/* FINANCE / LIABILITIES TAB (HIDDEN FOR AUX) */}
+        {/* FINANCE / LIABILITIES TAB */}
         {activeTab === 'finance' && !isAux && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* DIARIAS SECTION */}
                 <div>
                     <h3 className="text-xl font-bold text-slate-800 mb-4 flex items-center gap-2">
                         <span className="bg-blue-100 text-blue-700 p-1.5 rounded text-sm">💰</span>
                         Diárias a Receber
                     </h3>
                     
-                    {/* Date Filter Inputs */}
                     <div className="flex gap-2 mb-4 bg-slate-50 p-3 rounded-lg border border-slate-200">
                         <div className="flex-1">
                             <label className="text-[10px] uppercase font-bold text-slate-500">De</label>
@@ -589,7 +565,6 @@ const DriverPortal: React.FC = () => {
                     </div>
                 </div>
 
-                {/* LIABILITIES SECTION */}
                 <div>
                     <h3 className="text-xl font-bold text-slate-800 mb-4 flex items-center gap-2">
                         <span className="bg-red-100 text-red-700 p-1.5 rounded text-sm">📉</span>
@@ -816,9 +791,9 @@ const DriverPortal: React.FC = () => {
 
       </div>
 
-      {/* MOBILE BOTTOM NAVIGATION - APP FEEL */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 z-50 pb-safe">
-          <div className="flex justify-around items-center h-16">
+      {/* MOBILE BOTTOM NAVIGATION - APP FEEL (FORCED VISIBILITY) */}
+      <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 z-50 pb-4 h-16">
+          <div className="flex justify-around items-center h-full">
               <button 
                   onClick={() => { setActiveTab('schedule'); setShowMoreMenu(false); }}
                   className={`flex flex-col items-center justify-center w-full h-full space-y-1 ${activeTab === 'schedule' ? 'text-blue-600' : 'text-slate-400'}`}
