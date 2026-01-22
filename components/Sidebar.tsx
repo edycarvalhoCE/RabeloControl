@@ -30,7 +30,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setView, isMobileOpen, s
     { id: 'finance', label: 'Financeiro (Caixa)', icon: '💰', roles: [UserRole.MANAGER, UserRole.FINANCE, UserRole.DEVELOPER] },
     { id: 'users', label: 'Usuários', icon: '👥', roles: [UserRole.MANAGER, UserRole.DEVELOPER] },
     { id: 'settings', label: 'Configurações', icon: '⚙️', roles: [UserRole.MANAGER, UserRole.DEVELOPER] },
-    { id: 'driver-portal', label: 'Minha Escala', icon: 'steering-wheel', roles: [UserRole.DRIVER, UserRole.DEVELOPER] },
+    { id: 'driver-portal', label: 'Portal do Colaborador', icon: 'steering-wheel', roles: [UserRole.DRIVER, UserRole.GARAGE_AUX, UserRole.DEVELOPER] },
   ];
 
   const filteredMenu = menuItems.filter(item => item.roles.includes(currentUser.role as UserRole));
@@ -42,6 +42,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setView, isMobileOpen, s
       case UserRole.FINANCE: return 'Financeiro';
       case UserRole.DRIVER: return 'Motorista';
       case UserRole.MECHANIC: return 'Mecânico';
+      case UserRole.GARAGE_AUX: return 'Aux. Garagem';
       default: return 'Usuário';
     }
   };

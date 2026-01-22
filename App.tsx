@@ -26,7 +26,7 @@ const MainContent = () => {
   // Default view logic
   const getDefaultView = () => {
     if (!currentUser) return 'dashboard';
-    if (currentUser.role === 'MOTORISTA') return 'driver-portal';
+    if (currentUser.role === 'MOTORISTA' || currentUser.role === 'AUX_GARAGEM') return 'driver-portal';
     if (currentUser.role === 'MECANICO') return 'maintenance';
     return 'dashboard';
   };

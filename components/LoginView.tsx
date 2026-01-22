@@ -110,6 +110,7 @@ const LoginView: React.FC = () => {
                                 className="w-full border border-slate-300 p-3 rounded-lg bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-600 outline-none transition-all"
                             >
                                 <option value={UserRole.DRIVER}>Motorista</option>
+                                <option value={UserRole.GARAGE_AUX}>Aux. Garagem / Limpeza</option>
                                 <option value={UserRole.MANAGER}>Gerente</option>
                                 <option value={UserRole.FINANCE}>Financeiro</option>
                                 <option value={UserRole.MECHANIC}>Mecânico</option>

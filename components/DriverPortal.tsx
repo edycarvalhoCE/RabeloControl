@@ -1,12 +1,16 @@
+
 import React, { useState } from 'react';
 import { useStore } from '../services/store';
 import CalendarView from './CalendarView';
-import { Booking } from '../types';
+import { Booking, UserRole } from '../types';
 import { Logo } from './Logo';
 
 const DriverPortal: React.FC = () => {
   const { currentUser, bookings, timeOffs, addTimeOff, documents, buses, addMaintenanceReport, maintenanceReports, addFuelRecord, driverLiabilities, charterContracts, driverFees, fuelRecords, users } = useStore();
   
+  // Check if Garage Aux
+  const isAux = currentUser.role === UserRole.GARAGE_AUX;
+
   // Request State
   const [requestType, setRequestType] = useState<'FOLGA' | 'FERIAS'>('FOLGA');
   const [requestDate, setRequestDate] = useState('');
@@ -45,13 +49,27 @@ const DriverPortal: React.FC = () => {
   // --- LOGIC TO MERGE BOOKINGS AND CHARTER SCHEDULE ---
   
   // 1. Regular Bookings
+  // IF AUX: Show ALL active bookings
+  // IF DRIVER: Show ONLY my bookings
+  const scheduleFilter = (b: Booking) => {
+      if (b.status === 'CANCELLED') return false;
+      if (isAux) return true; // Garage sees all
+      return b.driverId === currentUser.id;
+  };
+
   const myRegularBookings = bookings
-    .filter(b => b.driverId === currentUser.id && b.status !== 'CANCELLED')
+    .filter(scheduleFilter)
     .map(b => ({ ...b, isCharter: false, sortTime: new Date(b.startTime).getTime() }));
 
   // 2. Generate Charter Occurrences for next 15 days
   const myCharterOccurrences: any[] = [];
-  const myContracts = charterContracts.filter(c => c.driverId === currentUser.id && c.status === 'ACTIVE');
+  
+  // Same logic for Charters
+  const myContracts = charterContracts.filter(c => {
+      if (c.status !== 'ACTIVE') return false;
+      if (isAux) return true;
+      return c.driverId === currentUser.id;
+  });
   
   if (myContracts.length > 0) {
       const today = new Date();
@@ -75,7 +93,7 @@ const DriverPortal: React.FC = () => {
                       startTime: `${dStr}T${c.morningDeparture}`,
                       endTime: `${dStr}T${c.afternoonDeparture}`,
                       busId: c.busId,
-                      driverId: currentUser.id,
+                      driverId: c.driverId || 'Freelance',
                       status: 'CONFIRMED',
                       isCharter: true,
                       observations: `Rota: ${c.route}`,
@@ -237,8 +255,8 @@ const DriverPortal: React.FC = () => {
     <div className="space-y-6 animate-fade-in max-w-6xl mx-auto">
       <div className="flex justify-between items-center bg-gradient-to-r from-blue-700 to-slate-800 rounded-2xl p-8 text-white shadow-xl relative overflow-hidden">
         <div className="z-10 relative">
-          <h1 className="text-3xl font-bold mb-2">Portal do Motorista</h1>
-          <p className="opacity-80">Bem-vindo, {currentUser.name}. Gerencie sua escala e documentos.</p>
+          <h1 className="text-3xl font-bold mb-2">Portal {isAux ? 'da Garagem' : 'do Motorista'}</h1>
+          <p className="opacity-80">Bem-vindo, {currentUser.name}. {isAux ? 'Acompanhe a escala da frota.' : 'Gerencie sua escala e documentos.'}</p>
         </div>
         <div className="hidden md:block bg-white/10 p-2 rounded-lg z-10 relative backdrop-blur-sm">
              <Logo variant="light" size="sm" showGlobe={false} />
@@ -254,20 +272,29 @@ const DriverPortal: React.FC = () => {
             onClick={() => setActiveTab('schedule')}
             className={`pb-2 px-1 font-medium text-sm transition-colors whitespace-nowrap ${activeTab === 'schedule' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}
         >
-            📅 Minha Escala
+            📅 {isAux ? 'Escala Geral' : 'Minha Escala'}
         </button>
-        <button 
-            onClick={() => setActiveTab('fuel')}
-            className={`pb-2 px-1 font-medium text-sm transition-colors whitespace-nowrap ${activeTab === 'fuel' ? 'border-b-2 border-green-600 text-green-600' : 'text-slate-500 hover:text-slate-700'}`}
-        >
-            ⛽ Abastecer
-        </button>
-        <button 
-            onClick={() => setActiveTab('finance')}
-            className={`pb-2 px-1 font-medium text-sm transition-colors whitespace-nowrap ${activeTab === 'finance' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}
-        >
-            💰 Diárias e Descontos
-        </button>
+        
+        {/* HIDE FUEL FOR AUX */}
+        {!isAux && (
+            <button 
+                onClick={() => setActiveTab('fuel')}
+                className={`pb-2 px-1 font-medium text-sm transition-colors whitespace-nowrap ${activeTab === 'fuel' ? 'border-b-2 border-green-600 text-green-600' : 'text-slate-500 hover:text-slate-700'}`}
+            >
+                ⛽ Abastecer
+            </button>
+        )}
+
+        {/* HIDE FINANCE FOR AUX */}
+        {!isAux && (
+            <button 
+                onClick={() => setActiveTab('finance')}
+                className={`pb-2 px-1 font-medium text-sm transition-colors whitespace-nowrap ${activeTab === 'finance' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}
+            >
+                💰 Diárias e Descontos
+            </button>
+        )}
+
         <button 
             onClick={() => setActiveTab('documents')}
             className={`pb-2 px-1 font-medium text-sm transition-colors whitespace-nowrap ${activeTab === 'documents' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}
@@ -298,42 +325,52 @@ const DriverPortal: React.FC = () => {
                 <div className="space-y-4">
                     <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
                         <span className="bg-blue-100 text-blue-600 p-2 rounded-lg text-sm">🚌</span>
-                        Próximas Viagens e Fretamentos
+                        {isAux ? 'Escala Geral de Viagens' : 'Próximas Viagens'}
                     </h2>
                     <div className="space-y-3 max-h-[600px] overflow-y-auto pr-1">
                         {combinedSchedule.length === 0 ? (
                             <p className="text-slate-500 italic">Nenhuma viagem agendada para os próximos 15 dias.</p>
                         ) : (
-                            combinedSchedule.slice(0, 10).map((booking: any) => (
-                                <div 
-                                    key={booking.id} 
-                                    onClick={() => handleBookingClick(booking)}
-                                    className={`p-4 rounded-xl shadow-sm border cursor-pointer hover:shadow-md transition-shadow relative overflow-hidden ${
-                                        booking.isCharter 
-                                        ? 'bg-orange-50 border-orange-200 border-l-4 border-l-orange-500' 
-                                        : 'bg-white border-slate-200 border-l-4 border-l-blue-500'
-                                    }`}
-                                >
-                                    <div className="flex justify-between items-start mb-2">
-                                        <h3 className="font-bold text-base text-slate-800">{booking.destination}</h3>
-                                        <span className={`text-[10px] font-bold px-2 py-1 rounded ${booking.isCharter ? 'bg-orange-200 text-orange-800' : 'bg-blue-100 text-blue-600'}`}>
-                                            {booking.isCharter ? 'FRETAMENTO' : 'LOCAÇÃO'}
-                                        </span>
+                            combinedSchedule.slice(0, 10).map((booking: any) => {
+                                // For aux view, get bus details clearly
+                                const bus = buses.find(b => b.id === booking.busId);
+                                
+                                return (
+                                    <div 
+                                        key={booking.id} 
+                                        onClick={() => handleBookingClick(booking)}
+                                        className={`p-4 rounded-xl shadow-sm border cursor-pointer hover:shadow-md transition-shadow relative overflow-hidden ${
+                                            booking.isCharter 
+                                            ? 'bg-orange-50 border-orange-200 border-l-4 border-l-orange-500' 
+                                            : 'bg-white border-slate-200 border-l-4 border-l-blue-500'
+                                        }`}
+                                    >
+                                        <div className="flex justify-between items-start mb-2">
+                                            <h3 className="font-bold text-base text-slate-800">{booking.destination}</h3>
+                                            <span className={`text-[10px] font-bold px-2 py-1 rounded ${booking.isCharter ? 'bg-orange-200 text-orange-800' : 'bg-blue-100 text-blue-600'}`}>
+                                                {booking.isCharter ? 'FRETAMENTO' : 'LOCAÇÃO'}
+                                            </span>
+                                        </div>
+                                        <div className="text-xs text-slate-600 space-y-1">
+                                            {isAux && (
+                                                <p className="font-bold text-slate-700 bg-slate-100 p-1 rounded inline-block mb-1">
+                                                    VEÍCULO: {bus?.plate} - {bus?.model}
+                                                </p>
+                                            )}
+                                            <p className="font-semibold">📅 {new Date(booking.startTime).toLocaleDateString()} • {new Date(booking.startTime).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</p>
+                                            {!booking.isCharter && <p>🏁 Retorno: {new Date(booking.endTime).toLocaleDateString()}</p>}
+                                        </div>
                                     </div>
-                                    <div className="text-xs text-slate-600 space-y-1">
-                                        <p className="font-semibold">📅 {new Date(booking.startTime).toLocaleDateString()} • {new Date(booking.startTime).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</p>
-                                        {!booking.isCharter && <p>🏁 Retorno: {new Date(booking.endTime).toLocaleDateString()}</p>}
-                                    </div>
-                                </div>
-                            ))
+                                );
+                            })
                         )}
                     </div>
                 </div>
             </div>
         )}
 
-        {/* FUEL TAB */}
-        {activeTab === 'fuel' && (
+        {/* FUEL TAB (HIDDEN FOR AUX) */}
+        {activeTab === 'fuel' && !isAux && (
             <div className="max-w-2xl mx-auto bg-white p-6 rounded-xl shadow-sm border border-slate-200">
                 <h2 className="text-xl font-bold text-slate-800 mb-6 flex items-center gap-2">
                     <span className="bg-green-100 text-green-600 p-2 rounded-lg">⛽</span>
@@ -500,8 +537,8 @@ const DriverPortal: React.FC = () => {
             </div>
         )}
 
-        {/* FINANCE / LIABILITIES TAB */}
-        {activeTab === 'finance' && (
+        {/* FINANCE / LIABILITIES TAB (HIDDEN FOR AUX) */}
+        {activeTab === 'finance' && !isAux && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* DIARIAS SECTION */}
                 <div>
@@ -709,6 +746,9 @@ const DriverPortal: React.FC = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 h-fit">
                     <h3 className="font-bold text-lg text-slate-800 mb-4">Reportar Problema no Veículo</h3>
+                    <p className="text-sm text-slate-500 mb-4">
+                        Encontrou algo errado durante a limpeza ou vistoria? Relate aqui.
+                    </p>
                     <form onSubmit={handleReportSubmit} className="space-y-4">
                         <div>
                             <label className="block text-sm font-medium text-slate-700 mb-1">Veículo</label>
@@ -731,7 +771,7 @@ const DriverPortal: React.FC = () => {
                                 value={reportForm.description} 
                                 onChange={(e) => setReportForm({...reportForm, description: e.target.value})}
                                 className="w-full border p-2 rounded h-24"
-                                placeholder="Ex: Ar condicionado não gela, barulho na roda..."
+                                placeholder="Ex: Banco rasgado, chiclete no chão, luz queimada..."
                             />
                         </div>
                         <button type="submit" className="w-full bg-red-600 text-white font-bold py-2 rounded hover:bg-red-700">

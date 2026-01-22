@@ -169,6 +169,7 @@ const UsersView: React.FC = () => {
                             className="w-full border p-2 rounded focus:ring-2 focus:ring-blue-500 outline-none"
                           >
                               <option value={UserRole.DRIVER}>Motorista</option>
+                              <option value={UserRole.GARAGE_AUX}>Aux. Garagem / Limpeza</option>
                               <option value={UserRole.MECHANIC}>Mecânico</option>
                               <option value={UserRole.FINANCE}>Financeiro</option>
                               <option value={UserRole.MANAGER}>Gerente</option>
