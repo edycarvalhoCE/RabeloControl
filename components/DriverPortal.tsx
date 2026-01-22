@@ -236,8 +236,8 @@ const DriverPortal: React.FC = () => {
     <div className="space-y-6 animate-fade-in max-w-6xl mx-auto pb-32 md:pb-0">
       
       {/* INDICADOR DE VERSÃO - VISÍVEL PARA CONFIRMAR ATUALIZAÇÃO */}
-      <div className="bg-green-600 text-white text-xs text-center py-1 font-bold md:hidden">
-          SISTEMA ATUALIZADO - PRONTO PARA APRESENTAÇÃO
+      <div className="bg-green-600 text-white text-xs text-center py-1 font-bold md:hidden shadow-sm">
+          SISTEMA ONLINE - VERSÃO APRESENTAÇÃO
       </div>
 
       {/* HEADER: Hidden on Mobile */}
@@ -781,48 +781,46 @@ const DriverPortal: React.FC = () => {
 
       </div>
 
-      {/* MOBILE BOTTOM NAVIGATION - FORCED TO BE VISIBLE AND FIXED */}
-      <div className="md:hidden !fixed !bottom-0 !left-0 !right-0 bg-white border-t border-slate-200 !z-[999] pb-safe h-16 shadow-[0_-2px_10px_rgba(0,0,0,0.1)]">
-          <div className="flex justify-around items-center h-full">
+      {/* MOBILE BOTTOM NAVIGATION - FORCED TO BE VISIBLE AND FIXED - Z-INDEX 9999 */}
+      <div className="md:hidden !fixed !bottom-0 !left-0 !right-0 bg-white border-t border-slate-200 z-[9999] pb-safe h-16 shadow-[0_-2px_10px_rgba(0,0,0,0.1)] flex justify-around items-center">
+          <button 
+              onClick={() => { setActiveTab('schedule'); setShowMoreMenu(false); }}
+              className={`flex flex-col items-center justify-center w-full h-full space-y-1 ${activeTab === 'schedule' ? 'text-blue-600' : 'text-slate-400'}`}
+          >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+              <span className="text-[10px] font-bold">Escala</span>
+          </button>
+          
+          {!isAux && (
               <button 
-                  onClick={() => { setActiveTab('schedule'); setShowMoreMenu(false); }}
-                  className={`flex flex-col items-center justify-center w-full h-full space-y-1 ${activeTab === 'schedule' ? 'text-blue-600' : 'text-slate-400'}`}
+                  onClick={() => { setActiveTab('fuel'); setShowMoreMenu(false); }}
+                  className={`flex flex-col items-center justify-center w-full h-full space-y-1 ${activeTab === 'fuel' ? 'text-green-600' : 'text-slate-400'}`}
               >
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-                  <span className="text-[10px] font-bold">Escala</span>
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" /></svg>
+                  <span className="text-[10px] font-bold">Abastecer</span>
               </button>
-              
-              {!isAux && (
-                  <button 
-                      onClick={() => { setActiveTab('fuel'); setShowMoreMenu(false); }}
-                      className={`flex flex-col items-center justify-center w-full h-full space-y-1 ${activeTab === 'fuel' ? 'text-green-600' : 'text-slate-400'}`}
-                  >
-                      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" /></svg>
-                      <span className="text-[10px] font-bold">Abastecer</span>
-                  </button>
-              )}
+          )}
 
-              <button 
-                  onClick={() => { setActiveTab('report'); setShowMoreMenu(false); }}
-                  className={`flex flex-col items-center justify-center w-full h-full space-y-1 ${activeTab === 'report' ? 'text-red-600' : 'text-slate-400'}`}
-              >
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
-                  <span className="text-[10px] font-bold">Defeito</span>
-              </button>
+          <button 
+              onClick={() => { setActiveTab('report'); setShowMoreMenu(false); }}
+              className={`flex flex-col items-center justify-center w-full h-full space-y-1 ${activeTab === 'report' ? 'text-red-600' : 'text-slate-400'}`}
+          >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+              <span className="text-[10px] font-bold">Defeito</span>
+          </button>
 
-              <button 
-                  onClick={() => setShowMoreMenu(!showMoreMenu)}
-                  className={`flex flex-col items-center justify-center w-full h-full space-y-1 ${showMoreMenu ? 'text-slate-800' : 'text-slate-400'}`}
-              >
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16m-7 6h7" /></svg>
-                  <span className="text-[10px] font-bold">Mais</span>
-              </button>
-          </div>
+          <button 
+              onClick={() => setShowMoreMenu(!showMoreMenu)}
+              className={`flex flex-col items-center justify-center w-full h-full space-y-1 ${showMoreMenu ? 'text-slate-800' : 'text-slate-400'}`}
+          >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16m-7 6h7" /></svg>
+              <span className="text-[10px] font-bold">Mais</span>
+          </button>
       </div>
 
       {/* MOBILE MORE MENU (DRAWER) */}
       {showMoreMenu && (
-          <div className="md:hidden fixed inset-0 z-[998] bg-black/50" onClick={() => setShowMoreMenu(false)}>
+          <div className="md:hidden fixed inset-0 z-[9998] bg-black/50" onClick={() => setShowMoreMenu(false)}>
               <div className="absolute bottom-16 left-0 right-0 bg-white rounded-t-xl overflow-hidden p-4 space-y-2 animate-slide-up shadow-2xl" onClick={e => e.stopPropagation()}>
                   <button 
                       onClick={() => { setActiveTab('documents'); setShowMoreMenu(false); }}
