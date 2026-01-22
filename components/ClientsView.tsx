@@ -2,15 +2,19 @@
 import React, { useState } from 'react';
 import { useStore } from '../services/store';
 import { UserRole, Client } from '../types';
+import * as XLSX from 'xlsx';
 
 const ClientsView: React.FC = () => {
-  const { clients, addClient, updateClient, deleteClient, bookings, packagePassengers, travelPackages, currentUser } = useStore();
+  const { clients, addClient, updateClient, deleteClient, importClients, bookings, packagePassengers, travelPackages, currentUser } = useStore();
   const [showForm, setShowForm] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [editingClient, setEditingClient] = useState<Client | null>(null);
   
   // History Modal State
   const [historyClient, setHistoryClient] = useState<Client | null>(null);
+  
+  // Import State
+  const [isImporting, setIsImporting] = useState(false);
 
   // Form State
   const [form, setForm] = useState({
@@ -75,6 +79,115 @@ const ClientsView: React.FC = () => {
       resetForm();
   };
 
+  // --- DOWNLOAD TEMPLATE ---
+  const handleDownloadTemplate = () => {
+      const headers = [
+          {
+              "Código": "1001",
+              "Nome Completo": "Exemplo da Silva",
+              "CPF/CNPJ": "123.456.789-00",
+              "RG": "12.345.678-9",
+              "Telefone": "(24) 99999-9999",
+              "Email": "exemplo@email.com",
+              "Endereço": "Rua Exemplo, 123, Centro",
+              "Data Nascimento": "01/01/1980"
+          }
+      ];
+
+      const ws = XLSX.utils.json_to_sheet(headers);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Modelo Importação");
+      XLSX.writeFile(wb, "modelo_importacao_clientes.xlsx");
+  };
+
+  // --- IMPORT LOGIC ---
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+
+      if (!confirm("Atenção: Esta ação importará clientes da planilha.\nO sistema tentará ignorar duplicatas com o mesmo CPF ou Nome.\nDeseja continuar?")) {
+          e.target.value = ''; // Reset input
+          return;
+      }
+
+      setIsImporting(true);
+      const reader = new FileReader();
+      
+      reader.onload = async (evt) => {
+          try {
+              const bstr = evt.target?.result;
+              const wb = XLSX.read(bstr, { type: 'binary' });
+              const wsname = wb.SheetNames[0];
+              const ws = wb.Sheets[wsname];
+              const data = XLSX.utils.sheet_to_json(ws);
+
+              // Normalize and Map Data
+              const clientsToImport: Omit<Client, 'id'>[] = data.map((row: any) => {
+                  // Helper to find key case-insensitive
+                  const findVal = (keys: string[]) => {
+                      for (const k of Object.keys(row)) {
+                          if (keys.some(key => k.toLowerCase().includes(key.toLowerCase()))) {
+                              return row[k];
+                          }
+                      }
+                      return '';
+                  };
+
+                  let name = findVal(['nome', 'cliente', 'passageiro']) || 'Sem Nome';
+                  let phone = findVal(['tel', 'cel', 'whatsapp', 'fone']) || '';
+                  let cpf = findVal(['cpf', 'cnpj', 'doc']) || '';
+                  let address = findVal(['endereço', 'rua', 'logradouro']) || '';
+                  let rg = findVal(['rg', 'identidade']) || '';
+                  let code = findVal(['código', 'cod', 'id']) || '';
+                  
+                  // Date parsing (Excel serial or String)
+                  let birthDate = '';
+                  const rawDate = findVal(['nasc', 'data']);
+                  if (rawDate) {
+                      if (typeof rawDate === 'number') {
+                          // Excel Serial Date
+                          const dateObj = new Date(Math.round((rawDate - 25569) * 86400 * 1000));
+                          birthDate = dateObj.toISOString().split('T')[0];
+                      } else if (typeof rawDate === 'string' && rawDate.includes('/')) {
+                          // DD/MM/YYYY
+                          const parts = rawDate.split('/');
+                          if (parts.length === 3) birthDate = `${parts[2]}-${parts[1]}-${parts[0]}`;
+                      }
+                  }
+
+                  return {
+                      name: String(name).trim(),
+                      phone: String(phone).trim(),
+                      cpf: String(cpf).replace(/\D/g, ''), // Numbers only
+                      address: String(address).trim(),
+                      rg: String(rg).trim(),
+                      birthDate,
+                      code: String(code),
+                      type: String(cpf).length > 11 ? 'PJ' : 'PF',
+                      email: '',
+                      observations: 'Importado via Planilha'
+                  };
+              }).filter(c => c.name && c.name !== 'Sem Nome');
+
+              if (clientsToImport.length === 0) {
+                  alert("Nenhum dado válido encontrado na planilha. Verifique se as colunas têm cabeçalhos como 'Nome', 'Telefone', 'CPF'.");
+              } else {
+                  const result = await importClients(clientsToImport);
+                  alert(result.message);
+              }
+
+          } catch (err: any) {
+              console.error(err);
+              alert("Erro ao ler arquivo: " + err.message);
+          } finally {
+              setIsImporting(false);
+              e.target.value = ''; // Reset input
+          }
+      };
+      
+      reader.readAsBinaryString(file);
+  };
+
   // Filter Clients
   const filteredClients = clients.filter(c => 
       c.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -99,17 +212,34 @@ const ClientsView: React.FC = () => {
 
   return (
     <div className="space-y-6 animate-fade-in relative">
-        <div className="flex justify-between items-center">
+        <div className="flex flex-col md:flex-row justify-between items-center gap-4">
             <div>
                 <h2 className="text-2xl font-bold text-slate-800">Gestão de Clientes</h2>
                 <p className="text-sm text-slate-500">Base de dados unificada de passageiros e contratantes.</p>
             </div>
-            <button 
-                onClick={() => { resetForm(); setShowForm(true); }}
-                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium shadow-sm transition-colors"
-            >
-                + Novo Cliente
-            </button>
+            <div className="flex flex-wrap gap-2 items-center">
+                {/* DOWNLOAD TEMPLATE */}
+                <button 
+                    onClick={handleDownloadTemplate}
+                    className="bg-slate-100 hover:bg-slate-200 text-slate-600 px-3 py-2 rounded-lg font-medium shadow-sm transition-colors text-xs flex items-center gap-1 border border-slate-300"
+                    title="Baixar modelo Excel para preencher"
+                >
+                    📑 Baixar Modelo
+                </button>
+
+                {/* IMPORT BUTTON */}
+                <label className={`cursor-pointer bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium shadow-sm transition-colors flex items-center gap-2 text-sm ${isImporting ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                    <span>{isImporting ? 'Importando...' : '📥 Importar'}</span>
+                    <input type="file" accept=".xlsx, .xls, .csv" onChange={handleFileUpload} disabled={isImporting} className="hidden" />
+                </label>
+
+                <button 
+                    onClick={() => { resetForm(); setShowForm(true); }}
+                    className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium shadow-sm transition-colors text-sm"
+                >
+                    + Novo Cliente
+                </button>
+            </div>
         </div>
 
         {/* LIST & SEARCH */}

@@ -4,7 +4,15 @@ import { useStore } from '../services/store';
 import { UserRole } from '../types';
 
 const SettingsView: React.FC = () => {
-  const { settings, updateSettings, currentUser } = useStore();
+  const { 
+      settings, updateSettings, currentUser,
+      // Destructure all data collections for Backup
+      users, buses, bookings, parts, transactions, timeOffs, documents, 
+      maintenanceRecords, purchaseRequests, maintenanceReports, charterContracts, 
+      travelPackages, packagePassengers, packagePayments, packageLeads, clients, 
+      fuelRecords, fuelSupplies, driverLiabilities, driverFees, quotes, priceRoutes 
+  } = useStore();
+
   const [form, setForm] = useState({
       companyName: '',
       cnpj: '',
@@ -59,6 +67,53 @@ const SettingsView: React.FC = () => {
       await updateSettings(form);
       setSuccessMsg('Configurações salvas com sucesso!');
       setTimeout(() => setSuccessMsg(''), 4000);
+  };
+
+  const handleSystemBackup = () => {
+      if (!confirm("Deseja baixar um arquivo de backup com todos os dados atuais do sistema?")) return;
+
+      const backupData = {
+          exportDate: new Date().toISOString(),
+          version: "1.0",
+          data: {
+              settings,
+              users,
+              buses,
+              bookings,
+              parts,
+              transactions,
+              timeOffs,
+              documents,
+              maintenanceRecords,
+              purchaseRequests,
+              maintenanceReports,
+              charterContracts,
+              travelPackages,
+              packagePassengers,
+              packagePayments,
+              packageLeads,
+              clients,
+              fuelRecords,
+              fuelSupplies,
+              driverLiabilities,
+              driverFees,
+              quotes,
+              priceRoutes
+          }
+      };
+
+      const jsonString = JSON.stringify(backupData, null, 2);
+      const blob = new Blob([jsonString], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      
+      const dateStr = new Date().toISOString().split('T')[0];
+      link.href = url;
+      link.download = `backup_rabelotour_${dateStr}.json`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
   };
 
   return (
@@ -138,14 +193,14 @@ const SettingsView: React.FC = () => {
                     </form>
                 </div>
 
-                {/* AI SETTINGS */}
+                {/* DATA & BACKUP */}
                 <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-                    <h3 className="font-bold text-slate-700 mb-2 flex items-center gap-2">
-                        <span>✨</span> Configuração Inteligência Artificial
+                    <h3 className="font-bold text-slate-700 mb-4 flex items-center gap-2">
+                        <span>💾</span> Dados e Backup
                     </h3>
-                    <p className="text-xs text-slate-500 mb-4">Insira sua chave de API do Google Gemini para habilitar as análises financeiras.</p>
                     
-                    <div className="space-y-3">
+                    <div className="space-y-4">
+                        {/* AI SETTINGS */}
                         <div>
                             <label className="block text-sm font-medium text-slate-700 mb-1">Chave de API (Google Gemini)</label>
                             <input 
@@ -155,9 +210,21 @@ const SettingsView: React.FC = () => {
                                 className="w-full border p-2 rounded focus:ring-2 focus:ring-blue-500 outline-none font-mono text-sm"
                                 placeholder="AIzaSy..."
                             />
+                            <p className="text-xs text-slate-500 mt-1">Para previsões financeiras.</p>
                         </div>
-                        <div className="text-xs text-slate-500 bg-slate-50 p-3 rounded border border-slate-100">
-                            <strong>Nota:</strong> Chaves da OpenAI (sk-proj...) não funcionam aqui. Use apenas chaves do Google AI Studio.
+
+                        <div className="border-t border-slate-100 pt-4">
+                            <p className="text-sm text-slate-600 mb-3">
+                                Faça o download de uma cópia de segurança de todos os dados do sistema. Mantenha este arquivo em local seguro.
+                            </p>
+                            <button 
+                                type="button" 
+                                onClick={handleSystemBackup}
+                                className="flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2 px-4 rounded border border-slate-300 transition-colors text-sm"
+                            >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                                Baixar Backup Completo (.JSON)
+                            </button>
                         </div>
                     </div>
                 </div>

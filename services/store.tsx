@@ -96,6 +96,7 @@ interface StoreContextType {
   addClient: (client: Omit<Client, 'id'>) => Promise<void>;
   updateClient: (id: string, data: Partial<Client>) => Promise<void>;
   deleteClient: (id: string) => Promise<void>;
+  importClients: (newClients: Omit<Client, 'id'>[]) => Promise<{ success: boolean; count: number; message: string }>;
 
   // Quote & Price Actions
   addQuote: (quote: Omit<Quote, 'id' | 'status' | 'createdAt'>) => Promise<void>;
@@ -482,6 +483,54 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   const updateClient = async (id: string, data: Partial<Client>) => { if (!isConfigured) return; await updateDoc(doc(db, 'clients', id), data); };
   const deleteClient = async (id: string) => { if (!isConfigured) return; await deleteDoc(doc(db, 'clients', id)); };
 
+  const importClients = async (newClients: Omit<Client, 'id'>[]) => {
+      if (!isConfigured) return { success: false, count: 0, message: "Banco de dados desconectado." };
+      
+      const batchSize = 500;
+      let addedCount = 0;
+      let duplicateCount = 0;
+
+      // Filter duplicates within the import list itself
+      const uniqueImportList = new Map();
+      newClients.forEach(c => {
+          if (c.cpf && c.cpf.length > 5) {
+              uniqueImportList.set(c.cpf, c); // Prefer CPF unique
+          } else if (c.name) {
+              uniqueImportList.set(c.name, c); // Fallback name
+          }
+      });
+      const listToProcess = Array.from(uniqueImportList.values());
+
+      try {
+          // Chunk into 500
+          for (let i = 0; i < listToProcess.length; i += batchSize) {
+              const chunk = listToProcess.slice(i, i + batchSize);
+              const batch = writeBatch(db);
+              
+              for (const client of chunk) {
+                  // Check against existing state (basic check to avoid obvious dupes)
+                  const exists = clients.some(existing => 
+                      (existing.cpf && client.cpf && existing.cpf === client.cpf) || 
+                      (existing.name.toLowerCase() === client.name.toLowerCase())
+                  );
+
+                  if (!exists) {
+                      const ref = doc(collection(db, 'clients'));
+                      batch.set(ref, client);
+                      addedCount++;
+                  } else {
+                      duplicateCount++;
+                  }
+              }
+              await batch.commit();
+          }
+          return { success: true, count: addedCount, message: `${addedCount} clientes importados. ${duplicateCount} duplicados ignorados.` };
+      } catch (e: any) {
+          console.error(e);
+          return { success: false, count: 0, message: "Erro na importação: " + e.message };
+      }
+  };
+
   const registerPackageSale = async (clientData: any, saleData: any) => { 
       if (!isConfigured) return; 
       let clientId = '';
@@ -726,7 +775,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       addQuote, updateQuote, convertQuoteToBooking, deleteQuote,
       addPriceRoute, updatePriceRoute, deletePriceRoute, importDefaultPrices, clearPriceTable,
       addDriverFee, payDriverFee, deleteDriverFee, restockPart,
-      addClient, updateClient, deleteClient
+      addClient, updateClient, deleteClient, importClients
     }}>
       {children}
     </StoreContext.Provider>
