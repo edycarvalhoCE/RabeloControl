@@ -153,6 +153,20 @@ const SettingsView: React.FC = () => {
       reader.readAsText(file);
   };
 
+  // Função para limpar cache e recarregar
+  const handleClearCache = () => {
+      if (window.confirm("Isso forçará um recarregamento completo da página para obter a versão mais recente. Continuar?")) {
+          if ('serviceWorker' in navigator) {
+              navigator.serviceWorker.getRegistrations().then(function(registrations) {
+                  for(let registration of registrations) {
+                      registration.unregister();
+                  }
+              });
+          }
+          window.location.reload();
+      }
+  };
+
   return (
     <div className="max-w-4xl mx-auto animate-fade-in">
         <h2 className="text-2xl font-bold text-slate-800 mb-6">Configurações do Sistema</h2>
@@ -192,7 +206,19 @@ const SettingsView: React.FC = () => {
             {/* COMPANY DATA FORM */}
             <div className="md:col-span-2 space-y-6">
                 <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-                    <h3 className="font-bold text-slate-700 mb-4">Dados da Empresa (Para Contratos/Recibos)</h3>
+                    <div className="flex justify-between items-center mb-4">
+                        <h3 className="font-bold text-slate-700">Dados da Empresa</h3>
+                        <button 
+                            type="button"
+                            onClick={handleClearCache}
+                            className="text-xs bg-red-100 hover:bg-red-200 text-red-700 font-bold px-3 py-1.5 rounded flex items-center gap-1 transition-colors"
+                            title="Use se as atualizações não aparecerem"
+                        >
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                            Forçar Atualização / Limpar Cache
+                        </button>
+                    </div>
+                    
                     <form onSubmit={handleSave} className="space-y-4">
                         <div>
                             <label className="block text-sm font-medium text-slate-700 mb-1">Nome Fantasia / Razão Social</label>

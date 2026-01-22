@@ -248,7 +248,7 @@ const DriverPortal: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6 animate-fade-in max-w-6xl mx-auto pb-24 md:pb-0">
+    <div className="space-y-6 animate-fade-in max-w-6xl mx-auto pb-32 md:pb-0">
       
       {/* HEADER: Hidden on Mobile */}
       <div className="hidden md:flex justify-between items-center bg-gradient-to-r from-blue-700 to-slate-800 rounded-2xl p-8 text-white shadow-xl relative overflow-hidden">
@@ -276,8 +276,8 @@ const DriverPortal: React.FC = () => {
         {activeTab === 'schedule' && (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <div className="lg:col-span-2">
-                     {/* Calendar View - Explicitly visible on mobile */}
-                     <div className="block mb-4">
+                     {/* Calendar View - Visible on mobile */}
+                     <div className="block w-full mb-4">
                         <CalendarView onEventClick={handleBookingClick} />
                      </div>
                 </div>
@@ -792,7 +792,7 @@ const DriverPortal: React.FC = () => {
       </div>
 
       {/* MOBILE BOTTOM NAVIGATION - APP FEEL (FORCED VISIBILITY) */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 z-50 pb-4 h-16">
+      <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 z-[100] pb-safe h-16 shadow-[0_-2px_10px_rgba(0,0,0,0.1)]">
           <div className="flex justify-around items-center h-full">
               <button 
                   onClick={() => { setActiveTab('schedule'); setShowMoreMenu(false); }}
@@ -833,7 +833,7 @@ const DriverPortal: React.FC = () => {
       {/* MOBILE MORE MENU (DRAWER) */}
       {showMoreMenu && (
           <div className="md:hidden fixed inset-0 z-40 bg-black/50" onClick={() => setShowMoreMenu(false)}>
-              <div className="absolute bottom-16 left-0 right-0 bg-white rounded-t-xl overflow-hidden p-4 space-y-2 animate-slide-up" onClick={e => e.stopPropagation()}>
+              <div className="absolute bottom-16 left-0 right-0 bg-white rounded-t-xl overflow-hidden p-4 space-y-2 animate-slide-up shadow-2xl" onClick={e => e.stopPropagation()}>
                   <button 
                       onClick={() => { setActiveTab('documents'); setShowMoreMenu(false); }}
                       className="w-full text-left p-3 rounded-lg hover:bg-slate-50 flex items-center gap-3 text-slate-700 font-medium"
