@@ -7,53 +7,29 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
-    <meta name="app-version" content="v8.2" />
+    <meta name="app-version" content="v8.3" />
     
     <!-- Cor Azul da Marca Rabelo Tour para a barra do navegador -->
     <meta name="theme-color" content="#2e2e77" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <!-- Favicon usando a mesma logo -->
+    <!-- Favicon -->
     <link rel="icon" type="image/png" href="./logo.png" />
-    <title>RabeloTour v8.2</title>
+    <title>RabeloTour v8.3</title>
     
-    <!-- SCRIPT NUCLEAR: DETECÇÃO E RELOAD DE VERSÃO -->
+    <!-- SCRIPT DE LIMPEZA DE CACHE (Versão Leve) -->
     <script>
       (function() {
-        var NEW_VERSION = 'v8.2-STABLE';
-        var storedVersion = localStorage.getItem('app_version_tag');
-
-        console.log('Verificando versão:', storedVersion, 'vs', NEW_VERSION);
-
-        if (storedVersion !== NEW_VERSION) {
-            console.log('Nova versão detectada! Limpando cache e recarregando...');
-            
-            // 1. Limpar Service Workers
+        var CURRENT_V = 'v8.3-FIX';
+        var storedV = localStorage.getItem('app_version_tag');
+        if (storedV !== CURRENT_V) {
+            console.log('Atualizando versão...');
             if ('serviceWorker' in navigator) {
-                navigator.serviceWorker.getRegistrations().then(function(registrations) {
-                    for(let registration of registrations) {
-                        registration.unregister();
-                    }
+                navigator.serviceWorker.getRegistrations().then(function(regs) {
+                    for(let reg of regs) reg.unregister();
                 });
             }
-
-            // 2. Limpar Caches de Arquivos
-            if (window.caches) {
-                caches.keys().then(function(names) {
-                    for (let name of names) caches.delete(name);
-                });
-            }
-
-            // 3. Atualizar flag e forçar reload
-            localStorage.setItem('app_version_tag', NEW_VERSION);
-            sessionStorage.clear();
-            
-            // Pequeno delay para garantir que a limpeza ocorra
-            setTimeout(function() {
-                 if (storedVersion) { // Só recarrega se já tinha uma versão antiga
-                    window.location.reload(true);
-                 }
-            }, 500);
+            localStorage.setItem('app_version_tag', CURRENT_V);
         }
       })();
     </script>
@@ -70,8 +46,8 @@
             },
             colors: {
               brand: {
-                blue: '#2e2e77', // Cor azul exata da logo
-                yellow: '#ffec00', // Cor amarela do globo
+                blue: '#2e2e77', 
+                yellow: '#ffec00', 
               },
               slate: {
                 850: '#1e293b', 
@@ -84,43 +60,31 @@
     </script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Great+Vibes&display=swap" rel="stylesheet">
     <style>
-      :root {
-        color-scheme: light; /* Força modo claro nos controles do navegador */
-      }
+      :root { color-scheme: light; }
       body { 
         font-family: 'Inter', sans-serif; 
-        background-color: #f8fafc !important; 
-        color: #0f172a !important; 
-        overscroll-behavior-y: none; /* Previne o efeito de elástico no iOS */
+        background-color: #f8fafc; 
+        color: #0f172a; 
       }
-      /* Inputs com fundo branco para contraste */
-      input, select, textarea {
-        background-color: #ffffff;
-        color: #1e293b;
-      }
-      /* Safe area padding for mobile adjustments */
-      .pb-safe {
-        padding-bottom: env(safe-area-inset-bottom);
-      }
+      .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
     </style>
 <script type="importmap">
 {
   "imports": {
-    "react": "https://esm.sh/react@18.3.1",
-    "react-dom/": "https://esm.sh/react-dom@18.3.1/",
-    "react/": "https://esm.sh/react@18.3.1/",
-    "@google/genai": "https://esm.sh/@google/genai@0.1.1",
-    "firebase/": "https://esm.sh/firebase@10.12.0/",
-    "recharts": "https://esm.sh/recharts@2.12.7",
-    "xlsx": "https://esm.sh/xlsx@0.18.5",
-    "vite": "https://esm.sh/vite@5.4.0",
-    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@4.3.0",
     "path": "https://esm.sh/path@^0.12.7",
-    "url": "https://esm.sh/url@^0.11.4"
+    "url": "https://esm.sh/url@^0.11.4",
+    "recharts": "https://esm.sh/recharts@^3.7.0",
+    "@google/genai": "https://esm.sh/@google/genai@^1.38.0",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "react/": "https://esm.sh/react@^19.2.3/",
+    "react": "https://esm.sh/react@^19.2.3",
+    "xlsx": "https://esm.sh/xlsx@^0.18.5",
+    "firebase/": "https://esm.sh/firebase@^12.8.0/",
+    "vite": "https://esm.sh/vite@^7.3.1",
+    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.2"
   }
 }
 </script>
-<link rel="stylesheet" href="/index.css">
 </head>
   <body class="bg-slate-50 text-slate-900">
     <div id="root"></div>
