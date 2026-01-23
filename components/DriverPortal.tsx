@@ -411,9 +411,9 @@ const DriverPortal: React.FC = () => {
                                                 ) : (
                                                     <button 
                                                         onClick={(e) => handleConfirmClick(e, booking)}
-                                                        className="text-xs bg-white border border-green-500 text-green-600 hover:bg-green-50 px-3 py-1.5 rounded-full font-bold shadow-sm transition-colors"
+                                                        className="text-xs bg-white border border-green-600 text-green-700 hover:bg-green-50 px-4 py-2 rounded-full font-bold shadow-sm transition-colors uppercase tracking-wide"
                                                     >
-                                                        Confirmar Escala
+                                                        CONFIRMAR ESCALA
                                                     </button>
                                                 )}
                                             </div>
@@ -963,9 +963,9 @@ const DriverPortal: React.FC = () => {
                             {!isAux && !getConfirmationStatus(selectedBooking) && (
                                 <button 
                                     onClick={(e) => { handleConfirmClick(e, selectedBooking); setSelectedBooking(null); }}
-                                    className="flex-1 bg-green-600 text-white py-3 rounded-lg font-bold hover:bg-green-700"
+                                    className="flex-1 bg-green-600 text-white py-3 rounded-lg font-bold hover:bg-green-700 uppercase tracking-wide"
                                 >
-                                    Confirmar Escala
+                                    CONFIRMAR ESCALA
                                 </button>
                             )}
                             <button 
