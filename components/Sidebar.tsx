@@ -20,7 +20,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setView, isMobileOpen, s
     { id: 'quotes', label: 'Orçamentos (CRM)', icon: '💬', roles: [UserRole.MANAGER, UserRole.FINANCE, UserRole.DEVELOPER] },
     { id: 'new-booking', label: 'Nova Locação', icon: '➕', roles: [UserRole.MANAGER, UserRole.DEVELOPER] },
     { id: 'bookings', label: 'Listar Locações', icon: '🚌', roles: [UserRole.MANAGER, UserRole.DEVELOPER] },
-    { id: 'clients', label: 'Clientes', icon: '👥', roles: [UserRole.MANAGER, UserRole.FINANCE, UserRole.DEVELOPER] }, // Novo Item
+    { id: 'clients', label: 'Clientes', icon: '👥', roles: [UserRole.MANAGER, UserRole.FINANCE, UserRole.DEVELOPER] },
     { id: 'calendar', label: 'Calendário (Escala)', icon: '📅', roles: [UserRole.MANAGER, UserRole.DEVELOPER] },
     { id: 'travel-packages', label: 'Pacotes de Viagem', icon: '🏖️', roles: [UserRole.MANAGER, UserRole.FINANCE, UserRole.DEVELOPER] },
     { id: 'charter', label: 'Fretamento', icon: '🏭', roles: [UserRole.MANAGER, UserRole.DEVELOPER] },
@@ -138,8 +138,8 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setView, isMobileOpen, s
                   <span>Sair</span>
               </button>
               
-              <div className="text-center text-[10px] text-green-400 mt-2 font-bold">
-                  Versão Restaurada (V4)
+              <div className="text-center text-[10px] text-red-500 mt-2 font-black bg-white/10 rounded py-1 border border-red-500">
+                  VERSÃO V7.0 ATIVA
               </div>
           </div>
         </div>

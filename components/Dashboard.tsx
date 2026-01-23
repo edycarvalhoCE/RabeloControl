@@ -398,8 +398,8 @@ const Dashboard: React.FC = () => {
 
               <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex flex-col">
                   <h3 className="text-lg font-semibold text-slate-700 mb-4 flex-shrink-0">Fluxo de Caixa Global</h3>
-                  {/* Fixed height container for chart */}
-                  <div className="w-full h-80 min-h-[300px]">
+                  {/* USO DE STYLE INLINE PARA FORÇAR ALTURA E EVITAR CRASH DE RENDERIZAÇÃO */}
+                  <div style={{ width: '100%', height: 320 }}>
                       <ResponsiveContainer width="100%" height="100%">
                           <BarChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
                               <CartesianGrid strokeDasharray="3 3" vertical={false} />

@@ -16,35 +16,43 @@
     <link rel="icon" type="image/png" href="./logo.png" />
     <title>RabeloTour - Sistema Integrado</title>
     
-    <!-- SCRIPT DE EMERGÊNCIA: LIMPEZA DE CACHE -->
+    <!-- SCRIPT NUCLEAR DE LIMPEZA DE CACHE -->
     <script>
-      // Força a remoção de qualquer Service Worker que esteja segurando versões antigas
-      if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.getRegistrations().then(function(registrations) {
-          for(let registration of registrations) {
-            registration.unregister();
-            console.log('Service Worker antigo removido.');
-          }
-        });
-      }
-      // Limpeza de cache de sessão - VERSÃO ATUALIZADA V6.0-FORCE
-      try {
-        // Verifica se a versão mudou para forçar recarregamento
-        var currentVersion = 'v6.0-FORCE';
-        if (sessionStorage.getItem('app_version') !== currentVersion) {
-           sessionStorage.clear();
-           localStorage.removeItem('firebase:host:rabelotour-190bd.firebaseio.com'); // Tenta limpar cache do firebase se existir
-           
-           // Tenta limpar caches de dados se possível, mas mantém auth
-           if(window.caches) {
-             caches.keys().then(function(names) {
-               for (let name of names) caches.delete(name);
-             });
-           }
-           sessionStorage.setItem('app_version', currentVersion);
-           console.log('Cache limpo para versão ' + currentVersion);
+      (function() {
+        var currentVersion = 'v7.0-NUCLEAR';
+        console.log("Verificando versão:", currentVersion);
+
+        // 1. Matar Service Workers antigos
+        if ('serviceWorker' in navigator) {
+          navigator.serviceWorker.getRegistrations().then(function(registrations) {
+            for(let registration of registrations) {
+              registration.unregister();
+              console.log('Service Worker antigo assassinado.');
+            }
+          });
         }
-      } catch(e) { console.error(e); }
+
+        // 2. Limpar Cache Storage do Navegador (Onde arquivos JS ficam presos)
+        if(window.caches) {
+           caches.keys().then(function(names) {
+             for (let name of names) {
+                 caches.delete(name);
+                 console.log("Cache deletado:", name);
+             }
+           });
+        }
+
+        // 3. Resetar Session Storage se a versão for diferente
+        try {
+          if (sessionStorage.getItem('app_version') !== currentVersion) {
+             sessionStorage.clear();
+             // NÃO limpamos o LocalStorage inteiro para não deslogar o Firebase
+             // Mas removemos chaves de cache de build se existissem
+             sessionStorage.setItem('app_version', currentVersion);
+             console.log('Sessão limpa para versão ' + currentVersion);
+          }
+        } catch(e) { console.error(e); }
+      })();
     </script>
 
     <script src="https://cdn.tailwindcss.com"></script>
