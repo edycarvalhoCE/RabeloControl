@@ -27,18 +27,22 @@
           }
         });
       }
-      // Limpeza de cache de sessão - VERSÃO ATUALIZADA V5
+      // Limpeza de cache de sessão - VERSÃO ATUALIZADA V6.0-FORCE
       try {
-        if (sessionStorage.getItem('app_version') !== 'v5.0') {
+        // Verifica se a versão mudou para forçar recarregamento
+        var currentVersion = 'v6.0-FORCE';
+        if (sessionStorage.getItem('app_version') !== currentVersion) {
            sessionStorage.clear();
+           localStorage.removeItem('firebase:host:rabelotour-190bd.firebaseio.com'); // Tenta limpar cache do firebase se existir
+           
            // Tenta limpar caches de dados se possível, mas mantém auth
            if(window.caches) {
              caches.keys().then(function(names) {
                for (let name of names) caches.delete(name);
              });
            }
-           sessionStorage.setItem('app_version', 'v5.0');
-           console.log('Cache limpo para versão V5.0');
+           sessionStorage.setItem('app_version', currentVersion);
+           console.log('Cache limpo para versão ' + currentVersion);
         }
       } catch(e) { console.error(e); }
     </script>
