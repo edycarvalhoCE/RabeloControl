@@ -396,26 +396,28 @@ const Dashboard: React.FC = () => {
                     </div>
                 </div>
 
-              <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 h-80">
-                  <h3 className="text-lg font-semibold text-slate-700 mb-4">Fluxo de Caixa Global</h3>
-                  <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-                          <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                          <XAxis dataKey="name" axisLine={false} tickLine={false} />
-                          <YAxis 
-                            axisLine={false} 
-                            tickLine={false} 
-                            tickFormatter={(val) => `R$ ${val.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}`} 
-                            width={80}
-                          />
-                          <Tooltip 
-                            contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                            cursor={{ fill: '#f3f4f6' }}
-                            formatter={(value: number) => [formatCurrency(value), 'Valor']}
-                          />
-                          <Bar dataKey="amount" fill="#3b82f6" radius={[4, 4, 0, 0]} barSize={60} />
-                      </BarChart>
-                  </ResponsiveContainer>
+              <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 h-80 flex flex-col">
+                  <h3 className="text-lg font-semibold text-slate-700 mb-4 flex-shrink-0">Fluxo de Caixa Global</h3>
+                  <div className="flex-1 w-full min-h-0">
+                      <ResponsiveContainer width="100%" height="100%">
+                          <BarChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                              <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                              <XAxis dataKey="name" axisLine={false} tickLine={false} />
+                              <YAxis 
+                                axisLine={false} 
+                                tickLine={false} 
+                                tickFormatter={(val) => `R$ ${val.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}`} 
+                                width={80}
+                              />
+                              <Tooltip 
+                                contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                                cursor={{ fill: '#f3f4f6' }}
+                                formatter={(value: number) => [formatCurrency(value), 'Valor']}
+                              />
+                              <Bar dataKey="amount" fill="#3b82f6" radius={[4, 4, 0, 0]} barSize={60} />
+                          </BarChart>
+                      </ResponsiveContainer>
+                  </div>
               </div>
           </div>
 
