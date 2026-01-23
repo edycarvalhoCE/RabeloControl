@@ -43,18 +43,6 @@ const DriverPortal: React.FC = () => {
       kmEnd: 0
   });
 
-  // Force Reload Function
-  const forceUpdate = () => {
-      if ('serviceWorker' in navigator) {
-          navigator.serviceWorker.getRegistrations().then(function(registrations) {
-              for(let registration of registrations) {
-                  registration.unregister();
-              }
-          });
-      }
-      window.location.reload();
-  };
-
   const scheduleFilter = (b: Booking) => {
       if (b.status === 'CANCELLED') return false;
       if (isAux) return true;
@@ -247,15 +235,6 @@ const DriverPortal: React.FC = () => {
   return (
     <div className="space-y-6 animate-fade-in max-w-6xl mx-auto pb-32 md:pb-0">
       
-      {/* BOTÃO DE EMERGÊNCIA PARA LIMPAR CACHE - VISÍVEL APENAS NO MOBILE */}
-      <button 
-        onClick={forceUpdate}
-        className="md:hidden w-full bg-red-600 text-white font-bold py-3 px-4 rounded-lg shadow-lg flex items-center justify-center gap-2 mb-4 animate-pulse"
-      >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
-          ↻ CLIQUE AQUI PARA ATUALIZAR O APP
-      </button>
-
       {/* HEADER: Hidden on Mobile */}
       <div className="hidden md:flex justify-between items-center bg-gradient-to-r from-blue-700 to-slate-800 rounded-2xl p-8 text-white shadow-xl relative overflow-hidden">
         <div className="z-10 relative">
