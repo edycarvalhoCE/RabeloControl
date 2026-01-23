@@ -23,6 +23,7 @@ const SettingsView: React.FC = () => {
   });
   const [uploading, setUploading] = useState(false);
   const [restoring, setRestoring] = useState(false);
+  const [generatingBackup, setGeneratingBackup] = useState(false); // New state
   const [successMsg, setSuccessMsg] = useState('');
 
   useEffect(() => {
@@ -70,51 +71,65 @@ const SettingsView: React.FC = () => {
       setTimeout(() => setSuccessMsg(''), 4000);
   };
 
-  const handleSystemBackup = () => {
+  const handleSystemBackup = async () => {
       if (!confirm("Deseja baixar um arquivo de backup com todos os dados atuais do sistema?")) return;
 
-      const backupData = {
-          exportDate: new Date().toISOString(),
-          version: "1.0",
-          data: {
-              settings,
-              users,
-              buses,
-              bookings,
-              parts,
-              transactions,
-              timeOffs,
-              documents,
-              maintenanceRecords,
-              purchaseRequests,
-              maintenanceReports,
-              charterContracts,
-              travelPackages,
-              packagePassengers,
-              packagePayments,
-              packageLeads,
-              clients,
-              fuelRecords,
-              fuelSupplies,
-              driverLiabilities,
-              driverFees,
-              quotes,
-              priceRoutes
-          }
-      };
+      setGeneratingBackup(true);
 
-      const jsonString = JSON.stringify(backupData, null, 2);
-      const blob = new Blob([jsonString], { type: "application/json" });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      
-      const dateStr = new Date().toISOString().split('T')[0];
-      link.href = url;
-      link.download = `backup_rabelotour_${dateStr}.json`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
+      try {
+          // Use safeguards (|| []) to ensure no undefined values break the JSON structure
+          const backupData = {
+              exportDate: new Date().toISOString(),
+              version: "1.0",
+              data: {
+                  settings: settings || {},
+                  users: users || [],
+                  buses: buses || [],
+                  bookings: bookings || [],
+                  parts: parts || [],
+                  transactions: transactions || [],
+                  timeOffs: timeOffs || [],
+                  documents: documents || [],
+                  maintenanceRecords: maintenanceRecords || [],
+                  purchaseRequests: purchaseRequests || [],
+                  maintenanceReports: maintenanceReports || [],
+                  charterContracts: charterContracts || [],
+                  travelPackages: travelPackages || [],
+                  packagePassengers: packagePassengers || [],
+                  packagePayments: packagePayments || [],
+                  packageLeads: packageLeads || [],
+                  clients: clients || [],
+                  fuelRecords: fuelRecords || [],
+                  fuelSupplies: fuelSupplies || [],
+                  driverLiabilities: driverLiabilities || [],
+                  driverFees: driverFees || [],
+                  quotes: quotes || [],
+                  priceRoutes: priceRoutes || []
+              }
+          };
+
+          const jsonString = JSON.stringify(backupData, null, 2);
+          const blob = new Blob([jsonString], { type: "application/json" });
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement("a");
+          
+          const dateStr = new Date().toISOString().split('T')[0];
+          link.href = url;
+          link.download = `backup_rabelotour_${dateStr}.json`;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          URL.revokeObjectURL(url);
+          
+          setSuccessMsg("Backup gerado e baixado com sucesso!");
+          setTimeout(() => setSuccessMsg(''), 3000);
+
+      } catch (error: any) {
+          console.error("Erro ao gerar backup:", error);
+          alert("Erro ao gerar arquivo de backup: " + (error.message || "Erro desconhecido"));
+      } finally {
+          setGeneratingBackup(false);
+      }
   };
 
   const handleRestoreBackup = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -284,10 +299,20 @@ const SettingsView: React.FC = () => {
                                 <button 
                                     type="button" 
                                     onClick={handleSystemBackup}
-                                    className="flex items-center justify-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2 px-4 rounded border border-slate-300 transition-colors text-sm flex-1"
+                                    disabled={generatingBackup}
+                                    className="flex items-center justify-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2 px-4 rounded border border-slate-300 transition-colors text-sm flex-1 disabled:opacity-50"
                                 >
-                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-                                    Baixar Backup (.JSON)
+                                    {generatingBackup ? (
+                                        <>
+                                            <svg className="animate-spin h-4 w-4 text-slate-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                                            Gerando...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                                            Baixar Backup (.JSON)
+                                        </>
+                                    )}
                                 </button>
 
                                 <label className={`flex items-center justify-center gap-2 bg-orange-100 hover:bg-orange-200 text-orange-800 font-bold py-2 px-4 rounded border border-orange-200 transition-colors text-sm flex-1 cursor-pointer ${restoring ? 'opacity-50 cursor-not-allowed' : ''}`}>
