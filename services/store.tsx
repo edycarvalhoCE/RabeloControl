@@ -111,6 +111,7 @@ interface StoreContextType {
 
   seedDatabase: () => Promise<void>;
   restoreDatabase: (jsonContent: any) => Promise<{ success: boolean; message: string }>;
+  resetSystemData: () => Promise<{ success: boolean; message: string }>;
 }
 
 const StoreContext = createContext<StoreContextType | undefined>(undefined);
@@ -843,11 +844,41 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       }
   };
 
+  // --- RESET SYSTEM DATA (DANGER ZONE) ---
+  const resetSystemData = async () => {
+      if (!isConfigured) return { success: false, message: "Não conectado ao Banco de Dados." };
+
+      const collectionsToClear = [
+          'buses', 'bookings', 'parts', 'transactions', 'timeOffs',
+          'documents', 'maintenanceRecords', 'purchaseRequests',
+          'maintenanceReports', 'charterContracts', 'travelPackages',
+          'packagePassengers', 'packagePayments', 'packageLeads',
+          'clients', 'fuelRecords', 'fuelSupplies', 'driverLiabilities',
+          'driverFees', 'quotes', 'priceRoutes'
+      ];
+
+      try {
+          for (const colName of collectionsToClear) {
+              const q = query(collection(db, colName));
+              const snapshot = await getDocs(q);
+              
+              if (!snapshot.empty) {
+                  const deletePromises = snapshot.docs.map(d => deleteDoc(d.ref));
+                  await Promise.all(deletePromises);
+              }
+          }
+          return { success: true, message: "Limpeza concluída! O sistema está zerado (exceto usuários e configurações)." };
+      } catch (e: any) {
+          console.error("Erro ao limpar dados:", e);
+          return { success: false, message: "Erro ao limpar: " + e.message };
+      }
+  };
+
   return (
     <StoreContext.Provider value={{
       currentUser: currentUser!, isAuthenticated, settings, users, buses, bookings, parts, transactions, timeOffs, documents, maintenanceRecords, purchaseRequests, maintenanceReports, charterContracts, travelPackages, packagePassengers, packagePayments, clients, packageLeads, fuelRecords, fuelSupplies, fuelStockLevel, driverLiabilities, quotes, priceRoutes, driverFees,
       switchUser, addUser, updateUser, deleteUser, addBooking, updateBooking, updateBookingStatus, addPart, updateStock, addTransaction, addTimeOff, updateTimeOffStatus, deleteTimeOff, addDocument, deleteDocument, addMaintenanceRecord, addPurchaseRequest, updatePurchaseRequestStatus, addMaintenanceReport, updateMaintenanceReportStatus, addBus, updateBusStatus, addCharterContract, addTravelPackage, registerPackageSale, updatePackagePassenger, deletePackagePassenger, addPackagePayment, addPackageLead, updatePackageLead, deletePackageLead, addFuelRecord, updateFuelRecord, deleteFuelRecord, addFuelSupply, addDriverLiability, payDriverLiability,
-      login, logout, register, updateSettings, seedDatabase, restoreDatabase,
+      login, logout, register, updateSettings, seedDatabase, restoreDatabase, resetSystemData,
       addQuote, updateQuote, convertQuoteToBooking, deleteQuote,
       addPriceRoute, updatePriceRoute, deletePriceRoute, importDefaultPrices, clearPriceTable,
       addDriverFee, payDriverFee, deleteDriverFee, restockPart,

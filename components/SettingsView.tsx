@@ -5,7 +5,7 @@ import { UserRole } from '../types';
 
 const SettingsView: React.FC = () => {
   const { 
-      settings, updateSettings, currentUser, restoreDatabase,
+      settings, updateSettings, currentUser, restoreDatabase, resetSystemData,
       // Destructure all data collections for Backup
       users, buses, bookings, parts, transactions, timeOffs, documents, 
       maintenanceRecords, purchaseRequests, maintenanceReports, charterContracts, 
@@ -23,7 +23,8 @@ const SettingsView: React.FC = () => {
   });
   const [uploading, setUploading] = useState(false);
   const [restoring, setRestoring] = useState(false);
-  const [generatingBackup, setGeneratingBackup] = useState(false); // New state
+  const [generatingBackup, setGeneratingBackup] = useState(false);
+  const [wipingData, setWipingData] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
 
   useEffect(() => {
@@ -168,8 +169,27 @@ const SettingsView: React.FC = () => {
       reader.readAsText(file);
   };
 
+  const handleWipeData = async () => {
+      const confirm1 = confirm("⚠️ PERIGO: Você está prestes a APAGAR TODOS OS DADOS do sistema (Viagens, Financeiro, Clientes, etc.).\n\nSomente USUÁRIOS e CONFIGURAÇÕES serão mantidos.\n\nDeseja continuar?");
+      if (!confirm1) return;
+
+      const confirm2 = confirm("Tem certeza absoluta? Essa ação é irreversível e prepara o sistema para um novo uso.");
+      if (!confirm2) return;
+
+      setWipingData(true);
+      const result = await resetSystemData();
+      setWipingData(false);
+
+      if (result.success) {
+          alert(result.message);
+          window.location.reload();
+      } else {
+          alert("Erro ao limpar dados: " + result.message);
+      }
+  };
+
   return (
-    <div className="max-w-4xl mx-auto animate-fade-in">
+    <div className="max-w-4xl mx-auto animate-fade-in pb-10">
         <h2 className="text-2xl font-bold text-slate-800 mb-6">Configurações do Sistema</h2>
 
         {successMsg && (
@@ -181,7 +201,7 @@ const SettingsView: React.FC = () => {
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {/* LOGO UPLOAD SECTION */}
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 h-fit">
                 <h3 className="font-bold text-slate-700 mb-4">Logotipo da Empresa</h3>
                 
                 <div className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-slate-300 rounded-lg bg-slate-50 mb-4">
@@ -302,7 +322,26 @@ const SettingsView: React.FC = () => {
                     </div>
                 </div>
 
-                <div className="flex justify-end">
+                {/* DANGER ZONE */}
+                <div className="bg-red-50 p-6 rounded-xl shadow-sm border border-red-200">
+                    <h3 className="font-bold text-red-800 mb-2 flex items-center gap-2">
+                        <span>⚠️</span> Zona de Perigo
+                    </h3>
+                    <p className="text-sm text-red-700 mb-4">
+                        Esta ação irá apagar <strong>TODOS OS REGISTROS</strong> do sistema (Viagens, Clientes, Financeiro, Peças, etc.). <br/>
+                        Apenas os <strong>USUÁRIOS</strong> (login) e as <strong>CONFIGURAÇÕES</strong> serão mantidos. Use para limpar o sistema para demonstrações.
+                    </p>
+                    <button 
+                        type="button" 
+                        onClick={handleWipeData}
+                        disabled={wipingData}
+                        className="bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-6 rounded shadow-sm transition-colors w-full flex items-center justify-center gap-2"
+                    >
+                        {wipingData ? 'Limpando Sistema...' : '🗑️ Zerar Sistema (Preservar Usuários)'}
+                    </button>
+                </div>
+
+                <div className="flex justify-end pt-4">
                     <button 
                         onClick={handleSave}
                         disabled={uploading}
