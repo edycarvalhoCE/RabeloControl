@@ -413,7 +413,7 @@ const DriverPortal: React.FC = () => {
                                                         onClick={(e) => handleConfirmClick(e, booking)}
                                                         className="text-xs bg-white border border-green-500 text-green-600 hover:bg-green-50 px-3 py-1.5 rounded-full font-bold shadow-sm transition-colors"
                                                     >
-                                                        Confirmar Presença
+                                                        Confirmar Escala
                                                     </button>
                                                 )}
                                             </div>
@@ -965,7 +965,7 @@ const DriverPortal: React.FC = () => {
                                     onClick={(e) => { handleConfirmClick(e, selectedBooking); setSelectedBooking(null); }}
                                     className="flex-1 bg-green-600 text-white py-3 rounded-lg font-bold hover:bg-green-700"
                                 >
-                                    Confirmar Viagem
+                                    Confirmar Escala
                                 </button>
                             )}
                             <button 
