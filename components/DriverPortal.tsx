@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useStore } from '../services/store';
 import CalendarView from './CalendarView';
@@ -8,27 +7,34 @@ import { Logo } from './Logo';
 const DriverPortal: React.FC = () => {
   const { currentUser, bookings, timeOffs, addTimeOff, documents, buses, addMaintenanceReport, maintenanceReports, addFuelRecord, driverLiabilities, charterContracts, driverFees, fuelRecords, users } = useStore();
   
+  // Check if Garage Aux
   const isAux = currentUser.role === UserRole.GARAGE_AUX;
 
+  // Request State
   const [requestType, setRequestType] = useState<'FOLGA' | 'FERIAS'>('FOLGA');
   const [requestDate, setRequestDate] = useState('');
   const [requestEndDate, setRequestEndDate] = useState('');
 
   const [activeTab, setActiveTab] = useState<'schedule' | 'documents' | 'requests' | 'report' | 'fuel' | 'finance'>('schedule');
-  const [showMoreMenu, setShowMoreMenu] = useState(false);
 
+  // Fee Filter State (New)
   const [feeStartDate, setFeeStartDate] = useState('');
   const [feeEndDate, setFeeEndDate] = useState('');
+
+  // Trip Details Modal State
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
 
+  // Helper to get local date string YYYY-MM-DD
   const getTodayLocal = () => {
     const d = new Date();
     d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
     return d.toISOString().split('T')[0];
   };
 
+  // Maintenance Report State
   const [reportForm, setReportForm] = useState({ busId: '', type: 'MECANICA', description: '', date: getTodayLocal() });
 
+  // Fuel Form State
   const [fuelForm, setFuelForm] = useState({
       date: getTodayLocal(),
       busId: '',
@@ -36,16 +42,21 @@ const DriverPortal: React.FC = () => {
       hasArla: false,
       arlaLiters: 0,
       location: 'STREET' as 'GARAGE' | 'STREET',
-      cost: 0,
+      cost: 0, // This is Diesel Cost or Total if Arla not separated
       arlaCost: 0,
       stationName: '',
       kmStart: 0,
       kmEnd: 0
   });
 
+  // --- LOGIC TO MERGE BOOKINGS AND CHARTER SCHEDULE ---
+  
+  // 1. Regular Bookings
+  // IF AUX: Show ALL active bookings
+  // IF DRIVER: Show ONLY my bookings
   const scheduleFilter = (b: Booking) => {
       if (b.status === 'CANCELLED') return false;
-      if (isAux) return true;
+      if (isAux) return true; // Garage sees all
       return b.driverId === currentUser.id;
   };
 
@@ -53,8 +64,10 @@ const DriverPortal: React.FC = () => {
     .filter(scheduleFilter)
     .map(b => ({ ...b, isCharter: false, sortTime: new Date(b.startTime).getTime() }));
 
+  // 2. Generate Charter Occurrences for next 15 days
   const myCharterOccurrences: any[] = [];
   
+  // Same logic for Charters
   const myContracts = charterContracts.filter(c => {
       if (c.status !== 'ACTIVE') return false;
       if (isAux) return true;
@@ -65,17 +78,20 @@ const DriverPortal: React.FC = () => {
       const today = new Date();
       today.setHours(0,0,0,0);
 
+      // Look ahead 15 days
       for (let i = 0; i < 15; i++) {
           const d = new Date(today);
           d.setDate(today.getDate() + i);
           const dStr = d.toISOString().split('T')[0];
-          const dayOfWeek = d.getDay();
+          const dayOfWeek = d.getDay(); // 0=Sun, 1=Mon...
 
           myContracts.forEach(c => {
+              // Check range and weekday
               if (dStr >= c.startDate && dStr <= c.endDate && c.weekDays.includes(dayOfWeek)) {
+                  // Create a fake booking object for display
                   myCharterOccurrences.push({
-                      id: `${c.id}_${dStr}`,
-                      destination: `${c.clientName} (Fretamento)`,
+                      id: `${c.id}_${dStr}`, // Unique temp ID
+                      destination: `${c.clientName} (Fretamento)`, // Display Route/Client
                       clientName: c.clientName,
                       startTime: `${dStr}T${c.morningDeparture}`,
                       endTime: `${dStr}T${c.afternoonDeparture}`,
@@ -91,6 +107,7 @@ const DriverPortal: React.FC = () => {
       }
   }
 
+  // 3. Merge and Sort
   const combinedSchedule = [...myRegularBookings, ...myCharterOccurrences].sort((a, b) => a.sortTime - b.sortTime);
 
   const myTimeOffs = timeOffs.filter(t => t.driverId === currentUser.id);
@@ -98,6 +115,7 @@ const DriverPortal: React.FC = () => {
   const myReports = maintenanceReports.filter(r => r.driverId === currentUser.id).sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   const myLiabilities = driverLiabilities.filter(l => l.driverId === currentUser.id).sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   
+  // FEES FILTERING LOGIC
   const myFees = driverFees.filter(f => f.driverId === currentUser.id);
   const filteredFees = myFees.filter(f => {
       if (feeStartDate && f.date < feeStartDate) return false;
@@ -105,6 +123,7 @@ const DriverPortal: React.FC = () => {
       return true;
   }).sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
+  // Calculate totals based on filtered fees
   const totalPendingInPeriod = filteredFees.filter(f => f.status === 'PENDING').reduce((acc, f) => acc + f.amount, 0);
 
   const handleRequest = (e: React.FormEvent) => {
@@ -134,13 +153,16 @@ const DriverPortal: React.FC = () => {
       }
   };
 
+  // Lógica para preencher KM Inicial automaticamente
   const handleBusChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
       const selectedBusId = e.target.value;
       let lastKm = 0;
 
       if (selectedBusId) {
+          // Filtra registros deste ônibus
           const busRecords = fuelRecords.filter(r => r.busId === selectedBusId);
           if (busRecords.length > 0) {
+              // Ordena pelo maior KM Final registrado
               busRecords.sort((a, b) => (b.kmEnd || 0) - (a.kmEnd || 0));
               lastKm = busRecords[0].kmEnd || 0;
           }
@@ -149,40 +171,48 @@ const DriverPortal: React.FC = () => {
       setFuelForm(prev => ({
           ...prev,
           busId: selectedBusId,
-          kmStart: lastKm,
-          kmEnd: 0
+          kmStart: lastKm, // Preenche automaticamente
+          kmEnd: 0 // Reseta o final para evitar confusão
       }));
   };
 
   const handleFuelSubmit = (e: React.FormEvent) => {
       e.preventDefault();
       
+      // Basic Validation
       if (!fuelForm.busId || fuelForm.dieselLiters <= 0) {
           alert('Por favor, selecione o ônibus e informe a quantidade de Diesel.');
           return;
       }
 
+      // Arla Mandatory Validation
       if (fuelForm.hasArla && (fuelForm.arlaLiters <= 0 || isNaN(fuelForm.arlaLiters))) {
           alert('⚠️ Atenção: Você marcou que abasteceu Arla.\nÉ obrigatório informar a quantidade de litros de Arla.');
           return;
       }
 
+      // KM VALIDATION
       if (fuelForm.kmEnd <= fuelForm.kmStart) {
           alert("⚠️ Erro de Quilometragem: O KM Final deve ser MAIOR que o KM Inicial.");
           return;
       }
 
+      // Calculate Average (Distance / Liters)
       const distance = fuelForm.kmEnd - fuelForm.kmStart;
       const average = distance / fuelForm.dieselLiters;
+      
+      // Calculate Total Cost
+      // If STREET + Arla, we sum both for the main financial record
       const totalCost = fuelForm.location === 'STREET' ? (fuelForm.cost + (fuelForm.hasArla ? fuelForm.arlaCost : 0)) : 0;
 
       addFuelRecord({
           ...fuelForm,
-          arlaLiters: fuelForm.hasArla ? fuelForm.arlaLiters : 0,
+          arlaLiters: fuelForm.hasArla ? fuelForm.arlaLiters : 0, // Ensure clean data
           cost: totalCost,
           arlaCost: fuelForm.hasArla && fuelForm.location === 'STREET' ? fuelForm.arlaCost : 0,
           stationName: fuelForm.location === 'STREET' ? fuelForm.stationName : '',
           loggedBy: currentUser.id,
+          // New Fields
           kmStart: fuelForm.kmStart,
           kmEnd: fuelForm.kmEnd,
           averageConsumption: average
@@ -208,12 +238,14 @@ const DriverPortal: React.FC = () => {
       setSelectedBooking(booking);
   };
 
+  // HELPER: Format date string YYYY-MM-DD to DD/MM/YYYY manually to avoid timezone bugs
   const formatDateString = (dateStr: string) => {
       if(!dateStr) return '';
       const [year, month, day] = dateStr.split('-');
       return `${day}/${month}/${year}`;
   };
 
+  // Helper for DateTime display
   const formatDateTime = (isoString: string) => {
       if (!isoString) return 'N/A';
       try {
@@ -233,10 +265,8 @@ const DriverPortal: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6 animate-fade-in max-w-6xl mx-auto pb-32 md:pb-0">
-      
-      {/* HEADER: Hidden on Mobile */}
-      <div className="hidden md:flex justify-between items-center bg-gradient-to-r from-blue-700 to-slate-800 rounded-2xl p-8 text-white shadow-xl relative overflow-hidden">
+    <div className="space-y-6 animate-fade-in max-w-6xl mx-auto">
+      <div className="flex justify-between items-center bg-gradient-to-r from-blue-700 to-slate-800 rounded-2xl p-8 text-white shadow-xl relative overflow-hidden">
         <div className="z-10 relative">
           <h1 className="text-3xl font-bold mb-2">Portal {isAux ? 'da Garagem' : 'do Motorista'}</h1>
           <p className="opacity-80">Bem-vindo, {currentUser.name}. {isAux ? 'Acompanhe a escala da frota.' : 'Gerencie sua escala e documentos.'}</p>
@@ -244,66 +274,104 @@ const DriverPortal: React.FC = () => {
         <div className="hidden md:block bg-white/10 p-2 rounded-lg z-10 relative backdrop-blur-sm">
              <Logo variant="light" size="sm" showGlobe={false} />
         </div>
+        {/* Abstract shapes */}
+        <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-5 rounded-full -mr-16 -mt-16"></div>
+        <div className="absolute bottom-0 left-0 w-32 h-32 bg-blue-500 opacity-20 rounded-full -ml-8 -mb-8"></div>
       </div>
 
-      {/* DESKTOP TABS (Hidden on Mobile) */}
-      <div className="hidden md:flex border-b border-slate-300 space-x-4 overflow-x-auto">
-        <button onClick={() => setActiveTab('schedule')} className={`pb-2 px-1 font-medium text-sm transition-colors whitespace-nowrap ${activeTab === 'schedule' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}>📅 {isAux ? 'Escala Geral' : 'Minha Escala'}</button>
-        {!isAux && <button onClick={() => setActiveTab('fuel')} className={`pb-2 px-1 font-medium text-sm transition-colors whitespace-nowrap ${activeTab === 'fuel' ? 'border-b-2 border-green-600 text-green-600' : 'text-slate-500 hover:text-slate-700'}`}>⛽ Abastecer</button>}
-        {!isAux && <button onClick={() => setActiveTab('finance')} className={`pb-2 px-1 font-medium text-sm transition-colors whitespace-nowrap ${activeTab === 'finance' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}>💰 Diárias e Descontos</button>}
-        <button onClick={() => setActiveTab('documents')} className={`pb-2 px-1 font-medium text-sm transition-colors whitespace-nowrap ${activeTab === 'documents' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}>📂 Documentos</button>
-        <button onClick={() => setActiveTab('requests')} className={`pb-2 px-1 font-medium text-sm transition-colors whitespace-nowrap ${activeTab === 'requests' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}>📝 Folgas</button>
-        <button onClick={() => setActiveTab('report')} className={`pb-2 px-1 font-medium text-sm transition-colors whitespace-nowrap ${activeTab === 'report' ? 'border-b-2 border-red-600 text-red-600' : 'text-slate-500 hover:text-slate-700'}`}>⚠️ Reportar Defeito</button>
+      {/* Tabs */}
+      <div className="flex border-b border-slate-300 space-x-4 overflow-x-auto">
+        <button 
+            onClick={() => setActiveTab('schedule')}
+            className={`pb-2 px-1 font-medium text-sm transition-colors whitespace-nowrap ${activeTab === 'schedule' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}
+        >
+            📅 {isAux ? 'Escala Geral' : 'Minha Escala'}
+        </button>
+        
+        {/* HIDE FUEL FOR AUX */}
+        {!isAux && (
+            <button 
+                onClick={() => setActiveTab('fuel')}
+                className={`pb-2 px-1 font-medium text-sm transition-colors whitespace-nowrap ${activeTab === 'fuel' ? 'border-b-2 border-green-600 text-green-600' : 'text-slate-500 hover:text-slate-700'}`}
+            >
+                ⛽ Abastecer
+            </button>
+        )}
+
+        {/* HIDE FINANCE FOR AUX */}
+        {!isAux && (
+            <button 
+                onClick={() => setActiveTab('finance')}
+                className={`pb-2 px-1 font-medium text-sm transition-colors whitespace-nowrap ${activeTab === 'finance' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}
+            >
+                💰 Diárias e Descontos
+            </button>
+        )}
+
+        <button 
+            onClick={() => setActiveTab('documents')}
+            className={`pb-2 px-1 font-medium text-sm transition-colors whitespace-nowrap ${activeTab === 'documents' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}
+        >
+            📂 Meus Documentos
+        </button>
+        <button 
+            onClick={() => setActiveTab('requests')}
+            className={`pb-2 px-1 font-medium text-sm transition-colors whitespace-nowrap ${activeTab === 'requests' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}
+        >
+            📝 Folgas e Férias
+        </button>
+        <button 
+            onClick={() => setActiveTab('report')}
+            className={`pb-2 px-1 font-medium text-sm transition-colors whitespace-nowrap ${activeTab === 'report' ? 'border-b-2 border-red-600 text-red-600' : 'text-slate-500 hover:text-slate-700'}`}
+        >
+            ⚠️ Reportar Defeito
+        </button>
       </div>
 
-      <div className="mt-4">
+      <div className="mt-6">
         {/* SCHEDULE TAB */}
         {activeTab === 'schedule' && (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <div className="lg:col-span-2">
-                     {/* Calendar View - Explicitly visible on mobile with z-index checks */}
-                     <div className="block w-full mb-4 relative z-0">
-                        <CalendarView onEventClick={handleBookingClick} />
-                     </div>
+                     <CalendarView onEventClick={handleBookingClick} />
                 </div>
                 <div className="space-y-4">
-                    <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2 px-2 md:px-0">
+                    <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
                         <span className="bg-blue-100 text-blue-600 p-2 rounded-lg text-sm">🚌</span>
-                        {isAux ? 'Escala Geral' : 'Minha Escala'}
+                        {isAux ? 'Escala Geral de Viagens' : 'Próximas Viagens'}
                     </h2>
-                    <div className="space-y-3 max-h-[75vh] md:max-h-[600px] overflow-y-auto px-2 md:px-0 pb-20 md:pb-0">
+                    <div className="space-y-3 max-h-[600px] overflow-y-auto pr-1">
                         {combinedSchedule.length === 0 ? (
-                            <p className="text-slate-500 italic text-center mt-10">Nenhuma viagem agendada para os próximos 15 dias.</p>
+                            <p className="text-slate-500 italic">Nenhuma viagem agendada para os próximos 15 dias.</p>
                         ) : (
-                            combinedSchedule.slice(0, 15).map((booking: any) => {
+                            combinedSchedule.slice(0, 10).map((booking: any) => {
+                                // For aux view, get bus details clearly
                                 const bus = buses.find(b => b.id === booking.busId);
+                                
                                 return (
                                     <div 
                                         key={booking.id} 
                                         onClick={() => handleBookingClick(booking)}
-                                        className={`p-4 rounded-xl shadow-sm border cursor-pointer active:scale-95 transition-all relative overflow-hidden ${
+                                        className={`p-4 rounded-xl shadow-sm border cursor-pointer hover:shadow-md transition-shadow relative overflow-hidden ${
                                             booking.isCharter 
                                             ? 'bg-orange-50 border-orange-200 border-l-4 border-l-orange-500' 
-                                            : 'bg-white border-slate-200 border-l-4 border-l-blue-600'
+                                            : 'bg-white border-slate-200 border-l-4 border-l-blue-500'
                                         }`}
                                     >
                                         <div className="flex justify-between items-start mb-2">
-                                            <h3 className="font-bold text-base text-slate-900">{booking.destination}</h3>
-                                            <span className={`text-[10px] font-bold px-2 py-1 rounded ${booking.isCharter ? 'bg-orange-200 text-orange-900' : 'bg-blue-100 text-blue-800'}`}>
+                                            <h3 className="font-bold text-base text-slate-800">{booking.destination}</h3>
+                                            <span className={`text-[10px] font-bold px-2 py-1 rounded ${booking.isCharter ? 'bg-orange-200 text-orange-800' : 'bg-blue-100 text-blue-600'}`}>
                                                 {booking.isCharter ? 'FRETAMENTO' : 'LOCAÇÃO'}
                                             </span>
                                         </div>
-                                        <div className="text-sm text-slate-700 space-y-1">
+                                        <div className="text-xs text-slate-600 space-y-1">
                                             {isAux && (
-                                                <p className="font-bold text-slate-800 bg-slate-200 p-1 rounded inline-block mb-1 text-xs">
-                                                    {bus?.plate} - {bus?.model}
+                                                <p className="font-bold text-slate-700 bg-slate-100 p-1 rounded inline-block mb-1">
+                                                    VEÍCULO: {bus?.plate} - {bus?.model}
                                                 </p>
                                             )}
-                                            <p className="font-semibold flex items-center gap-2">
-                                                <span>📅 {new Date(booking.startTime).toLocaleDateString()}</span>
-                                                <span>⏰ {new Date(booking.startTime).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span>
-                                            </p>
-                                            {!booking.isCharter && <p className="text-xs text-slate-500">Retorno: {new Date(booking.endTime).toLocaleDateString()}</p>}
+                                            <p className="font-semibold">📅 {new Date(booking.startTime).toLocaleDateString()} • {new Date(booking.startTime).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</p>
+                                            {!booking.isCharter && <p>🏁 Retorno: {new Date(booking.endTime).toLocaleDateString()}</p>}
                                         </div>
                                     </div>
                                 );
@@ -314,7 +382,7 @@ const DriverPortal: React.FC = () => {
             </div>
         )}
 
-        {/* FUEL TAB */}
+        {/* FUEL TAB (HIDDEN FOR AUX) */}
         {activeTab === 'fuel' && !isAux && (
             <div className="max-w-2xl mx-auto bg-white p-6 rounded-xl shadow-sm border border-slate-200">
                 <h2 className="text-xl font-bold text-slate-800 mb-6 flex items-center gap-2">
@@ -346,7 +414,7 @@ const DriverPortal: React.FC = () => {
                             <label className="block text-sm font-medium text-slate-700 mb-1">Veículo</label>
                             <select 
                                 required value={fuelForm.busId}
-                                onChange={handleBusChange} 
+                                onChange={handleBusChange} // Lógica para auto-preencher KM
                                 className="w-full border p-3 rounded-lg focus:ring-2 focus:ring-green-500 outline-none bg-slate-50"
                             >
                                 <option value="">Selecione o ônibus...</option>
@@ -365,7 +433,7 @@ const DriverPortal: React.FC = () => {
                         </div>
                     </div>
 
-                    {/* KM CONTROL FIELDS */}
+                    {/* KM CONTROL FIELDS (CRITICAL) */}
                     <div className="grid grid-cols-2 gap-3 p-3 bg-slate-100 rounded-lg border border-slate-200">
                         <div>
                             <label className="block text-xs font-bold text-slate-700 mb-1">KM Inicial</label>
@@ -419,6 +487,7 @@ const DriverPortal: React.FC = () => {
                                 />
                             </div>
 
+                            {/* Arla Cost Input */}
                             {fuelForm.hasArla && (
                                 <div>
                                     <label className="block text-xs font-bold text-blue-800 mb-1">
@@ -442,6 +511,7 @@ const DriverPortal: React.FC = () => {
                         </div>
                     )}
 
+                    {/* Arla Switch Component */}
                     <div className="bg-blue-50 p-4 rounded-xl border border-blue-100 transition-all">
                         <label className="flex items-center justify-between cursor-pointer select-none">
                             <span className="font-bold text-blue-800 text-sm">Abasteceu Arla 32?</span>
@@ -480,15 +550,17 @@ const DriverPortal: React.FC = () => {
             </div>
         )}
 
-        {/* FINANCE / LIABILITIES TAB */}
+        {/* FINANCE / LIABILITIES TAB (HIDDEN FOR AUX) */}
         {activeTab === 'finance' && !isAux && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* DIARIAS SECTION */}
                 <div>
                     <h3 className="text-xl font-bold text-slate-800 mb-4 flex items-center gap-2">
                         <span className="bg-blue-100 text-blue-700 p-1.5 rounded text-sm">💰</span>
                         Diárias a Receber
                     </h3>
                     
+                    {/* Date Filter Inputs */}
                     <div className="flex gap-2 mb-4 bg-slate-50 p-3 rounded-lg border border-slate-200">
                         <div className="flex-1">
                             <label className="text-[10px] uppercase font-bold text-slate-500">De</label>
@@ -522,7 +594,8 @@ const DriverPortal: React.FC = () => {
                         <div className="p-4 bg-blue-50 border-b border-blue-100 flex justify-between items-center">
                             <span className="text-sm font-bold text-blue-900">Total Pendente</span>
                             <span className="text-lg font-bold text-blue-700">
-                                R$ {totalPendingInPeriod.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</p>
+                                R$ {totalPendingInPeriod.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
+                            </span>
                         </div>
                         <div className="divide-y divide-slate-100 max-h-96 overflow-y-auto">
                             {filteredFees.length === 0 ? (
@@ -550,6 +623,7 @@ const DriverPortal: React.FC = () => {
                     </div>
                 </div>
 
+                {/* LIABILITIES SECTION */}
                 <div>
                     <h3 className="text-xl font-bold text-slate-800 mb-4 flex items-center gap-2">
                         <span className="bg-red-100 text-red-700 p-1.5 rounded text-sm">📉</span>
@@ -616,7 +690,7 @@ const DriverPortal: React.FC = () => {
             <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
                 <h3 className="font-bold text-lg text-slate-800 mb-4">Meus Documentos</h3>
                 {myDocuments.length === 0 ? (
-                    <p className="text-slate-500 text-sm text-center py-10">Nenhum documento arquivado.</p>
+                    <p className="text-slate-500 text-sm">Nenhum documento arquivado.</p>
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {myDocuments.map(doc => (
@@ -686,7 +760,7 @@ const DriverPortal: React.FC = () => {
                     <h3 className="font-bold text-lg text-slate-800 mb-4">Minhas Solicitações</h3>
                     <div className="space-y-3">
                         {myTimeOffs.length === 0 ? (
-                            <p className="text-slate-500 text-sm text-center py-4">Nenhuma solicitação.</p>
+                            <p className="text-slate-500 text-sm">Nenhuma solicitação.</p>
                         ) : (
                             myTimeOffs.map(req => (
                                 <div key={req.id} className="border p-3 rounded-lg flex justify-between items-center">
@@ -753,7 +827,7 @@ const DriverPortal: React.FC = () => {
                     <h3 className="font-bold text-lg text-slate-800 mb-4">Meus Reportes</h3>
                     <div className="space-y-3">
                         {myReports.length === 0 ? (
-                            <p className="text-slate-500 text-sm text-center py-4">Nenhum reporte recente.</p>
+                            <p className="text-slate-500 text-sm">Nenhum reporte recente.</p>
                         ) : (
                             myReports.map(rep => {
                                 const bus = buses.find(b => b.id === rep.busId);
@@ -775,78 +849,6 @@ const DriverPortal: React.FC = () => {
         )}
 
       </div>
-
-      {/* MOBILE BOTTOM NAVIGATION - FORCED TO BE VISIBLE AND FIXED - Z-INDEX 9999 */}
-      <div className="md:hidden !fixed !bottom-0 !left-0 !right-0 bg-white border-t border-slate-200 z-[9999] pb-safe h-16 shadow-[0_-2px_10px_rgba(0,0,0,0.1)] flex justify-around items-center">
-          <button 
-              onClick={() => { setActiveTab('schedule'); setShowMoreMenu(false); }}
-              className={`flex flex-col items-center justify-center w-full h-full space-y-1 ${activeTab === 'schedule' ? 'text-blue-600' : 'text-slate-400'}`}
-          >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-              <span className="text-[10px] font-bold">Escala</span>
-          </button>
-          
-          {!isAux && (
-              <button 
-                  onClick={() => { setActiveTab('fuel'); setShowMoreMenu(false); }}
-                  className={`flex flex-col items-center justify-center w-full h-full space-y-1 ${activeTab === 'fuel' ? 'text-green-600' : 'text-slate-400'}`}
-              >
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" /></svg>
-                  <span className="text-[10px] font-bold">Abastecer</span>
-              </button>
-          )}
-
-          <button 
-              onClick={() => { setActiveTab('report'); setShowMoreMenu(false); }}
-              className={`flex flex-col items-center justify-center w-full h-full space-y-1 ${activeTab === 'report' ? 'text-red-600' : 'text-slate-400'}`}
-          >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
-              <span className="text-[10px] font-bold">Defeito</span>
-          </button>
-
-          <button 
-              onClick={() => setShowMoreMenu(!showMoreMenu)}
-              className={`flex flex-col items-center justify-center w-full h-full space-y-1 ${showMoreMenu ? 'text-slate-800' : 'text-slate-400'}`}
-          >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16m-7 6h7" /></svg>
-              <span className="text-[10px] font-bold">Mais</span>
-          </button>
-      </div>
-
-      {/* MOBILE MORE MENU (DRAWER) */}
-      {showMoreMenu && (
-          <div className="md:hidden fixed inset-0 z-[9998] bg-black/50" onClick={() => setShowMoreMenu(false)}>
-              <div className="absolute bottom-16 left-0 right-0 bg-white rounded-t-xl overflow-hidden p-4 space-y-2 animate-slide-up shadow-2xl" onClick={e => e.stopPropagation()}>
-                  <button 
-                      onClick={() => { setActiveTab('documents'); setShowMoreMenu(false); }}
-                      className="w-full text-left p-3 rounded-lg hover:bg-slate-50 flex items-center gap-3 text-slate-700 font-medium"
-                  >
-                      <span className="bg-blue-100 p-2 rounded text-blue-600">📂</span> Meus Documentos
-                  </button>
-                  <button 
-                      onClick={() => { setActiveTab('requests'); setShowMoreMenu(false); }}
-                      className="w-full text-left p-3 rounded-lg hover:bg-slate-50 flex items-center gap-3 text-slate-700 font-medium"
-                  >
-                      <span className="bg-purple-100 p-2 rounded text-purple-600">📝</span> Folgas e Férias
-                  </button>
-                  {!isAux && (
-                      <button 
-                          onClick={() => { setActiveTab('finance'); setShowMoreMenu(false); }}
-                          className="w-full text-left p-3 rounded-lg hover:bg-slate-50 flex items-center gap-3 text-slate-700 font-medium"
-                      >
-                          <span className="bg-green-100 p-2 rounded text-green-600">💰</span> Diárias e Finanças
-                      </button>
-                  )}
-                  <div className="border-t border-slate-100 my-2"></div>
-                  <button 
-                      onClick={() => setShowMoreMenu(false)}
-                      className="w-full text-center p-3 text-slate-500 font-bold"
-                  >
-                      Fechar
-                  </button>
-              </div>
-          </div>
-      )}
 
       {/* TRIP DETAILS MODAL - For Cards Click */}
       {selectedBooking && (

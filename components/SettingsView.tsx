@@ -5,7 +5,7 @@ import { UserRole } from '../types';
 
 const SettingsView: React.FC = () => {
   const { 
-      settings, updateSettings, currentUser, restoreDatabase, resetSystemData,
+      settings, updateSettings, currentUser, restoreDatabase,
       // Destructure all data collections for Backup
       users, buses, bookings, parts, transactions, timeOffs, documents, 
       maintenanceRecords, purchaseRequests, maintenanceReports, charterContracts, 
@@ -23,8 +23,6 @@ const SettingsView: React.FC = () => {
   });
   const [uploading, setUploading] = useState(false);
   const [restoring, setRestoring] = useState(false);
-  const [generatingBackup, setGeneratingBackup] = useState(false);
-  const [wipingData, setWipingData] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
 
   useEffect(() => {
@@ -72,65 +70,51 @@ const SettingsView: React.FC = () => {
       setTimeout(() => setSuccessMsg(''), 4000);
   };
 
-  const handleSystemBackup = async () => {
+  const handleSystemBackup = () => {
       if (!confirm("Deseja baixar um arquivo de backup com todos os dados atuais do sistema?")) return;
 
-      setGeneratingBackup(true);
+      const backupData = {
+          exportDate: new Date().toISOString(),
+          version: "1.0",
+          data: {
+              settings,
+              users,
+              buses,
+              bookings,
+              parts,
+              transactions,
+              timeOffs,
+              documents,
+              maintenanceRecords,
+              purchaseRequests,
+              maintenanceReports,
+              charterContracts,
+              travelPackages,
+              packagePassengers,
+              packagePayments,
+              packageLeads,
+              clients,
+              fuelRecords,
+              fuelSupplies,
+              driverLiabilities,
+              driverFees,
+              quotes,
+              priceRoutes
+          }
+      };
 
-      try {
-          // Use safeguards (|| []) to ensure no undefined values break the JSON structure
-          const backupData = {
-              exportDate: new Date().toISOString(),
-              version: "1.0",
-              data: {
-                  settings: settings || {},
-                  users: users || [],
-                  buses: buses || [],
-                  bookings: bookings || [],
-                  parts: parts || [],
-                  transactions: transactions || [],
-                  timeOffs: timeOffs || [],
-                  documents: documents || [],
-                  maintenanceRecords: maintenanceRecords || [],
-                  purchaseRequests: purchaseRequests || [],
-                  maintenanceReports: maintenanceReports || [],
-                  charterContracts: charterContracts || [],
-                  travelPackages: travelPackages || [],
-                  packagePassengers: packagePassengers || [],
-                  packagePayments: packagePayments || [],
-                  packageLeads: packageLeads || [],
-                  clients: clients || [],
-                  fuelRecords: fuelRecords || [],
-                  fuelSupplies: fuelSupplies || [],
-                  driverLiabilities: driverLiabilities || [],
-                  driverFees: driverFees || [],
-                  quotes: quotes || [],
-                  priceRoutes: priceRoutes || []
-              }
-          };
-
-          const jsonString = JSON.stringify(backupData, null, 2);
-          const blob = new Blob([jsonString], { type: "application/json" });
-          const url = URL.createObjectURL(blob);
-          const link = document.createElement("a");
-          
-          const dateStr = new Date().toISOString().split('T')[0];
-          link.href = url;
-          link.download = `backup_rabelotour_${dateStr}.json`;
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
-          URL.revokeObjectURL(url);
-          
-          setSuccessMsg("Backup gerado e baixado com sucesso!");
-          setTimeout(() => setSuccessMsg(''), 3000);
-
-      } catch (error: any) {
-          console.error("Erro ao gerar backup:", error);
-          alert("Erro ao gerar arquivo de backup: " + (error.message || "Erro desconhecido"));
-      } finally {
-          setGeneratingBackup(false);
-      }
+      const jsonString = JSON.stringify(backupData, null, 2);
+      const blob = new Blob([jsonString], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      
+      const dateStr = new Date().toISOString().split('T')[0];
+      link.href = url;
+      link.download = `backup_rabelotour_${dateStr}.json`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
   };
 
   const handleRestoreBackup = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -169,27 +153,8 @@ const SettingsView: React.FC = () => {
       reader.readAsText(file);
   };
 
-  const handleWipeData = async () => {
-      const confirm1 = confirm("⚠️ PERIGO: Você está prestes a APAGAR TODOS OS DADOS do sistema (Viagens, Financeiro, Clientes, etc.).\n\nSomente USUÁRIOS e CONFIGURAÇÕES serão mantidos.\n\nDeseja continuar?");
-      if (!confirm1) return;
-
-      const confirm2 = confirm("Tem certeza absoluta? Essa ação é irreversível e prepara o sistema para um novo uso.");
-      if (!confirm2) return;
-
-      setWipingData(true);
-      const result = await resetSystemData();
-      setWipingData(false);
-
-      if (result.success) {
-          alert(result.message);
-          window.location.reload();
-      } else {
-          alert("Erro ao limpar dados: " + result.message);
-      }
-  };
-
   return (
-    <div className="max-w-4xl mx-auto animate-fade-in pb-10">
+    <div className="max-w-4xl mx-auto animate-fade-in">
         <h2 className="text-2xl font-bold text-slate-800 mb-6">Configurações do Sistema</h2>
 
         {successMsg && (
@@ -201,7 +166,7 @@ const SettingsView: React.FC = () => {
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {/* LOGO UPLOAD SECTION */}
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 h-fit">
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
                 <h3 className="font-bold text-slate-700 mb-4">Logotipo da Empresa</h3>
                 
                 <div className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-slate-300 rounded-lg bg-slate-50 mb-4">
@@ -227,10 +192,7 @@ const SettingsView: React.FC = () => {
             {/* COMPANY DATA FORM */}
             <div className="md:col-span-2 space-y-6">
                 <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-                    <div className="flex justify-between items-center mb-4">
-                        <h3 className="font-bold text-slate-700">Dados da Empresa</h3>
-                    </div>
-                    
+                    <h3 className="font-bold text-slate-700 mb-4">Dados da Empresa (Para Contratos/Recibos)</h3>
                     <form onSubmit={handleSave} className="space-y-4">
                         <div>
                             <label className="block text-sm font-medium text-slate-700 mb-1">Nome Fantasia / Razão Social</label>
@@ -296,20 +258,10 @@ const SettingsView: React.FC = () => {
                                 <button 
                                     type="button" 
                                     onClick={handleSystemBackup}
-                                    disabled={generatingBackup}
-                                    className="flex items-center justify-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2 px-4 rounded border border-slate-300 transition-colors text-sm flex-1 disabled:opacity-50"
+                                    className="flex items-center justify-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2 px-4 rounded border border-slate-300 transition-colors text-sm flex-1"
                                 >
-                                    {generatingBackup ? (
-                                        <>
-                                            <svg className="animate-spin h-4 w-4 text-slate-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                                            Gerando...
-                                        </>
-                                    ) : (
-                                        <>
-                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-                                            Baixar Backup (.JSON)
-                                        </>
-                                    )}
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                                    Baixar Backup (.JSON)
                                 </button>
 
                                 <label className={`flex items-center justify-center gap-2 bg-orange-100 hover:bg-orange-200 text-orange-800 font-bold py-2 px-4 rounded border border-orange-200 transition-colors text-sm flex-1 cursor-pointer ${restoring ? 'opacity-50 cursor-not-allowed' : ''}`}>
@@ -322,26 +274,7 @@ const SettingsView: React.FC = () => {
                     </div>
                 </div>
 
-                {/* DANGER ZONE */}
-                <div className="bg-red-50 p-6 rounded-xl shadow-sm border border-red-200">
-                    <h3 className="font-bold text-red-800 mb-2 flex items-center gap-2">
-                        <span>⚠️</span> Zona de Perigo
-                    </h3>
-                    <p className="text-sm text-red-700 mb-4">
-                        Esta ação irá apagar <strong>TODOS OS REGISTROS</strong> do sistema (Viagens, Clientes, Financeiro, Peças, etc.). <br/>
-                        Apenas os <strong>USUÁRIOS</strong> (login) e as <strong>CONFIGURAÇÕES</strong> serão mantidos. Use para limpar o sistema para demonstrações.
-                    </p>
-                    <button 
-                        type="button" 
-                        onClick={handleWipeData}
-                        disabled={wipingData}
-                        className="bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-6 rounded shadow-sm transition-colors w-full flex items-center justify-center gap-2"
-                    >
-                        {wipingData ? 'Limpando Sistema...' : '🗑️ Zerar Sistema (Preservar Usuários)'}
-                    </button>
-                </div>
-
-                <div className="flex justify-end pt-4">
+                <div className="flex justify-end">
                     <button 
                         onClick={handleSave}
                         disabled={uploading}

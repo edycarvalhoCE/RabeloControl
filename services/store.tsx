@@ -111,7 +111,6 @@ interface StoreContextType {
 
   seedDatabase: () => Promise<void>;
   restoreDatabase: (jsonContent: any) => Promise<{ success: boolean; message: string }>;
-  resetSystemData: () => Promise<{ success: boolean; message: string }>;
 }
 
 const StoreContext = createContext<StoreContextType | undefined>(undefined);
@@ -541,9 +540,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
           clientId = existingClient.id; 
           await updateDoc(doc(db, 'clients', clientId), { ...clientData }); 
       } else { 
-          // FIX: Use provided type or default to PF if missing
-          const clientType = clientData.type || 'PF';
-          const ref = await addDoc(collection(db, 'clients'), { ...clientData, type: clientType }); 
+          const ref = await addDoc(collection(db, 'clients'), { ...clientData, type: 'PF' }); // Default to PF for package sales
           clientId = ref.id; 
       }
       let commissionRate = saleData.saleType === 'AGENCY' ? 0.12 : 0.01;
@@ -844,51 +841,11 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       }
   };
 
-  // --- RESET SYSTEM DATA (DANGER ZONE) ---
-  const resetSystemData = async () => {
-      if (!isConfigured) return { success: false, message: "Não conectado ao Banco de Dados." };
-
-      const collectionsToClear = [
-          'buses', 'bookings', 'parts', 'transactions', 'timeOffs',
-          'documents', 'maintenanceRecords', 'purchaseRequests',
-          'maintenanceReports', 'charterContracts', 'travelPackages',
-          'packagePassengers', 'packagePayments', 'packageLeads',
-          'clients', 'fuelRecords', 'fuelSupplies', 'driverLiabilities',
-          'driverFees', 'quotes', 'priceRoutes'
-      ];
-
-      let totalDeleted = 0;
-
-      try {
-          for (const colName of collectionsToClear) {
-              const q = query(collection(db, colName));
-              const snapshot = await getDocs(q);
-              
-              if (snapshot.empty) continue;
-
-              // BATCH DELETE IN CHUNKS OF 400 (Firebase Limit is 500)
-              const chunk = 400;
-              for (let i = 0; i < snapshot.docs.length; i += chunk) {
-                  const batch = writeBatch(db);
-                  snapshot.docs.slice(i, i + chunk).forEach(doc => {
-                      batch.delete(doc.ref);
-                  });
-                  await batch.commit();
-                  totalDeleted += snapshot.docs.slice(i, i + chunk).length;
-              }
-          }
-          return { success: true, message: `Limpeza concluída! ${totalDeleted} registros foram removidos com sucesso.` };
-      } catch (e: any) {
-          console.error("Erro ao limpar dados:", e);
-          return { success: false, message: "Erro ao limpar: " + e.message };
-      }
-  };
-
   return (
     <StoreContext.Provider value={{
       currentUser: currentUser!, isAuthenticated, settings, users, buses, bookings, parts, transactions, timeOffs, documents, maintenanceRecords, purchaseRequests, maintenanceReports, charterContracts, travelPackages, packagePassengers, packagePayments, clients, packageLeads, fuelRecords, fuelSupplies, fuelStockLevel, driverLiabilities, quotes, priceRoutes, driverFees,
       switchUser, addUser, updateUser, deleteUser, addBooking, updateBooking, updateBookingStatus, addPart, updateStock, addTransaction, addTimeOff, updateTimeOffStatus, deleteTimeOff, addDocument, deleteDocument, addMaintenanceRecord, addPurchaseRequest, updatePurchaseRequestStatus, addMaintenanceReport, updateMaintenanceReportStatus, addBus, updateBusStatus, addCharterContract, addTravelPackage, registerPackageSale, updatePackagePassenger, deletePackagePassenger, addPackagePayment, addPackageLead, updatePackageLead, deletePackageLead, addFuelRecord, updateFuelRecord, deleteFuelRecord, addFuelSupply, addDriverLiability, payDriverLiability,
-      login, logout, register, updateSettings, seedDatabase, restoreDatabase, resetSystemData,
+      login, logout, register, updateSettings, seedDatabase, restoreDatabase,
       addQuote, updateQuote, convertQuoteToBooking, deleteQuote,
       addPriceRoute, updatePriceRoute, deletePriceRoute, importDefaultPrices, clearPriceTable,
       addDriverFee, payDriverFee, deleteDriverFee, restockPart,

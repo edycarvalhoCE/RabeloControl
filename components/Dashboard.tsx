@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { useStore } from '../services/store';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { getFinancialInsight } from '../services/geminiService';
 import { Logo } from './Logo';
 import { Transaction } from '../types';
@@ -48,13 +48,22 @@ const Dashboard: React.FC = () => {
     .filter(t => t.type === 'EXPENSE' && (t.category === 'Multas' || t.category.includes('Multa')))
     .reduce((acc, t) => acc + t.amount, 0);
 
-  // Operational Stats (Used in Top Cards)
+  // Operational Stats
+  const activeBookings = bookings.filter(b => b.status === 'CONFIRMED').length;
   const maintenanceBuses = buses.filter(b => b.status === 'MAINTENANCE').length;
 
   const chartData = [
     { name: 'Entradas', amount: totalRevenue },
     { name: 'Saídas', amount: totalExpenses },
   ];
+
+  const busStatusData = [
+    { name: 'Disponível', value: buses.filter(b => b.status === 'AVAILABLE').length },
+    { name: 'Alugado', value: buses.filter(b => b.status === 'BUSY').length },
+    { name: 'Manutenção', value: buses.filter(b => b.status === 'MAINTENANCE').length },
+  ];
+  
+  const COLORS = ['#10b981', '#3b82f6', '#f59e0b'];
 
   // --- FUEL CONSUMPTION STATS (SIMPLIFIED LIST) ---
   const busConsumptionMap: {[key: string]: {distance: number, liters: number}} = {};
@@ -283,7 +292,7 @@ const Dashboard: React.FC = () => {
           </div>
       </div>
 
-      {/* FUEL CONSUMPTION LIST */}
+      {/* FUEL CONSUMPTION LIST (REPLACED CHART) */}
       <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
           <h3 className="text-lg font-semibold text-slate-700 mb-4 flex items-center gap-2">
               <span className="bg-blue-100 p-1 rounded">⛽</span>
@@ -396,35 +405,59 @@ const Dashboard: React.FC = () => {
                     </div>
                 </div>
 
-              <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex flex-col">
-                  <h3 className="text-lg font-semibold text-slate-700 mb-4 flex-shrink-0">Fluxo de Caixa Global</h3>
-                  {/* USO DE STYLE INLINE PARA FORÇAR ALTURA E EVITAR CRASH DE RENDERIZAÇÃO */}
-                  <div style={{ width: '100%', height: 320 }}>
-                      <ResponsiveContainer width="100%" height="100%">
-                          <BarChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-                              <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                              <XAxis dataKey="name" axisLine={false} tickLine={false} />
-                              <YAxis 
-                                axisLine={false} 
-                                tickLine={false} 
-                                tickFormatter={(val) => `R$ ${val.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}`} 
-                                width={80}
-                              />
-                              <Tooltip 
-                                contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                                cursor={{ fill: '#f3f4f6' }}
-                                formatter={(value: number) => [formatCurrency(value), 'Valor']}
-                              />
-                              <Bar dataKey="amount" fill="#3b82f6" radius={[4, 4, 0, 0]} barSize={60} />
-                          </BarChart>
-                      </ResponsiveContainer>
-                  </div>
+              <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 h-80">
+                  <h3 className="text-lg font-semibold text-slate-700 mb-4">Fluxo de Caixa Global</h3>
+                  <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                          <XAxis dataKey="name" axisLine={false} tickLine={false} />
+                          <YAxis 
+                            axisLine={false} 
+                            tickLine={false} 
+                            tickFormatter={(val) => `R$ ${val.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}`} 
+                            width={80}
+                          />
+                          <Tooltip 
+                            contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                            cursor={{ fill: '#f3f4f6' }}
+                            formatter={(value: number) => [formatCurrency(value), 'Valor']}
+                          />
+                          <Bar dataKey="amount" fill="#3b82f6" radius={[4, 4, 0, 0]} barSize={60} />
+                      </BarChart>
+                  </ResponsiveContainer>
               </div>
           </div>
 
-          {/* RIGHT COLUMN (Time Off History only) */}
+          {/* RIGHT COLUMN (Pie Chart + Time Off History) */}
           <div className="space-y-6">
-              
+              <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 h-80">
+                  <h3 className="text-lg font-semibold text-slate-700 mb-4">Status da Frota</h3>
+                  <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                          <Pie
+                              data={busStatusData}
+                              innerRadius={60}
+                              outerRadius={80}
+                              paddingAngle={5}
+                              dataKey="value"
+                          >
+                              {busStatusData.map((entry, index) => (
+                                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                              ))}
+                          </Pie>
+                          <Tooltip />
+                      </PieChart>
+                  </ResponsiveContainer>
+                  <div className="flex justify-center gap-4 text-sm text-slate-600 mt-[-20px]">
+                      {busStatusData.map((entry, index) => (
+                          <div key={index} className="flex items-center gap-1">
+                              <div className="w-3 h-3 rounded-full" style={{ backgroundColor: COLORS[index] }}></div>
+                              {entry.name}: {entry.value}
+                          </div>
+                      ))}
+                  </div>
+              </div>
+
               {/* TIME OFF HISTORY */}
               <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                    <div className="p-4 bg-slate-50 border-b border-slate-200">

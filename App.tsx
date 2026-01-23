@@ -15,7 +15,7 @@ import UsersView from './components/UsersView';
 import VehiclesView from './components/VehiclesView';
 import CharterView from './components/CharterView';
 import TravelPackagesView from './components/TravelPackagesView';
-import ClientsView from './components/ClientsView';
+import ClientsView from './components/ClientsView'; // Import
 import LoginView from './components/LoginView';
 import SettingsView from './components/SettingsView';
 import QuotesView from './components/QuotesView';
@@ -94,7 +94,7 @@ const MainContent = () => {
       case 'new-booking': return <NewBookingView />;
       case 'bookings': return <BookingsView />;
       case 'travel-packages': return <TravelPackagesView />;
-      case 'clients': return <ClientsView />;
+      case 'clients': return <ClientsView />; // Nova Rota
       case 'vehicles': return <VehiclesView />;
       case 'charter': return <CharterView />;
       case 'inventory': return <InventoryView />;
@@ -117,13 +117,13 @@ const MainContent = () => {
         setIsMobileOpen={setIsMobileOpen}
       />
       
-      <div className="flex-1 flex flex-col h-full overflow-hidden relative">
-        {/* Mobile Header - Classic Hamburger Style */}
+      <div className="flex-1 flex flex-col h-full overflow-hidden">
+        {/* Mobile Header */}
         <div className="md:hidden bg-slate-900 text-white p-4 flex justify-between items-center shadow-md shrink-0">
             <div className="font-extrabold text-xl">
                 Rabelo<span className="text-blue-500">Tour</span>
             </div>
-            <button onClick={() => setIsMobileOpen(true)} className="p-2 text-white hover:text-blue-400 transition-colors">
+            <button onClick={() => setIsMobileOpen(true)} className="p-2">
                 <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16m-7 6h7" /></svg>
             </button>
         </div>

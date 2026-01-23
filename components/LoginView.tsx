@@ -83,9 +83,6 @@ const LoginView: React.FC = () => {
                     <Logo size="lg" /> {/* Reduzido de 'xl' para 'lg' */}
                 </div>
                 <p className="text-slate-500 text-sm font-medium uppercase tracking-wide">Sistema Integrado de Gestão</p>
-                <span className="text-[10px] bg-green-100 text-green-700 px-2 py-0.5 rounded-full mt-2 font-bold">
-                    v8.0 Ready
-                </span>
             </div>
 
             {error && (
@@ -192,7 +189,7 @@ const LoginView: React.FC = () => {
         </div>
         
         <div className="absolute bottom-4 text-center w-full text-slate-400 text-xs opacity-80 font-medium">
-            &copy; {new Date().getFullYear()} Rabelo Tour. v8.0.0
+            &copy; {new Date().getFullYear()} Rabelo Tour. Todos os direitos reservados.
         </div>
     </div>
   );

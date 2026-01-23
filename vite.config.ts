@@ -23,16 +23,6 @@ export default defineConfig(({ mode }) => {
         alias: {
           '@': path.resolve(__dirname, '.'),
         }
-      },
-      build: {
-        // Força nomes de arquivos únicos para evitar cache antigo
-        rollupOptions: {
-          output: {
-            entryFileNames: `assets/[name].[hash].js`,
-            chunkFileNames: `assets/[name].[hash].js`,
-            assetFileNames: `assets/[name].[hash].[ext]`
-          }
-        }
       }
     };
 });

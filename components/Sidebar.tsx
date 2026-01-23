@@ -20,7 +20,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setView, isMobileOpen, s
     { id: 'quotes', label: 'Orçamentos (CRM)', icon: '💬', roles: [UserRole.MANAGER, UserRole.FINANCE, UserRole.DEVELOPER] },
     { id: 'new-booking', label: 'Nova Locação', icon: '➕', roles: [UserRole.MANAGER, UserRole.DEVELOPER] },
     { id: 'bookings', label: 'Listar Locações', icon: '🚌', roles: [UserRole.MANAGER, UserRole.DEVELOPER] },
-    { id: 'clients', label: 'Clientes', icon: '👥', roles: [UserRole.MANAGER, UserRole.FINANCE, UserRole.DEVELOPER] },
+    { id: 'clients', label: 'Clientes', icon: '👥', roles: [UserRole.MANAGER, UserRole.FINANCE, UserRole.DEVELOPER] }, // Novo Item
     { id: 'calendar', label: 'Calendário (Escala)', icon: '📅', roles: [UserRole.MANAGER, UserRole.DEVELOPER] },
     { id: 'travel-packages', label: 'Pacotes de Viagem', icon: '🏖️', roles: [UserRole.MANAGER, UserRole.FINANCE, UserRole.DEVELOPER] },
     { id: 'charter', label: 'Fretamento', icon: '🏭', roles: [UserRole.MANAGER, UserRole.DEVELOPER] },
@@ -137,10 +137,6 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setView, isMobileOpen, s
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
                   <span>Sair</span>
               </button>
-              
-              <div className="text-center text-[10px] text-yellow-400 mt-2 font-black bg-yellow-900/30 rounded py-1 border border-yellow-800 animate-pulse">
-                  VERSÃO V8.2 (CORREÇÃO)
-              </div>
           </div>
         </div>
       </div>

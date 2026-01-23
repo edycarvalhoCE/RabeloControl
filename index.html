@@ -4,36 +4,13 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
-    <meta http-equiv="Pragma" content="no-cache" />
-    <meta http-equiv="Expires" content="0" />
-    <meta name="app-version" content="v8.3" />
-    
     <!-- Cor Azul da Marca Rabelo Tour para a barra do navegador -->
     <meta name="theme-color" content="#2e2e77" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <!-- Favicon -->
+    <!-- Favicon usando a mesma logo -->
     <link rel="icon" type="image/png" href="./logo.png" />
-    <title>RabeloTour v8.3</title>
-    
-    <!-- SCRIPT DE LIMPEZA DE CACHE (Versão Leve) -->
-    <script>
-      (function() {
-        var CURRENT_V = 'v8.3-FIX';
-        var storedV = localStorage.getItem('app_version_tag');
-        if (storedV !== CURRENT_V) {
-            console.log('Atualizando versão...');
-            if ('serviceWorker' in navigator) {
-                navigator.serviceWorker.getRegistrations().then(function(regs) {
-                    for(let reg of regs) reg.unregister();
-                });
-            }
-            localStorage.setItem('app_version_tag', CURRENT_V);
-        }
-      })();
-    </script>
-
+    <title>RabeloTour - Sistema Integrado</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
       tailwind.config = {
@@ -46,8 +23,8 @@
             },
             colors: {
               brand: {
-                blue: '#2e2e77', 
-                yellow: '#ffec00', 
+                blue: '#2e2e77', // Cor azul exata da logo
+                yellow: '#ffec00', // Cor amarela do globo
               },
               slate: {
                 850: '#1e293b', 
@@ -60,34 +37,47 @@
     </script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Great+Vibes&display=swap" rel="stylesheet">
     <style>
-      :root { color-scheme: light; }
+      :root {
+        color-scheme: light; /* Força modo claro nos controles do navegador */
+      }
       body { 
         font-family: 'Inter', sans-serif; 
-        background-color: #f8fafc; 
-        color: #0f172a; 
+        background-color: #f8fafc !important; 
+        color: #0f172a !important; 
       }
-      .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
+      /* Inputs com fundo branco para contraste */
+      input, select, textarea {
+        background-color: #ffffff;
+        color: #1e293b;
+      }
+      /* Scrollbar personalizada */
+      ::-webkit-scrollbar { width: 8px; }
+      ::-webkit-scrollbar-track { background: #f1f1f1; }
+      ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+      ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
     </style>
 <script type="importmap">
 {
   "imports": {
-    "path": "https://esm.sh/path@^0.12.7",
-    "url": "https://esm.sh/url@^0.11.4",
-    "recharts": "https://esm.sh/recharts@^3.7.0",
-    "@google/genai": "https://esm.sh/@google/genai@^1.38.0",
+    "react": "https://esm.sh/react@^19.2.3",
     "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
     "react/": "https://esm.sh/react@^19.2.3/",
-    "react": "https://esm.sh/react@^19.2.3",
-    "xlsx": "https://esm.sh/xlsx@^0.18.5",
-    "firebase/": "https://esm.sh/firebase@^12.8.0/",
+    "@google/genai": "https://esm.sh/@google/genai@^1.35.0",
+    "firebase/": "https://esm.sh/firebase@^12.7.0/",
+    "recharts": "https://esm.sh/recharts@^3.6.0",
     "vite": "https://esm.sh/vite@^7.3.1",
-    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.2"
+    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.2",
+    "path": "https://esm.sh/path@^0.12.7",
+    "url": "https://esm.sh/url@^0.11.4",
+    "xlsx": "https://esm.sh/xlsx@0.18.5"
   }
 }
 </script>
+<link rel="stylesheet" href="/index.css">
 </head>
   <body class="bg-slate-50 text-slate-900">
     <div id="root"></div>
-    <script type="module" src="/index.tsx"></script>
+    <script type="module" src="./index.tsx"></script>
+  <script type="module" src="/index.tsx"></script>
 </body>
 </html>
