@@ -5,7 +5,7 @@ import { UserRole } from '../types';
 
 const SettingsView: React.FC = () => {
   const { 
-      settings, updateSettings, currentUser, restoreDatabase,
+      settings, updateSettings, currentUser, restoreDatabase, resetSystemData,
       // Destructure all data collections for Backup
       users, buses, bookings, parts, transactions, timeOffs, documents, 
       maintenanceRecords, purchaseRequests, maintenanceReports, charterContracts, 
@@ -24,6 +24,7 @@ const SettingsView: React.FC = () => {
   const [uploading, setUploading] = useState(false);
   const [restoring, setRestoring] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
+  const [resetting, setResetting] = useState(false);
 
   useEffect(() => {
       if (settings) {
@@ -153,6 +154,25 @@ const SettingsView: React.FC = () => {
       reader.readAsText(file);
   };
 
+  const handleResetSystem = async () => {
+      const confirm1 = window.confirm("⚠️ PERIGO: Você está prestes a APAGAR TODOS OS REGISTROS do sistema (Financeiro, Reservas, Veículos, Estoque, etc).\n\nApenas os USUÁRIOS e as CONFIGURAÇÕES GERAIS serão mantidos.\n\nIsso não pode ser desfeito. Tem certeza?");
+      if (!confirm1) return;
+
+      const confirm2 = window.confirm("Último aviso: Todos os dados operacionais serão excluídos permanentemente.\n\nConfirma o reset?");
+      if (!confirm2) return;
+
+      setResetting(true);
+      const result = await resetSystemData();
+      setResetting(false);
+      
+      if (result.success) {
+          alert(result.message);
+          window.location.reload();
+      } else {
+          alert("Erro ao resetar: " + result.message);
+      }
+  };
+
   return (
     <div className="max-w-4xl mx-auto animate-fade-in">
         <h2 className="text-2xl font-bold text-slate-800 mb-6">Configurações do Sistema</h2>
@@ -166,7 +186,7 @@ const SettingsView: React.FC = () => {
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {/* LOGO UPLOAD SECTION */}
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 h-fit">
                 <h3 className="font-bold text-slate-700 mb-4">Logotipo da Empresa</h3>
                 
                 <div className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-slate-300 rounded-lg bg-slate-50 mb-4">
@@ -274,13 +294,35 @@ const SettingsView: React.FC = () => {
                     </div>
                 </div>
 
-                <div className="flex justify-end">
+                {/* DANGER ZONE - RESET */}
+                <div className="bg-red-50 p-6 rounded-xl shadow-sm border border-red-200">
+                    <h3 className="font-bold text-red-800 mb-4 flex items-center gap-2">
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                        Zona de Perigo
+                    </h3>
+                    <p className="text-sm text-red-700 mb-4">
+                        Ações irreversíveis. Tenha certeza do que está fazendo antes de prosseguir.
+                    </p>
+                    <button 
+                        type="button" 
+                        onClick={handleResetSystem}
+                        disabled={resetting}
+                        className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-4 rounded transition-colors text-sm shadow-md disabled:opacity-50"
+                    >
+                        {resetting ? 'Apagando dados...' : '🗑️ RESETAR SISTEMA (Apagar tudo exceto usuários)'}
+                    </button>
+                    <p className="text-xs text-red-500 mt-2 text-center">
+                        Isso apagará reservas, financeiro, veículos, estoque, etc. Usuários e configurações gerais serão mantidos.
+                    </p>
+                </div>
+
+                <div className="flex justify-end pt-4">
                     <button 
                         onClick={handleSave}
                         disabled={uploading}
                         className="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-8 rounded shadow-sm transition-colors w-full md:w-auto"
                     >
-                        Salvar Todas as Configurações
+                        Salvar Configurações
                     </button>
                 </div>
             </div>
