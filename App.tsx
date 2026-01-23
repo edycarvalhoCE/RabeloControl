@@ -15,7 +15,7 @@ import UsersView from './components/UsersView';
 import VehiclesView from './components/VehiclesView';
 import CharterView from './components/CharterView';
 import TravelPackagesView from './components/TravelPackagesView';
-import ClientsView from './components/ClientsView'; // Import
+import ClientsView from './components/ClientsView';
 import LoginView from './components/LoginView';
 import SettingsView from './components/SettingsView';
 import QuotesView from './components/QuotesView';
@@ -94,7 +94,7 @@ const MainContent = () => {
       case 'new-booking': return <NewBookingView />;
       case 'bookings': return <BookingsView />;
       case 'travel-packages': return <TravelPackagesView />;
-      case 'clients': return <ClientsView />; // Nova Rota
+      case 'clients': return <ClientsView />;
       case 'vehicles': return <VehiclesView />;
       case 'charter': return <CharterView />;
       case 'inventory': return <InventoryView />;
@@ -123,7 +123,7 @@ const MainContent = () => {
             <div className="font-extrabold text-xl">
                 Rabelo<span className="text-blue-500">Tour</span>
             </div>
-            <button onClick={() => setIsMobileOpen(true)} className="p-2">
+            <button onClick={() => setIsMobileOpen(true)} className="p-2 text-white hover:text-blue-400 transition-colors">
                 <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16m-7 6h7" /></svg>
             </button>
         </div>
