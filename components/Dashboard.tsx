@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { useStore } from '../services/store';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { getFinancialInsight } from '../services/geminiService';
 import { Logo } from './Logo';
 import { Transaction } from '../types';
@@ -48,22 +48,13 @@ const Dashboard: React.FC = () => {
     .filter(t => t.type === 'EXPENSE' && (t.category === 'Multas' || t.category.includes('Multa')))
     .reduce((acc, t) => acc + t.amount, 0);
 
-  // Operational Stats
-  const activeBookings = bookings.filter(b => b.status === 'CONFIRMED').length;
+  // Operational Stats (Used in Top Cards)
   const maintenanceBuses = buses.filter(b => b.status === 'MAINTENANCE').length;
 
   const chartData = [
     { name: 'Entradas', amount: totalRevenue },
     { name: 'Saídas', amount: totalExpenses },
   ];
-
-  const busStatusData = [
-    { name: 'Disponível', value: buses.filter(b => b.status === 'AVAILABLE').length },
-    { name: 'Alugado', value: buses.filter(b => b.status === 'BUSY').length },
-    { name: 'Manutenção', value: buses.filter(b => b.status === 'MAINTENANCE').length },
-  ];
-  
-  const COLORS = ['#10b981', '#3b82f6', '#f59e0b'];
 
   // --- FUEL CONSUMPTION STATS (SIMPLIFIED LIST) ---
   const busConsumptionMap: {[key: string]: {distance: number, liters: number}} = {};
@@ -292,7 +283,7 @@ const Dashboard: React.FC = () => {
           </div>
       </div>
 
-      {/* FUEL CONSUMPTION LIST (REPLACED CHART) */}
+      {/* FUEL CONSUMPTION LIST */}
       <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
           <h3 className="text-lg font-semibold text-slate-700 mb-4 flex items-center gap-2">
               <span className="bg-blue-100 p-1 rounded">⛽</span>
@@ -428,36 +419,9 @@ const Dashboard: React.FC = () => {
               </div>
           </div>
 
-          {/* RIGHT COLUMN (Pie Chart + Time Off History) */}
+          {/* RIGHT COLUMN (Time Off History only) */}
           <div className="space-y-6">
-              <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 h-80">
-                  <h3 className="text-lg font-semibold text-slate-700 mb-4">Status da Frota</h3>
-                  <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                          <Pie
-                              data={busStatusData}
-                              innerRadius={60}
-                              outerRadius={80}
-                              paddingAngle={5}
-                              dataKey="value"
-                          >
-                              {busStatusData.map((entry, index) => (
-                                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                              ))}
-                          </Pie>
-                          <Tooltip />
-                      </PieChart>
-                  </ResponsiveContainer>
-                  <div className="flex justify-center gap-4 text-sm text-slate-600 mt-[-20px]">
-                      {busStatusData.map((entry, index) => (
-                          <div key={index} className="flex items-center gap-1">
-                              <div className="w-3 h-3 rounded-full" style={{ backgroundColor: COLORS[index] }}></div>
-                              {entry.name}: {entry.value}
-                          </div>
-                      ))}
-                  </div>
-              </div>
-
+              
               {/* TIME OFF HISTORY */}
               <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                    <div className="p-4 bg-slate-50 border-b border-slate-200">
