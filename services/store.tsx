@@ -1,6 +1,6 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { User, Bus, Booking, Part, Transaction, TimeOff, UserRole, DriverDocument, MaintenanceRecord, PurchaseRequest, MaintenanceReport, CharterContract, TravelPackage, PackagePassenger, PackagePayment, Client, FuelRecord, FuelSupply, DriverLiability, PackageLead, SystemSettings, Quote, PriceRoute, DriverFee } from '../types';
+import { User, Bus, Booking, Part, Transaction, TimeOff, UserRole, DriverDocument, MaintenanceRecord, PurchaseRequest, MaintenanceReport, CharterContract, TravelPackage, PackagePassenger, PackagePayment, Client, FuelRecord, FuelSupply, DriverLiability, PackageLead, SystemSettings, Quote, PriceRoute, DriverFee, ScheduleConfirmation } from '../types';
 import { MOCK_USERS, MOCK_BUSES, MOCK_PARTS } from '../constants';
 
 // Firebase Imports
@@ -39,6 +39,7 @@ interface StoreContextType {
   driverFees: DriverFee[]; // New
   quotes: Quote[];
   priceRoutes: PriceRoute[];
+  scheduleConfirmations: ScheduleConfirmation[]; // New
   
   // Actions
   login: (email: string, password: string) => Promise<{success: boolean, message?: string}>;
@@ -112,6 +113,9 @@ interface StoreContextType {
   seedDatabase: () => Promise<void>;
   restoreDatabase: (jsonContent: any) => Promise<{ success: boolean; message: string }>;
   resetSystemData: () => Promise<{ success: boolean; message: string }>; // New Reset Function
+
+  // Confirmation
+  confirmTrip: (type: 'BOOKING' | 'CHARTER', refId: string, date: string) => Promise<void>;
 }
 
 const StoreContext = createContext<StoreContextType | undefined>(undefined);
@@ -157,6 +161,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   const [driverFees, setDriverFees] = useState<DriverFee[]>([]);
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [priceRoutes, setPriceRoutes] = useState<PriceRoute[]>([]);
+  const [scheduleConfirmations, setScheduleConfirmations] = useState<ScheduleConfirmation[]>([]); // New
   
   const [fuelStockLevel, setFuelStockLevel] = useState(0);
 
@@ -210,6 +215,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         { name: 'driverFees', setter: setDriverFees },
         { name: 'quotes', setter: setQuotes },
         { name: 'priceRoutes', setter: setPriceRoutes },
+        { name: 'scheduleConfirmations', setter: setScheduleConfirmations }, // New
     ];
 
     const unsubscribes = collectionsToSync.map(c => 
@@ -692,6 +698,32 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       } catch(e: any) { return { success: false, message: `Erro ao importar: ${e.message}` }; }
   };
 
+  // --- CONFIRMATION ACTION ---
+  const confirmTrip = async (type: 'BOOKING' | 'CHARTER', refId: string, date: string) => {
+      if (!isConfigured || !currentUser) return;
+      
+      const payload: Omit<ScheduleConfirmation, 'id'> = {
+          driverId: currentUser.id,
+          type,
+          referenceId: refId,
+          date,
+          status: 'CONFIRMED',
+          confirmedAt: new Date().toISOString()
+      };
+
+      // Check if already confirmed (Optional safety)
+      const existing = scheduleConfirmations.find(c => 
+          c.driverId === currentUser.id && 
+          c.type === type && 
+          c.referenceId === refId &&
+          c.date === date
+      );
+
+      if (!existing) {
+          await addDoc(collection(db, 'scheduleConfirmations'), payload);
+      }
+  };
+
   const seedDatabase = async () => { 
       if (!isConfigured) return; 
       const batch = writeBatch(db); 
@@ -708,7 +740,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       let count = 0;
       let totalRestored = 0;
       const collectionMap: {[key: string]: string} = {
-          users: 'users', buses: 'buses', bookings: 'bookings', parts: 'parts', transactions: 'transactions', timeOffs: 'timeOffs', documents: 'documents', maintenanceRecords: 'maintenanceRecords', purchaseRequests: 'purchaseRequests', maintenanceReports: 'maintenanceReports', charterContracts: 'charterContracts', travelPackages: 'travelPackages', packagePassengers: 'packagePassengers', packagePayments: 'packagePayments', packageLeads: 'packageLeads', clients: 'clients', fuelRecords: 'fuelRecords', fuelSupplies: 'fuelSupplies', driverLiabilities: 'driverLiabilities', driverFees: 'driverFees', quotes: 'quotes', priceRoutes: 'priceRoutes',
+          users: 'users', buses: 'buses', bookings: 'bookings', parts: 'parts', transactions: 'transactions', timeOffs: 'timeOffs', documents: 'documents', maintenanceRecords: 'maintenanceRecords', purchaseRequests: 'purchaseRequests', maintenanceReports: 'maintenanceReports', charterContracts: 'charterContracts', travelPackages: 'travelPackages', packagePassengers: 'packagePassengers', packagePayments: 'packagePayments', packageLeads: 'packageLeads', clients: 'clients', fuelRecords: 'fuelRecords', fuelSupplies: 'fuelSupplies', driverLiabilities: 'driverLiabilities', driverFees: 'driverFees', quotes: 'quotes', priceRoutes: 'priceRoutes', scheduleConfirmations: 'scheduleConfirmations'
       };
       try {
           for (const [jsonKey, collectionName] of Object.entries(collectionMap)) {
@@ -740,43 +772,11 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
           'maintenanceReports', 'charterContracts', 'travelPackages',
           'packagePassengers', 'packagePayments', 'packageLeads', 'clients',
           'fuelRecords', 'fuelSupplies', 'driverLiabilities', 'driverFees',
-          'quotes', 'priceRoutes'
+          'quotes', 'priceRoutes', 'scheduleConfirmations'
           // NOTE: 'users' and 'settings' are NOT included
       ];
 
       try {
-          for (const colName of collectionsToClear) {
-              const q = query(collection(db, colName));
-              const snapshot = await getDocs(q);
-              
-              const batch = writeBatch(db);
-              let count = 0;
-              let hasItems = false;
-
-              for (const docSnapshot of snapshot.docs) {
-                  batch.delete(docSnapshot.ref);
-                  count++;
-                  hasItems = true;
-                  
-                  if (count >= 400) { // Safety margin
-                      await batch.commit();
-                      count = 0; // Reset for new batch (though creating new batch obj would be safer, simple commit here works for linear flow)
-                  }
-              }
-              if (hasItems) {
-                  // Re-instantiate batch if we looped but didn't commit final
-                  // Actually simplest approach for "delete all" without cloud functions is recursive
-                  // but for typical test data size, this loop is fine. 
-                  // If we already committed inside loop, we need a new batch.
-                  // For simplicity in this context, we assume < 500 items per collection for test data.
-                  // If > 500, this simple loop might fail on the single batch instance reuse pattern without re-init.
-                  // Correct pattern for >500:
-                  // We already committed in loop. 
-                  // Let's refine:
-              }
-          }
-          
-          // Re-implementation with safer batch handling per collection
           for (const colName of collectionsToClear) {
               const q = query(collection(db, colName));
               const snapshot = await getDocs(q);
@@ -811,14 +811,14 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
   return (
     <StoreContext.Provider value={{
-      currentUser: currentUser!, isAuthenticated, settings, users, buses, bookings, parts, transactions, timeOffs, documents, maintenanceRecords, purchaseRequests, maintenanceReports, charterContracts, travelPackages, packagePassengers, packagePayments, clients, packageLeads, fuelRecords, fuelSupplies, fuelStockLevel, driverLiabilities, quotes, priceRoutes, driverFees,
+      currentUser: currentUser!, isAuthenticated, settings, users, buses, bookings, parts, transactions, timeOffs, documents, maintenanceRecords, purchaseRequests, maintenanceReports, charterContracts, travelPackages, packagePassengers, packagePayments, clients, packageLeads, fuelRecords, fuelSupplies, fuelStockLevel, driverLiabilities, quotes, priceRoutes, driverFees, scheduleConfirmations,
       switchUser, addUser, updateUser, deleteUser, addBooking, updateBooking, updateBookingStatus, addPart, updateStock, addTransaction, addTimeOff, updateTimeOffStatus, deleteTimeOff, addDocument, deleteDocument, addMaintenanceRecord, addPurchaseRequest, updatePurchaseRequestStatus, addMaintenanceReport, updateMaintenanceReportStatus, addBus, updateBusStatus, addCharterContract, addTravelPackage, registerPackageSale, updatePackagePassenger, deletePackagePassenger, addPackagePayment, addPackageLead, updatePackageLead, deletePackageLead, addFuelRecord, updateFuelRecord, deleteFuelRecord, addFuelSupply, addDriverLiability, payDriverLiability,
       login, logout, register, updateSettings, seedDatabase, restoreDatabase,
       addQuote, updateQuote, convertQuoteToBooking, deleteQuote,
       addPriceRoute, updatePriceRoute, deletePriceRoute, importDefaultPrices, clearPriceTable,
       addDriverFee, payDriverFee, deleteDriverFee, restockPart,
       addClient, updateClient, deleteClient, importClients,
-      resetSystemData // Exported
+      resetSystemData, confirmTrip // Exported
     }}>
       {children}
     </StoreContext.Provider>

@@ -1,11 +1,12 @@
+
 import React, { useState } from 'react';
 import { useStore } from '../services/store';
 import CalendarView from './CalendarView';
-import { Booking, UserRole } from '../types';
+import { Booking, UserRole, ScheduleConfirmation } from '../types';
 import { Logo } from './Logo';
 
 const DriverPortal: React.FC = () => {
-  const { currentUser, bookings, timeOffs, addTimeOff, documents, buses, addMaintenanceReport, maintenanceReports, addFuelRecord, driverLiabilities, charterContracts, driverFees, fuelRecords, users } = useStore();
+  const { currentUser, bookings, timeOffs, addTimeOff, documents, buses, addMaintenanceReport, maintenanceReports, addFuelRecord, driverLiabilities, charterContracts, driverFees, fuelRecords, users, scheduleConfirmations, confirmTrip } = useStore();
   
   // Check if Garage Aux
   const isAux = currentUser.role === UserRole.GARAGE_AUX;
@@ -22,7 +23,7 @@ const DriverPortal: React.FC = () => {
   const [feeEndDate, setFeeEndDate] = useState('');
 
   // Trip Details Modal State
-  const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
+  const [selectedBooking, setSelectedBooking] = useState<any | null>(null);
 
   // Helper to get local date string YYYY-MM-DD
   const getTodayLocal = () => {
@@ -91,6 +92,7 @@ const DriverPortal: React.FC = () => {
                   // Create a fake booking object for display
                   myCharterOccurrences.push({
                       id: `${c.id}_${dStr}`, // Unique temp ID
+                      originalContractId: c.id, // Reference to original
                       destination: `${c.clientName} (Fretamento)`, // Display Route/Client
                       clientName: c.clientName,
                       startTime: `${dStr}T${c.morningDeparture}`,
@@ -109,6 +111,30 @@ const DriverPortal: React.FC = () => {
 
   // 3. Merge and Sort
   const combinedSchedule = [...myRegularBookings, ...myCharterOccurrences].sort((a, b) => a.sortTime - b.sortTime);
+
+  // --- CONFIRMATION CHECKER HELPER ---
+  const getConfirmationStatus = (item: any) => {
+      const type = item.isCharter ? 'CHARTER' : 'BOOKING';
+      const refId = item.isCharter ? item.originalContractId : item.id;
+      const date = item.startTime.split('T')[0]; // Compare by date
+
+      return scheduleConfirmations.find(c => 
+          c.driverId === currentUser.id &&
+          c.type === type &&
+          c.referenceId === refId &&
+          c.date === date
+      );
+  };
+
+  const handleConfirmClick = async (e: React.MouseEvent, item: any) => {
+      e.stopPropagation();
+      if (confirm("Confirmar que você está ciente desta viagem?")) {
+          const type = item.isCharter ? 'CHARTER' : 'BOOKING';
+          const refId = item.isCharter ? item.originalContractId : item.id;
+          const date = item.startTime.split('T')[0];
+          await confirmTrip(type, refId, date);
+      }
+  };
 
   const myTimeOffs = timeOffs.filter(t => t.driverId === currentUser.id);
   const myDocuments = documents.filter(d => d.driverId === currentUser.id);
@@ -347,6 +373,7 @@ const DriverPortal: React.FC = () => {
                             combinedSchedule.slice(0, 10).map((booking: any) => {
                                 // For aux view, get bus details clearly
                                 const bus = buses.find(b => b.id === booking.busId);
+                                const isConfirmed = !!getConfirmationStatus(booking);
                                 
                                 return (
                                     <div 
@@ -373,6 +400,24 @@ const DriverPortal: React.FC = () => {
                                             <p className="font-semibold">📅 {new Date(booking.startTime).toLocaleDateString()} • {new Date(booking.startTime).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</p>
                                             {!booking.isCharter && <p>🏁 Retorno: {new Date(booking.endTime).toLocaleDateString()}</p>}
                                         </div>
+
+                                        {/* Confirmation Action for Drivers */}
+                                        {!isAux && (
+                                            <div className="mt-3 flex justify-end">
+                                                {isConfirmed ? (
+                                                    <span className="text-xs font-bold text-green-600 flex items-center gap-1 bg-green-50 px-2 py-1 rounded border border-green-100">
+                                                        ✅ Confirmado
+                                                    </span>
+                                                ) : (
+                                                    <button 
+                                                        onClick={(e) => handleConfirmClick(e, booking)}
+                                                        className="text-xs bg-white border border-green-500 text-green-600 hover:bg-green-50 px-3 py-1.5 rounded-full font-bold shadow-sm transition-colors"
+                                                    >
+                                                        Confirmar Presença
+                                                    </button>
+                                                )}
+                                            </div>
+                                        )}
                                     </div>
                                 );
                             })
@@ -594,8 +639,7 @@ const DriverPortal: React.FC = () => {
                         <div className="p-4 bg-blue-50 border-b border-blue-100 flex justify-between items-center">
                             <span className="text-sm font-bold text-blue-900">Total Pendente</span>
                             <span className="text-lg font-bold text-blue-700">
-                                R$ {totalPendingInPeriod.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
-                            </span>
+                                R$ {totalPendingInPeriod.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</p>
                         </div>
                         <div className="divide-y divide-slate-100 max-h-96 overflow-y-auto">
                             {filteredFees.length === 0 ? (
@@ -914,12 +958,23 @@ const DriverPortal: React.FC = () => {
                             )}
                         </div>
 
-                        <button 
-                            onClick={() => setSelectedBooking(null)}
-                            className="w-full bg-slate-800 text-white py-3 rounded-lg font-bold hover:bg-slate-700 mt-2"
-                        >
-                            Fechar Detalhes
-                        </button>
+                        <div className="flex gap-2 mt-4">
+                            {/* Confirmation in Modal */}
+                            {!isAux && !getConfirmationStatus(selectedBooking) && (
+                                <button 
+                                    onClick={(e) => { handleConfirmClick(e, selectedBooking); setSelectedBooking(null); }}
+                                    className="flex-1 bg-green-600 text-white py-3 rounded-lg font-bold hover:bg-green-700"
+                                >
+                                    Confirmar Viagem
+                                </button>
+                            )}
+                            <button 
+                                onClick={() => setSelectedBooking(null)}
+                                className="flex-1 bg-slate-200 text-slate-800 py-3 rounded-lg font-bold hover:bg-slate-300"
+                            >
+                                Fechar
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
