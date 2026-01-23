@@ -405,7 +405,7 @@ const DriverPortal: React.FC = () => {
                                         {!isAux && (
                                             <div className="mt-3 flex justify-end">
                                                 {isConfirmed ? (
-                                                    <span className="text-xs font-bold text-green-600 flex items-center gap-1 bg-green-50 px-2 py-1 rounded border border-green-100">
+                                                    <span className="text-xs font-bold text-green-600 flex items-center gap-1 bg-green-50 px-3 py-1.5 rounded border border-green-200 shadow-sm animate-fade-in">
                                                         ✅ Confirmado
                                                     </span>
                                                 ) : (
