@@ -7,7 +7,7 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
-    <meta name="app-version" content="v8.0" />
+    <meta name="app-version" content="v8.2" />
     
     <!-- Cor Azul da Marca Rabelo Tour para a barra do navegador -->
     <meta name="theme-color" content="#2e2e77" />
@@ -15,12 +15,12 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <!-- Favicon usando a mesma logo -->
     <link rel="icon" type="image/png" href="./logo.png" />
-    <title>RabeloTour v8.0</title>
+    <title>RabeloTour v8.2</title>
     
     <!-- SCRIPT NUCLEAR: DETECÇÃO E RELOAD DE VERSÃO -->
     <script>
       (function() {
-        var NEW_VERSION = 'v8.0-RELEASE';
+        var NEW_VERSION = 'v8.2-STABLE';
         var storedVersion = localStorage.getItem('app_version_tag');
 
         console.log('Verificando versão:', storedVersion, 'vs', NEW_VERSION);
@@ -44,13 +44,15 @@
                 });
             }
 
-            // 3. Atualizar flag e forçar reload do servidor (true)
+            // 3. Atualizar flag e forçar reload
             localStorage.setItem('app_version_tag', NEW_VERSION);
             sessionStorage.clear();
             
             // Pequeno delay para garantir que a limpeza ocorra
             setTimeout(function() {
-                window.location.reload(true);
+                 if (storedVersion) { // Só recarrega se já tinha uma versão antiga
+                    window.location.reload(true);
+                 }
             }, 500);
         }
       })();
@@ -104,17 +106,17 @@
 <script type="importmap">
 {
   "imports": {
-    "react": "https://esm.sh/react@^19.2.3",
-    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
-    "react/": "https://esm.sh/react@^19.2.3/",
-    "@google/genai": "https://esm.sh/@google/genai@^1.35.0",
-    "firebase/": "https://esm.sh/firebase@^12.7.0/",
-    "recharts": "https://esm.sh/recharts@^3.6.0",
-    "vite": "https://esm.sh/vite@^7.3.1",
-    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.2",
+    "react": "https://esm.sh/react@18.3.1",
+    "react-dom/": "https://esm.sh/react-dom@18.3.1/",
+    "react/": "https://esm.sh/react@18.3.1/",
+    "@google/genai": "https://esm.sh/@google/genai@0.1.1",
+    "firebase/": "https://esm.sh/firebase@10.12.0/",
+    "recharts": "https://esm.sh/recharts@2.12.7",
+    "xlsx": "https://esm.sh/xlsx@0.18.5",
+    "vite": "https://esm.sh/vite@5.4.0",
+    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@4.3.0",
     "path": "https://esm.sh/path@^0.12.7",
-    "url": "https://esm.sh/url@^0.11.4",
-    "xlsx": "https://esm.sh/xlsx@0.18.5"
+    "url": "https://esm.sh/url@^0.11.4"
   }
 }
 </script>
