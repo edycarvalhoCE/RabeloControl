@@ -108,9 +108,6 @@ const MainContent = () => {
     }
   };
 
-  // Check if current user is NOT a driver (Drivers already have their own bottom nav in DriverPortal)
-  const showMainBottomNav = currentUser.role !== 'MOTORISTA' && currentUser.role !== 'AUX_GARAGEM';
-
   return (
     <div className="flex h-screen bg-slate-100 font-sans text-slate-900 overflow-hidden">
       <Sidebar 
@@ -121,66 +118,21 @@ const MainContent = () => {
       />
       
       <div className="flex-1 flex flex-col h-full overflow-hidden relative">
-        {/* Mobile Header (Only visible if NOT showing bottom nav, or maybe simplified) 
-            Actually, let's keep it simple: top header always visible on mobile for Logo 
-        */}
+        {/* Mobile Header - Classic Hamburger Style */}
         <div className="md:hidden bg-slate-900 text-white p-4 flex justify-between items-center shadow-md shrink-0">
             <div className="font-extrabold text-xl">
                 Rabelo<span className="text-blue-500">Tour</span>
             </div>
-            {/* If we have bottom nav, we might not need this top hamburger, but keeping it as backup is okay.
-                However, for cleaner UI with bottom nav, we usually remove top hamburger.
-                Let's keep it for now as a secondary way or remove it if Bottom Nav has "Menu".
-            */}
-            {!showMainBottomNav && (
-                <button onClick={() => setIsMobileOpen(true)} className="p-2">
-                    <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16m-7 6h7" /></svg>
-                </button>
-            )}
+            <button onClick={() => setIsMobileOpen(true)} className="p-2">
+                <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16m-7 6h7" /></svg>
+            </button>
         </div>
 
-        <main className={`flex-1 overflow-y-auto p-4 md:p-8 ${showMainBottomNav ? 'pb-24' : ''}`}>
+        <main className="flex-1 overflow-y-auto p-4 md:p-8">
           <div className="max-w-7xl mx-auto">
             {renderView()}
           </div>
         </main>
-
-        {/* NEW: MOBILE BOTTOM NAVIGATION FOR ADMINS/MANAGERS */}
-        {showMainBottomNav && (
-            <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 z-50 pb-safe h-16 shadow-[0_-2px_10px_rgba(0,0,0,0.1)] flex justify-around items-center">
-                <button 
-                    onClick={() => setCurrentView('dashboard')}
-                    className={`flex flex-col items-center justify-center w-full h-full space-y-1 ${currentView === 'dashboard' ? 'text-blue-600' : 'text-slate-400'}`}
-                >
-                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>
-                    <span className="text-[10px] font-bold">Início</span>
-                </button>
-
-                <button 
-                    onClick={() => setCurrentView('calendar')}
-                    className={`flex flex-col items-center justify-center w-full h-full space-y-1 ${currentView === 'calendar' ? 'text-blue-600' : 'text-slate-400'}`}
-                >
-                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-                    <span className="text-[10px] font-bold">Agenda</span>
-                </button>
-
-                <button 
-                    onClick={() => setCurrentView('bookings')}
-                    className={`flex flex-col items-center justify-center w-full h-full space-y-1 ${currentView === 'bookings' ? 'text-blue-600' : 'text-slate-400'}`}
-                >
-                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                    <span className="text-[10px] font-bold">Viagens</span>
-                </button>
-
-                <button 
-                    onClick={() => setIsMobileOpen(true)}
-                    className={`flex flex-col items-center justify-center w-full h-full space-y-1 ${isMobileOpen ? 'text-blue-600' : 'text-slate-400'}`}
-                >
-                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16m-7 6h7" /></svg>
-                    <span className="text-[10px] font-bold">Menu</span>
-                </button>
-            </div>
-        )}
       </div>
     </div>
   );
