@@ -7,6 +7,7 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
+    <meta name="app-version" content="v8.0" />
     
     <!-- Cor Azul da Marca Rabelo Tour para a barra do navegador -->
     <meta name="theme-color" content="#2e2e77" />
@@ -14,44 +15,44 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <!-- Favicon usando a mesma logo -->
     <link rel="icon" type="image/png" href="./logo.png" />
-    <title>RabeloTour - Sistema Integrado</title>
+    <title>RabeloTour v8.0</title>
     
-    <!-- SCRIPT NUCLEAR DE LIMPEZA DE CACHE -->
+    <!-- SCRIPT NUCLEAR: DETECÇÃO E RELOAD DE VERSÃO -->
     <script>
       (function() {
-        var currentVersion = 'v7.0-NUCLEAR';
-        console.log("Verificando versão:", currentVersion);
+        var NEW_VERSION = 'v8.0-RELEASE';
+        var storedVersion = localStorage.getItem('app_version_tag');
 
-        // 1. Matar Service Workers antigos
-        if ('serviceWorker' in navigator) {
-          navigator.serviceWorker.getRegistrations().then(function(registrations) {
-            for(let registration of registrations) {
-              registration.unregister();
-              console.log('Service Worker antigo assassinado.');
+        console.log('Verificando versão:', storedVersion, 'vs', NEW_VERSION);
+
+        if (storedVersion !== NEW_VERSION) {
+            console.log('Nova versão detectada! Limpando cache e recarregando...');
+            
+            // 1. Limpar Service Workers
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.getRegistrations().then(function(registrations) {
+                    for(let registration of registrations) {
+                        registration.unregister();
+                    }
+                });
             }
-          });
-        }
 
-        // 2. Limpar Cache Storage do Navegador (Onde arquivos JS ficam presos)
-        if(window.caches) {
-           caches.keys().then(function(names) {
-             for (let name of names) {
-                 caches.delete(name);
-                 console.log("Cache deletado:", name);
-             }
-           });
-        }
+            // 2. Limpar Caches de Arquivos
+            if (window.caches) {
+                caches.keys().then(function(names) {
+                    for (let name of names) caches.delete(name);
+                });
+            }
 
-        // 3. Resetar Session Storage se a versão for diferente
-        try {
-          if (sessionStorage.getItem('app_version') !== currentVersion) {
-             sessionStorage.clear();
-             // NÃO limpamos o LocalStorage inteiro para não deslogar o Firebase
-             // Mas removemos chaves de cache de build se existissem
-             sessionStorage.setItem('app_version', currentVersion);
-             console.log('Sessão limpa para versão ' + currentVersion);
-          }
-        } catch(e) { console.error(e); }
+            // 3. Atualizar flag e forçar reload do servidor (true)
+            localStorage.setItem('app_version_tag', NEW_VERSION);
+            sessionStorage.clear();
+            
+            // Pequeno delay para garantir que a limpeza ocorra
+            setTimeout(function() {
+                window.location.reload(true);
+            }, 500);
+        }
       })();
     </script>
 

@@ -138,8 +138,8 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setView, isMobileOpen, s
                   <span>Sair</span>
               </button>
               
-              <div className="text-center text-[10px] text-red-500 mt-2 font-black bg-white/10 rounded py-1 border border-red-500">
-                  VERSÃO V7.0 ATIVA
+              <div className="text-center text-[10px] text-green-400 mt-2 font-black bg-green-900/30 rounded py-1 border border-green-800">
+                  VERSÃO V8.0 (NOVA)
               </div>
           </div>
         </div>
