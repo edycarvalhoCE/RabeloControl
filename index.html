@@ -27,13 +27,20 @@
           }
         });
       }
-      // Limpeza de cache de sessão
+      // Limpeza de cache de sessão - VERSÃO ATUALIZADA V5
       try {
-        if (!sessionStorage.getItem('version_reset_v4')) {
+        if (sessionStorage.getItem('app_version') !== 'v5.0') {
            sessionStorage.clear();
-           sessionStorage.setItem('version_reset_v4', 'true');
+           // Tenta limpar caches de dados se possível, mas mantém auth
+           if(window.caches) {
+             caches.keys().then(function(names) {
+               for (let name of names) caches.delete(name);
+             });
+           }
+           sessionStorage.setItem('app_version', 'v5.0');
+           console.log('Cache limpo para versão V5.0');
         }
-      } catch(e) {}
+      } catch(e) { console.error(e); }
     </script>
 
     <script src="https://cdn.tailwindcss.com"></script>

@@ -396,9 +396,10 @@ const Dashboard: React.FC = () => {
                     </div>
                 </div>
 
-              <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 h-80 flex flex-col">
+              <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex flex-col">
                   <h3 className="text-lg font-semibold text-slate-700 mb-4 flex-shrink-0">Fluxo de Caixa Global</h3>
-                  <div className="flex-1 w-full min-h-0">
+                  {/* Fixed height container for chart */}
+                  <div className="w-full h-80 min-h-[300px]">
                       <ResponsiveContainer width="100%" height="100%">
                           <BarChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
                               <CartesianGrid strokeDasharray="3 3" vertical={false} />

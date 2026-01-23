@@ -857,17 +857,27 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
           'driverFees', 'quotes', 'priceRoutes'
       ];
 
+      let totalDeleted = 0;
+
       try {
           for (const colName of collectionsToClear) {
               const q = query(collection(db, colName));
               const snapshot = await getDocs(q);
               
-              if (!snapshot.empty) {
-                  const deletePromises = snapshot.docs.map(d => deleteDoc(d.ref));
-                  await Promise.all(deletePromises);
+              if (snapshot.empty) continue;
+
+              // BATCH DELETE IN CHUNKS OF 400 (Firebase Limit is 500)
+              const chunk = 400;
+              for (let i = 0; i < snapshot.docs.length; i += chunk) {
+                  const batch = writeBatch(db);
+                  snapshot.docs.slice(i, i + chunk).forEach(doc => {
+                      batch.delete(doc.ref);
+                  });
+                  await batch.commit();
+                  totalDeleted += snapshot.docs.slice(i, i + chunk).length;
               }
           }
-          return { success: true, message: "Limpeza concluída! O sistema está zerado (exceto usuários e configurações)." };
+          return { success: true, message: `Limpeza concluída! ${totalDeleted} registros foram removidos com sucesso.` };
       } catch (e: any) {
           console.error("Erro ao limpar dados:", e);
           return { success: false, message: "Erro ao limpar: " + e.message };
