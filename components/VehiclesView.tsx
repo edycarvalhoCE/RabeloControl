@@ -121,7 +121,7 @@ const VehiclesView: React.FC = () => {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {buses.map(bus => (
-              <div key={bus.id} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
+              <div key={bus.id} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col relative group">
                   <div className={`h-2 w-full ${bus.status === 'AVAILABLE' ? 'bg-green-500' : bus.status === 'MAINTENANCE' ? 'bg-red-500' : 'bg-blue-500'}`}></div>
                   <div className="p-5 flex-1">
                       <div className="flex justify-between items-start mb-2">
@@ -149,25 +149,25 @@ const VehiclesView: React.FC = () => {
                       </div>
                   </div>
                   
-                  <div className="bg-slate-50 p-3 border-t border-slate-100 flex justify-between items-center">
+                  <div className="bg-slate-50 p-3 border-t border-slate-100 flex justify-between items-center gap-2">
                       <button 
                         onClick={() => handleDelete(bus.id, bus.plate)}
-                        className="text-red-400 hover:text-red-600 p-2 rounded-full hover:bg-red-50 transition-colors"
-                        title="Excluir Veículo"
+                        className="text-xs bg-white border border-red-200 text-red-600 px-3 py-2 rounded hover:bg-red-50 font-bold flex items-center gap-1 shadow-sm"
+                        title="Excluir Veículo do Sistema"
                       >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                        🗑️ EXCLUIR
                       </button>
 
                       <button 
                         onClick={() => handleStatusToggle(bus.id, bus.status)}
-                        className={`text-xs font-bold px-3 py-1.5 rounded transition-colors ${
+                        className={`flex-1 text-xs font-bold px-3 py-2 rounded transition-colors shadow-sm ${
                             bus.status === 'MAINTENANCE' 
                             ? 'bg-green-600 text-white hover:bg-green-700' 
-                            : 'bg-red-600 text-white hover:bg-red-700'
+                            : 'bg-slate-800 text-white hover:bg-slate-700'
                         }`}
                         title={bus.status === 'BUSY' ? 'Forçar Manutenção' : ''}
                       >
-                          {bus.status === 'MAINTENANCE' ? 'Liberar Veículo' : 'Por em Manutenção'}
+                          {bus.status === 'MAINTENANCE' ? 'LIBERAR VEÍCULO' : 'POR EM MANUTENÇÃO'}
                       </button>
                   </div>
               </div>

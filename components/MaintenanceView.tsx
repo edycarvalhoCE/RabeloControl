@@ -6,7 +6,9 @@ import { Logo } from './Logo';
 
 const MaintenanceView: React.FC = () => {
   const { buses, parts, currentUser, addMaintenanceRecord, addPurchaseRequest, maintenanceRecords, users, maintenanceReports, updateMaintenanceReportStatus, addFuelRecord, fuelRecords, fuelStockLevel, updateBusStatus } = useStore();
-  const [activeTab, setActiveTab] = useState<'usage' | 'request' | 'history' | 'reports' | 'fuel' | 'fleet'>('reports');
+  
+  // Default to Fleet Status for Mechanics to make it easier
+  const [activeTab, setActiveTab] = useState<'usage' | 'request' | 'history' | 'reports' | 'fuel' | 'fleet'>('fleet');
 
   // Usage Form State
   const [usage, setUsage] = useState({ busId: '', partId: '', quantityUsed: 1, type: 'CORRETIVA' as 'CORRETIVA' | 'PREVENTIVA', date: new Date().toISOString().split('T')[0] });
@@ -172,10 +174,17 @@ const MaintenanceView: React.FC = () => {
             </div>
         </div>
 
-        <div className="flex border-b border-slate-300 space-x-4 overflow-x-auto">
+        {/* TABS - REORDERED: Fleet Status First */}
+        <div className="flex border-b border-slate-300 space-x-4 overflow-x-auto bg-white p-2 rounded-t-lg shadow-sm">
+            <button 
+                onClick={() => setActiveTab('fleet')}
+                className={`pb-2 px-4 font-bold transition-colors whitespace-nowrap border-b-4 ${activeTab === 'fleet' ? 'border-orange-500 text-orange-600 bg-orange-50' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+            >
+                🚍 Status da Frota
+            </button>
             <button 
                 onClick={() => setActiveTab('reports')}
-                className={`pb-2 px-4 font-bold transition-colors whitespace-nowrap relative ${activeTab === 'reports' ? 'border-b-4 border-red-600 text-red-600' : 'text-slate-500'}`}
+                className={`pb-2 px-4 font-bold transition-colors whitespace-nowrap relative border-b-4 ${activeTab === 'reports' ? 'border-red-600 text-red-600 bg-red-50' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
             >
                 ⚠️ Reportes
                 {pendingReportsCount > 0 && (
@@ -183,36 +192,75 @@ const MaintenanceView: React.FC = () => {
                 )}
             </button>
             <button 
-                onClick={() => setActiveTab('fleet')}
-                className={`pb-2 px-4 font-bold transition-colors whitespace-nowrap ${activeTab === 'fleet' ? 'border-b-4 border-orange-500 text-orange-600' : 'text-slate-500'}`}
-            >
-                🚍 Status da Frota
-            </button>
-            <button 
                 onClick={() => setActiveTab('fuel')}
-                className={`pb-2 px-4 font-bold transition-colors whitespace-nowrap ${activeTab === 'fuel' ? 'border-b-4 border-green-600 text-green-600' : 'text-slate-500'}`}
+                className={`pb-2 px-4 font-bold transition-colors whitespace-nowrap border-b-4 ${activeTab === 'fuel' ? 'border-green-600 text-green-600 bg-green-50' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
             >
                 ⛽ Abastecer
             </button>
             <button 
                 onClick={() => setActiveTab('usage')}
-                className={`pb-2 px-4 font-bold transition-colors whitespace-nowrap ${activeTab === 'usage' ? 'border-b-4 border-slate-800 text-slate-800' : 'text-slate-500'}`}
+                className={`pb-2 px-4 font-bold transition-colors whitespace-nowrap border-b-4 ${activeTab === 'usage' ? 'border-slate-800 text-slate-800' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
             >
                 Uso de Peças
             </button>
             <button 
                 onClick={() => setActiveTab('request')}
-                className={`pb-2 px-4 font-bold transition-colors whitespace-nowrap ${activeTab === 'request' ? 'border-b-4 border-slate-800 text-slate-800' : 'text-slate-500'}`}
+                className={`pb-2 px-4 font-bold transition-colors whitespace-nowrap border-b-4 ${activeTab === 'request' ? 'border-slate-800 text-slate-800' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
             >
                 Solicitar Compra
             </button>
             <button 
                 onClick={() => setActiveTab('history')}
-                className={`pb-2 px-4 font-bold transition-colors whitespace-nowrap ${activeTab === 'history' ? 'border-b-4 border-slate-800 text-slate-800' : 'text-slate-500'}`}
+                className={`pb-2 px-4 font-bold transition-colors whitespace-nowrap border-b-4 ${activeTab === 'history' ? 'border-slate-800 text-slate-800' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
             >
                 📜 Histórico
             </button>
         </div>
+
+        {/* FLEET STATUS TAB (MOVED TO TOP PRIORITY) */}
+        {activeTab === 'fleet' && (
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                <h3 className="font-bold text-lg text-slate-800 mb-4 flex items-center gap-2">
+                    <span className="bg-orange-100 text-orange-600 p-1.5 rounded">🚍</span>
+                    Controle de Status da Frota
+                </h3>
+                <p className="text-sm text-slate-500 mb-6">
+                    Visualize e altere o status dos veículos (Disponível / Manutenção).
+                </p>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {buses.map(bus => (
+                        <div key={bus.id} className="bg-white border rounded-xl overflow-hidden shadow-sm flex flex-col">
+                            <div className={`h-2 w-full ${bus.status === 'AVAILABLE' ? 'bg-green-500' : bus.status === 'MAINTENANCE' ? 'bg-red-500' : 'bg-blue-500'}`}></div>
+                            <div className="p-4 flex-1 flex flex-col justify-between">
+                                <div>
+                                    <h4 className="font-bold text-lg text-slate-800">{bus.plate}</h4>
+                                    <p className="text-sm text-slate-500 mb-2">{bus.model}</p>
+                                    <div className="mb-3">
+                                        <span className={`px-2 py-1 rounded text-xs font-bold ${
+                                            bus.status === 'AVAILABLE' ? 'bg-green-100 text-green-700' : 
+                                            bus.status === 'MAINTENANCE' ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'
+                                        }`}>
+                                            {bus.status === 'AVAILABLE' ? 'DISPONÍVEL' : bus.status === 'MAINTENANCE' ? 'MANUTENÇÃO' : 'EM VIAGEM'}
+                                        </span>
+                                    </div>
+                                </div>
+                                <button 
+                                    onClick={() => handleFleetStatusToggle(bus.id, bus.status)}
+                                    className={`w-full py-3 rounded-lg font-bold text-sm transition-colors shadow-sm ${
+                                        bus.status === 'MAINTENANCE' 
+                                        ? 'bg-green-600 text-white hover:bg-green-700' 
+                                        : 'bg-red-600 text-white hover:bg-red-700'
+                                    }`}
+                                >
+                                    {bus.status === 'MAINTENANCE' ? 'LIBERAR VEÍCULO' : 'POR EM MANUTENÇÃO'}
+                                </button>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        )}
 
         {/* DRIVER REPORTS TAB */}
         {activeTab === 'reports' && (
@@ -273,51 +321,6 @@ const MaintenanceView: React.FC = () => {
                             );
                         })
                     )}
-                </div>
-            </div>
-        )}
-
-        {/* FLEET STATUS TAB (NEW) */}
-        {activeTab === 'fleet' && (
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-                <h3 className="font-bold text-lg text-slate-800 mb-4 flex items-center gap-2">
-                    <span className="bg-orange-100 text-orange-600 p-1.5 rounded">🚍</span>
-                    Controle de Status da Frota
-                </h3>
-                <p className="text-sm text-slate-500 mb-6">
-                    Visualize e altere o status dos veículos (Disponível / Manutenção).
-                </p>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {buses.map(bus => (
-                        <div key={bus.id} className="bg-white border rounded-xl overflow-hidden shadow-sm flex flex-col">
-                            <div className={`h-2 w-full ${bus.status === 'AVAILABLE' ? 'bg-green-500' : bus.status === 'MAINTENANCE' ? 'bg-red-500' : 'bg-blue-500'}`}></div>
-                            <div className="p-4 flex-1 flex flex-col justify-between">
-                                <div>
-                                    <h4 className="font-bold text-lg text-slate-800">{bus.plate}</h4>
-                                    <p className="text-sm text-slate-500 mb-2">{bus.model}</p>
-                                    <div className="mb-3">
-                                        <span className={`px-2 py-1 rounded text-xs font-bold ${
-                                            bus.status === 'AVAILABLE' ? 'bg-green-100 text-green-700' : 
-                                            bus.status === 'MAINTENANCE' ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'
-                                        }`}>
-                                            {bus.status === 'AVAILABLE' ? 'DISPONÍVEL' : bus.status === 'MAINTENANCE' ? 'MANUTENÇÃO' : 'EM VIAGEM'}
-                                        </span>
-                                    </div>
-                                </div>
-                                <button 
-                                    onClick={() => handleFleetStatusToggle(bus.id, bus.status)}
-                                    className={`w-full py-2 rounded font-bold text-sm transition-colors ${
-                                        bus.status === 'MAINTENANCE' 
-                                        ? 'bg-green-100 text-green-700 hover:bg-green-200 border border-green-200' 
-                                        : 'bg-red-100 text-red-700 hover:bg-red-200 border border-red-200'
-                                    }`}
-                                >
-                                    {bus.status === 'MAINTENANCE' ? 'LIBERAR VEÍCULO' : 'POR EM MANUTENÇÃO'}
-                                </button>
-                            </div>
-                        </div>
-                    ))}
                 </div>
             </div>
         )}
