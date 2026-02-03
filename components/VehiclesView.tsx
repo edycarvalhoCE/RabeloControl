@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { useStore } from '../services/store';
 
 const VehiclesView: React.FC = () => {
-  const { buses, addBus, updateBusStatus } = useStore();
+  const { buses, addBus, updateBusStatus, deleteBus } = useStore();
   const [showAddForm, setShowAddForm] = useState(false);
   const [newBus, setNewBus] = useState({ 
     plate: '', 
@@ -41,6 +41,12 @@ const VehiclesView: React.FC = () => {
 
     const newStatus = currentStatus === 'MAINTENANCE' ? 'AVAILABLE' : 'MAINTENANCE';
     updateBusStatus(busId, newStatus);
+  };
+
+  const handleDelete = async (id: string, plate: string) => {
+      if (window.confirm(`Tem certeza que deseja excluir o veículo ${plate}? Esta ação não pode ser desfeita.`)) {
+          await deleteBus(id);
+      }
   };
 
   return (
@@ -144,7 +150,14 @@ const VehiclesView: React.FC = () => {
                   </div>
                   
                   <div className="bg-slate-50 p-3 border-t border-slate-100 flex justify-between items-center">
-                      <span className="text-xs text-slate-500 font-medium uppercase tracking-wider">Ações Rápidas</span>
+                      <button 
+                        onClick={() => handleDelete(bus.id, bus.plate)}
+                        className="text-red-400 hover:text-red-600 p-2 rounded-full hover:bg-red-50 transition-colors"
+                        title="Excluir Veículo"
+                      >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                      </button>
+
                       <button 
                         onClick={() => handleStatusToggle(bus.id, bus.status)}
                         className={`text-xs font-bold px-3 py-1.5 rounded transition-colors ${

@@ -69,6 +69,7 @@ interface StoreContextType {
   updateMaintenanceReportStatus: (id: string, status: MaintenanceReport['status']) => void;
   addBus: (bus: Omit<Bus, 'id' | 'status'>) => void;
   updateBusStatus: (id: string, status: Bus['status']) => void;
+  deleteBus: (id: string) => Promise<void>;
   addCharterContract: (contract: Omit<CharterContract, 'id' | 'status'>) => void;
   addTravelPackage: (pkg: Omit<TravelPackage, 'id' | 'status'>) => void;
   registerPackageSale: (
@@ -459,6 +460,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   const updateMaintenanceReportStatus = async (id: string, status: MaintenanceReport['status']) => { if (isConfigured) await updateDoc(doc(db, 'maintenanceReports', id), { status }); };
   const addBus = async (bus: Omit<Bus, 'id' | 'status'>) => { if (isConfigured) await addDoc(collection(db, 'buses'), { ...bus, status: 'AVAILABLE' }); };
   const updateBusStatus = async (id: string, status: Bus['status']) => { if (isConfigured) await updateDoc(doc(db, 'buses', id), { status }); };
+  const deleteBus = async (id: string) => { if (isConfigured) await deleteDoc(doc(db, 'buses', id)); };
   const addCharterContract = async (contract: Omit<CharterContract, 'id' | 'status'>) => { if (!isConfigured) return; await addDoc(collection(db, 'charterContracts'), { ...contract, status: 'ACTIVE' }); }; 
   const addTravelPackage = async (pkg: Omit<TravelPackage, 'id' | 'status'>) => { if (isConfigured) await addDoc(collection(db, 'travelPackages'), { ...pkg, status: 'OPEN' }); };
   
@@ -812,7 +814,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   return (
     <StoreContext.Provider value={{
       currentUser: currentUser!, isAuthenticated, settings, users, buses, bookings, parts, transactions, timeOffs, documents, maintenanceRecords, purchaseRequests, maintenanceReports, charterContracts, travelPackages, packagePassengers, packagePayments, clients, packageLeads, fuelRecords, fuelSupplies, fuelStockLevel, driverLiabilities, quotes, priceRoutes, driverFees, scheduleConfirmations,
-      switchUser, addUser, updateUser, deleteUser, addBooking, updateBooking, updateBookingStatus, addPart, updateStock, addTransaction, addTimeOff, updateTimeOffStatus, deleteTimeOff, addDocument, deleteDocument, addMaintenanceRecord, addPurchaseRequest, updatePurchaseRequestStatus, addMaintenanceReport, updateMaintenanceReportStatus, addBus, updateBusStatus, addCharterContract, addTravelPackage, registerPackageSale, updatePackagePassenger, deletePackagePassenger, addPackagePayment, addPackageLead, updatePackageLead, deletePackageLead, addFuelRecord, updateFuelRecord, deleteFuelRecord, addFuelSupply, addDriverLiability, payDriverLiability,
+      switchUser, addUser, updateUser, deleteUser, addBooking, updateBooking, updateBookingStatus, addPart, updateStock, addTransaction, addTimeOff, updateTimeOffStatus, deleteTimeOff, addDocument, deleteDocument, addMaintenanceRecord, addPurchaseRequest, updatePurchaseRequestStatus, addMaintenanceReport, updateMaintenanceReportStatus, addBus, updateBusStatus, deleteBus, addCharterContract, addTravelPackage, registerPackageSale, updatePackagePassenger, deletePackagePassenger, addPackagePayment, addPackageLead, updatePackageLead, deletePackageLead, addFuelRecord, updateFuelRecord, deleteFuelRecord, addFuelSupply, addDriverLiability, payDriverLiability,
       login, logout, register, updateSettings, seedDatabase, restoreDatabase,
       addQuote, updateQuote, convertQuoteToBooking, deleteQuote,
       addPriceRoute, updatePriceRoute, deletePriceRoute, importDefaultPrices, clearPriceTable,
