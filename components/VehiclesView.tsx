@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useStore } from '../services/store';
 
@@ -31,8 +32,13 @@ const VehiclesView: React.FC = () => {
   };
 
   const handleStatusToggle = (busId: string, currentStatus: string) => {
-    // If it's maintenance, make it available. If available, make it maintenance.
-    // We ignore BUSY status for this simple toggle, or we can force it to MAINTENANCE from BUSY too.
+    // Permitir forçar manutenção mesmo se estiver em viagem (BUSY)
+    if (currentStatus === 'BUSY') {
+        if (!window.confirm("⚠️ ATENÇÃO: Este veículo está marcado como EM VIAGEM.\n\nDeseja forçar a mudança para MANUTENÇÃO?")) {
+            return;
+        }
+    }
+
     const newStatus = currentStatus === 'MAINTENANCE' ? 'AVAILABLE' : 'MAINTENANCE';
     updateBusStatus(busId, newStatus);
   };
@@ -141,12 +147,12 @@ const VehiclesView: React.FC = () => {
                       <span className="text-xs text-slate-500 font-medium uppercase tracking-wider">Ações Rápidas</span>
                       <button 
                         onClick={() => handleStatusToggle(bus.id, bus.status)}
-                        disabled={bus.status === 'BUSY'}
                         className={`text-xs font-bold px-3 py-1.5 rounded transition-colors ${
                             bus.status === 'MAINTENANCE' 
                             ? 'bg-green-600 text-white hover:bg-green-700' 
-                            : 'bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed'
+                            : 'bg-red-600 text-white hover:bg-red-700'
                         }`}
+                        title={bus.status === 'BUSY' ? 'Forçar Manutenção' : ''}
                       >
                           {bus.status === 'MAINTENANCE' ? 'Liberar Veículo' : 'Por em Manutenção'}
                       </button>
