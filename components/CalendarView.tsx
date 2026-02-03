@@ -16,7 +16,7 @@ type GenericEventType = {
 };
 
 const CalendarView: React.FC<CalendarViewProps> = ({ onEventClick }) => {
-  const { bookings, timeOffs, users, currentUser, addTimeOff, updateTimeOffStatus, deleteTimeOff, buses, charterContracts, scheduleConfirmations, confirmTrip } = useStore();
+  const { bookings, timeOffs, users, currentUser, addTimeOff, updateTimeOffStatus, deleteTimeOff, buses, charterContracts } = useStore();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [showModal, setShowModal] = useState(false);
   
@@ -77,15 +77,6 @@ const CalendarView: React.FC<CalendarViewProps> = ({ onEventClick }) => {
           const d = new Date(isoString);
           return d.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
       } catch (e) { return isoString; }
-  };
-
-  // Helper for checking confirmation
-  const isConfirmed = (refId: string, type: 'BOOKING' | 'CHARTER', date: string) => {
-      return scheduleConfirmations.some(c => 
-          c.referenceId === refId && 
-          c.type === type &&
-          c.date === date
-      );
   };
 
   const handleAddFolga = (e: React.FormEvent) => {
@@ -230,10 +221,13 @@ const CalendarView: React.FC<CalendarViewProps> = ({ onEventClick }) => {
             ))}
             
             {days.map(day => {
+                // IMPORTANT: Create date using local year, month, day to correspond to calendar visual
+                // Format string for simple comparisons (YYYY-MM-DD)
                 const cellDateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
                 const cellDateObj = new Date(year, month, day, 12, 0, 0);
                 const cellDayOfWeek = cellDateObj.getDay();
 
+                // 1. FILTER BOOKINGS
                 const dayBookings = bookings.filter(b => {
                    if (b.status === 'CANCELLED') return false;
                    const start = new Date(b.startTime);
@@ -243,6 +237,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ onEventClick }) => {
                    return cellDateObj >= start && cellDateObj <= end;
                 });
 
+                // 2. FILTER TIME OFFS
                 const dayTimeOffs = timeOffs.filter(t => {
                     const isOwner = t.driverId === currentUser.id;
                     if (!canManage && !isOwner) return false;
@@ -255,18 +250,25 @@ const CalendarView: React.FC<CalendarViewProps> = ({ onEventClick }) => {
                     return false;
                 });
 
+                // 3. FILTER CHARTERS (NEW)
                 const dayCharters = charterContracts.filter(c => {
+                    // Check date range
                     if (cellDateStr < c.startDate || cellDateStr > c.endDate) return false;
+                    // Check day of week
                     if (!c.weekDays.includes(cellDayOfWeek)) return false;
+                    // Check status
                     if (c.status !== 'ACTIVE') return false;
                     
+                    // Privacy Check (Manager/Aux sees all, Driver sees own)
                     const isOwner = c.driverId === currentUser.id;
                     if (!canViewAllSchedule && !isOwner) return false;
 
                     return true;
                 });
 
+                // Privacy for bookings (Manager/Aux sees all, Driver sees own)
                 const visibleBookings = canViewAllSchedule ? dayBookings : dayBookings.filter(b => b.driverId === currentUser.id);
+
                 const isToday = new Date().getDate() === day && new Date().getMonth() === month && new Date().getFullYear() === year;
 
                 return (
@@ -314,7 +316,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ onEventClick }) => {
                                                 type: 'TIMEOFF',
                                                 data: t,
                                                 title: isVacation ? 'Férias' : isStandby ? 'Plantão' : 'Folga',
-                                                colorClass: styleClass.replace('border', '').split(' ')[0]
+                                                colorClass: styleClass.replace('border', '').split(' ')[0] // Extract bg color
                                             });
                                         }}
                                         className={`group text-[10px] px-1 py-0.5 rounded truncate font-medium border cursor-pointer hover:shadow-sm ${styleClass} flex justify-between items-center`} 
@@ -327,11 +329,10 @@ const CalendarView: React.FC<CalendarViewProps> = ({ onEventClick }) => {
                                 );
                             })}
                             
+                            {/* CHARTER EVENTS */}
                             {dayCharters.map(c => {
                                 const driver = users.find(u => u.id === c.driverId);
                                 const driverName = driver ? driver.name : c.freelanceDriverName ? `${c.freelanceDriverName} (F)` : 'S/ Mot';
-                                const confirmed = isConfirmed(c.id, 'CHARTER', cellDateStr);
-
                                 return (
                                     <div 
                                         key={`charter-${c.id}-${day}`} 
@@ -344,19 +345,16 @@ const CalendarView: React.FC<CalendarViewProps> = ({ onEventClick }) => {
                                                 colorClass: 'bg-orange-100'
                                             });
                                         }}
-                                        className="text-[10px] px-2 py-1 rounded truncate font-medium border bg-orange-100 text-orange-900 border-orange-300 cursor-pointer hover:bg-orange-200 flex justify-between items-center" 
+                                        className="text-[10px] px-2 py-1 rounded truncate font-medium border bg-orange-100 text-orange-900 border-orange-300 cursor-pointer hover:bg-orange-200" 
                                         title={`Fretamento: ${c.clientName}`}
                                     >
-                                        <span>🏭 {canViewAllSchedule ? `${c.route.substring(0,8)}.. (${driverName.split(' ')[0]})` : c.route}</span>
-                                        {confirmed && <span>✅</span>}
+                                        🏭 {canViewAllSchedule ? `${c.route.substring(0,12)}.. (${driverName.split(' ')[0]})` : c.route}
                                     </div>
                                 )
                             })}
 
                             {visibleBookings.map(b => {
                                 const driver = users.find(u => u.id === b.driverId);
-                                const confirmed = isConfirmed(b.id, 'BOOKING', cellDateStr);
-
                                 return (
                                     <div 
                                         key={b.id} 
@@ -369,15 +367,14 @@ const CalendarView: React.FC<CalendarViewProps> = ({ onEventClick }) => {
                                                 setSelectedBooking(b);
                                             }
                                         }}
-                                        className={`relative z-10 text-[10px] px-2 py-1 rounded truncate font-medium border cursor-pointer hover:opacity-80 transition-opacity hover:scale-[1.02] transform transition-transform flex justify-between items-center ${
+                                        className={`relative z-10 text-[10px] px-2 py-1 rounded truncate font-medium border cursor-pointer hover:opacity-80 transition-opacity hover:scale-[1.02] transform transition-transform ${
                                             b.driverId === currentUser.id && currentUser.role === UserRole.DRIVER 
-                                            ? 'bg-blue-600 text-white border-blue-700' 
+                                            ? 'bg-blue-600 text-white border-blue-700' // Highlight own trips
                                             : 'bg-blue-100 text-blue-800 border-blue-200'
                                         }`} 
                                         title={`${b.destination} - ${driver?.name || 'S/ Motorista'}`}
                                     >
-                                        <span>🚌 {canViewAllSchedule ? `${b.destination.substring(0,8)}.. (${driver?.name?.split(' ')[0] || '?'})` : b.destination}</span>
-                                        {confirmed && <span>✅</span>}
+                                        🚌 {canViewAllSchedule ? `${b.destination} (${driver?.name?.split(' ')[0] || '?'})` : b.destination}
                                     </div>
                                 );
                             })}
@@ -462,7 +459,6 @@ const CalendarView: React.FC<CalendarViewProps> = ({ onEventClick }) => {
                                   const bus = buses.find(b => b.id === c.busId);
                                   const driver = users.find(u => u.id === c.driverId);
                                   const driverDisplay = c.driverId ? driver?.name : c.freelanceDriverName ? `${c.freelanceDriverName} (Freelance)` : 'Não atribuído';
-                                  const confirmed = isConfirmed(c.id, 'CHARTER', c.currentDate);
                                   
                                   return (
                                       <div className="space-y-3">
@@ -470,13 +466,6 @@ const CalendarView: React.FC<CalendarViewProps> = ({ onEventClick }) => {
                                               <p className="text-xs text-slate-500 font-bold uppercase">Rota / Linha</p>
                                               <p className="text-lg font-bold text-slate-800">{c.route}</p>
                                           </div>
-                                          
-                                          {confirmed && (
-                                              <div className="bg-green-100 text-green-800 px-3 py-2 rounded font-bold text-center text-sm border border-green-200">
-                                                  ✅ Motorista Confirmou Presença
-                                              </div>
-                                          )}
-
                                           <div>
                                               <p className="text-xs text-slate-500 font-bold uppercase">Cliente</p>
                                               <p className="text-slate-700">{c.clientName}</p>
@@ -532,13 +521,6 @@ const CalendarView: React.FC<CalendarViewProps> = ({ onEventClick }) => {
                                 })()}
                             </div>
                         </div>
-
-                        {/* Confirmation Banner in Modal */}
-                        {isConfirmed(selectedBooking.id, 'BOOKING', selectedBooking.startTime.split('T')[0]) && (
-                            <div className="bg-green-100 text-green-800 px-4 py-3 rounded-lg font-bold text-center text-sm border border-green-200 shadow-sm">
-                                ✅ Motorista Confirmou Presença nesta viagem
-                            </div>
-                        )}
 
                         <div className="grid grid-cols-2 gap-4 bg-slate-50 p-3 rounded-lg border border-slate-100">
                             <div>
@@ -601,12 +583,12 @@ const CalendarView: React.FC<CalendarViewProps> = ({ onEventClick }) => {
                     {canManage ? 'Lançar Evento na Escala' : 'Solicitar Evento / Folga'}
                 </h3>
                 <form onSubmit={handleAddFolga} className="space-y-4">
-                    {/* ... form content unchanged ... */}
                     <div>
                         <label className="block text-sm font-medium text-slate-700 mb-1">Tipo de Evento</label>
                         <div className="flex gap-2">
                             <button type="button" onClick={() => setNewTimeOff({...newTimeOff, type: 'FOLGA'})} className={`flex-1 py-2 text-sm font-bold rounded border ${newTimeOff.type === 'FOLGA' ? 'bg-yellow-100 text-yellow-800 border-yellow-300' : 'bg-white border-slate-200 text-slate-500'}`}>Folga</button>
                             
+                            {/* Plantão might be Manager only, but let's allow it if desired, or restrict it visually if needed. Assuming everyone for now or just restrict behavior. */}
                             {canManage && (
                                 <button type="button" onClick={() => setNewTimeOff({...newTimeOff, type: 'PLANTAO'})} className={`flex-1 py-2 text-sm font-bold rounded border ${newTimeOff.type === 'PLANTAO' ? 'bg-purple-100 text-purple-800 border-purple-300' : 'bg-white border-slate-200 text-slate-500'}`}>Plantão</button>
                             )}
@@ -622,7 +604,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ onEventClick }) => {
                             value={newTimeOff.driverId}
                             onChange={(e) => setNewTimeOff({...newTimeOff, driverId: e.target.value})}
                             required
-                            disabled={!canManage} 
+                            disabled={!canManage} // Disable for non-managers
                         >
                             <option value="">Selecione...</option>
                             {drivers.map(d => (
@@ -631,6 +613,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ onEventClick }) => {
                         </select>
                     </div>
 
+                    {/* Date Logic */}
                     {newTimeOff.type === 'FERIAS' ? (
                         <div className="grid grid-cols-2 gap-3">
                             <div>
@@ -667,6 +650,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ onEventClick }) => {
                         </div>
                     )}
 
+                    {/* Shift Logic for Plantão */}
                     {newTimeOff.type === 'PLANTAO' && (
                         <div className="bg-purple-50 p-3 rounded border border-purple-100">
                             <label className="block text-xs font-bold text-purple-800 uppercase mb-2">Horário do Plantão</label>

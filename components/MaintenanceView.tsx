@@ -5,10 +5,8 @@ import { UserRole } from '../types';
 import { Logo } from './Logo';
 
 const MaintenanceView: React.FC = () => {
-  const { buses, parts, currentUser, addMaintenanceRecord, addPurchaseRequest, maintenanceRecords, users, maintenanceReports, updateMaintenanceReportStatus, addFuelRecord, fuelRecords, fuelStockLevel, updateBusStatus } = useStore();
-  
-  // Default to Fleet Status for Mechanics to make it easier
-  const [activeTab, setActiveTab] = useState<'usage' | 'request' | 'history' | 'reports' | 'fuel' | 'fleet'>('fleet');
+  const { buses, parts, currentUser, addMaintenanceRecord, addPurchaseRequest, maintenanceRecords, users, maintenanceReports, updateMaintenanceReportStatus } = useStore();
+  const [activeTab, setActiveTab] = useState<'usage' | 'request' | 'history' | 'reports'>('reports');
 
   // Usage Form State
   const [usage, setUsage] = useState({ busId: '', partId: '', quantityUsed: 1, type: 'CORRETIVA' as 'CORRETIVA' | 'PREVENTIVA', date: new Date().toISOString().split('T')[0] });
@@ -18,28 +16,6 @@ const MaintenanceView: React.FC = () => {
 
   // History Filter
   const [historyBusFilter, setHistoryBusFilter] = useState('');
-
-  // Helper to get local date string YYYY-MM-DD
-  const getTodayLocal = () => {
-    const d = new Date();
-    d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
-    return d.toISOString().split('T')[0];
-  };
-
-  // Fuel Form State
-  const [fuelForm, setFuelForm] = useState({
-      date: getTodayLocal(),
-      busId: '',
-      dieselLiters: 0,
-      hasArla: false,
-      arlaLiters: 0,
-      location: 'GARAGE' as 'GARAGE' | 'STREET',
-      cost: 0,
-      arlaCost: 0,
-      stationName: '',
-      kmStart: 0,
-      kmEnd: 0
-  });
 
   const handleUsageSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -67,91 +43,6 @@ const MaintenanceView: React.FC = () => {
     }
   };
 
-  // FUEL HANDLERS
-  const handleBusChangeFuel = (e: React.ChangeEvent<HTMLSelectElement>) => {
-      const selectedBusId = e.target.value;
-      let lastKm = 0;
-
-      if (selectedBusId) {
-          const busRecords = fuelRecords.filter(r => r.busId === selectedBusId);
-          if (busRecords.length > 0) {
-              busRecords.sort((a, b) => (b.kmEnd || 0) - (a.kmEnd || 0));
-              lastKm = busRecords[0].kmEnd || 0;
-          }
-      }
-
-      setFuelForm(prev => ({
-          ...prev,
-          busId: selectedBusId,
-          kmStart: lastKm,
-          kmEnd: 0
-      }));
-  };
-
-  const handleFuelSubmit = (e: React.FormEvent) => {
-      e.preventDefault();
-      
-      if (!fuelForm.busId || fuelForm.dieselLiters <= 0) {
-          alert("Selecione o ônibus e informe a quantidade de Diesel.");
-          return;
-      }
-      
-      if (fuelForm.hasArla && (fuelForm.arlaLiters <= 0 || !fuelForm.arlaLiters)) {
-         alert("⚠️ Atenção: Você marcou que abasteceu Arla.\nÉ obrigatório informar a quantidade de litros de Arla.");
-         return;
-      }
-
-      if (fuelForm.kmEnd <= fuelForm.kmStart) {
-          alert("⚠️ Erro de Quilometragem: O KM Final deve ser MAIOR que o KM Inicial.");
-          return;
-      }
-
-      const distance = fuelForm.kmEnd - fuelForm.kmStart;
-      const average = distance / fuelForm.dieselLiters;
-      
-      const totalCost = fuelForm.location === 'STREET' ? (fuelForm.cost + (fuelForm.hasArla ? fuelForm.arlaCost : 0)) : 0;
-
-      addFuelRecord({
-          date: fuelForm.date,
-          busId: fuelForm.busId,
-          dieselLiters: fuelForm.dieselLiters,
-          arlaLiters: fuelForm.hasArla ? fuelForm.arlaLiters : 0,
-          hasArla: fuelForm.hasArla,
-          location: fuelForm.location,
-          cost: totalCost,
-          arlaCost: fuelForm.hasArla && fuelForm.location === 'STREET' ? fuelForm.arlaCost : 0,
-          stationName: fuelForm.location === 'STREET' ? fuelForm.stationName : '',
-          loggedBy: currentUser.id,
-          kmStart: fuelForm.kmStart,
-          kmEnd: fuelForm.kmEnd,
-          averageConsumption: average
-      });
-      
-      alert(`Abastecimento registrado!\nMédia calculada: ${average.toFixed(2)} km/L`);
-      setFuelForm({
-        date: getTodayLocal(),
-        busId: '',
-        dieselLiters: 0,
-        hasArla: false,
-        arlaLiters: 0,
-        location: 'GARAGE',
-        cost: 0,
-        arlaCost: 0,
-        stationName: '',
-        kmStart: 0,
-        kmEnd: 0
-      });
-  };
-
-  // Fleet Status Handler
-  const handleFleetStatusToggle = (busId: string, currentStatus: string) => {
-      if (currentStatus === 'BUSY') {
-          if (!confirm("⚠️ Este ônibus está EM VIAGEM na escala.\nDeseja forçar o status para MANUTENÇÃO?")) return;
-      }
-      const newStatus = currentStatus === 'MAINTENANCE' ? 'AVAILABLE' : 'MAINTENANCE';
-      updateBusStatus(busId, newStatus);
-  };
-
   // Filter history records
   const filteredHistory = maintenanceRecords
     .filter(record => historyBusFilter ? record.busId === historyBusFilter : true)
@@ -174,93 +65,35 @@ const MaintenanceView: React.FC = () => {
             </div>
         </div>
 
-        {/* TABS - REORDERED: Fleet Status First */}
-        <div className="flex border-b border-slate-300 space-x-4 overflow-x-auto bg-white p-2 rounded-t-lg shadow-sm">
-            <button 
-                onClick={() => setActiveTab('fleet')}
-                className={`pb-2 px-4 font-bold transition-colors whitespace-nowrap border-b-4 ${activeTab === 'fleet' ? 'border-orange-500 text-orange-600 bg-orange-50' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
-            >
-                🚍 Status da Frota
-            </button>
+        <div className="flex border-b border-slate-300 space-x-4 overflow-x-auto">
             <button 
                 onClick={() => setActiveTab('reports')}
-                className={`pb-2 px-4 font-bold transition-colors whitespace-nowrap relative border-b-4 ${activeTab === 'reports' ? 'border-red-600 text-red-600 bg-red-50' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+                className={`pb-2 px-4 font-bold transition-colors whitespace-nowrap relative ${activeTab === 'reports' ? 'border-b-4 border-red-600 text-red-600' : 'text-slate-500'}`}
             >
-                ⚠️ Reportes
+                ⚠️ Reportes de Motoristas
                 {pendingReportsCount > 0 && (
                     <span className="ml-2 bg-red-600 text-white text-xs px-2 py-0.5 rounded-full">{pendingReportsCount}</span>
                 )}
             </button>
             <button 
-                onClick={() => setActiveTab('fuel')}
-                className={`pb-2 px-4 font-bold transition-colors whitespace-nowrap border-b-4 ${activeTab === 'fuel' ? 'border-green-600 text-green-600 bg-green-50' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
-            >
-                ⛽ Abastecer
-            </button>
-            <button 
                 onClick={() => setActiveTab('usage')}
-                className={`pb-2 px-4 font-bold transition-colors whitespace-nowrap border-b-4 ${activeTab === 'usage' ? 'border-slate-800 text-slate-800' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+                className={`pb-2 px-4 font-bold transition-colors whitespace-nowrap ${activeTab === 'usage' ? 'border-b-4 border-slate-800 text-slate-800' : 'text-slate-500'}`}
             >
-                Uso de Peças
+                Registrar Uso de Peças
             </button>
             <button 
                 onClick={() => setActiveTab('request')}
-                className={`pb-2 px-4 font-bold transition-colors whitespace-nowrap border-b-4 ${activeTab === 'request' ? 'border-slate-800 text-slate-800' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+                className={`pb-2 px-4 font-bold transition-colors whitespace-nowrap ${activeTab === 'request' ? 'border-b-4 border-slate-800 text-slate-800' : 'text-slate-500'}`}
             >
                 Solicitar Compra
             </button>
             <button 
                 onClick={() => setActiveTab('history')}
-                className={`pb-2 px-4 font-bold transition-colors whitespace-nowrap border-b-4 ${activeTab === 'history' ? 'border-slate-800 text-slate-800' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+                className={`pb-2 px-4 font-bold transition-colors whitespace-nowrap ${activeTab === 'history' ? 'border-b-4 border-slate-800 text-slate-800' : 'text-slate-500'}`}
             >
-                📜 Histórico
+                📜 Histórico do Veículo
             </button>
         </div>
-
-        {/* FLEET STATUS TAB (MOVED TO TOP PRIORITY) */}
-        {activeTab === 'fleet' && (
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-                <h3 className="font-bold text-lg text-slate-800 mb-4 flex items-center gap-2">
-                    <span className="bg-orange-100 text-orange-600 p-1.5 rounded">🚍</span>
-                    Controle de Status da Frota
-                </h3>
-                <p className="text-sm text-slate-500 mb-6">
-                    Visualize e altere o status dos veículos (Disponível / Manutenção).
-                </p>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {buses.map(bus => (
-                        <div key={bus.id} className="bg-white border rounded-xl overflow-hidden shadow-sm flex flex-col">
-                            <div className={`h-2 w-full ${bus.status === 'AVAILABLE' ? 'bg-green-500' : bus.status === 'MAINTENANCE' ? 'bg-red-500' : 'bg-blue-500'}`}></div>
-                            <div className="p-4 flex-1 flex flex-col justify-between">
-                                <div>
-                                    <h4 className="font-bold text-lg text-slate-800">{bus.plate}</h4>
-                                    <p className="text-sm text-slate-500 mb-2">{bus.model}</p>
-                                    <div className="mb-3">
-                                        <span className={`px-2 py-1 rounded text-xs font-bold ${
-                                            bus.status === 'AVAILABLE' ? 'bg-green-100 text-green-700' : 
-                                            bus.status === 'MAINTENANCE' ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'
-                                        }`}>
-                                            {bus.status === 'AVAILABLE' ? 'DISPONÍVEL' : bus.status === 'MAINTENANCE' ? 'MANUTENÇÃO' : 'EM VIAGEM'}
-                                        </span>
-                                    </div>
-                                </div>
-                                <button 
-                                    onClick={() => handleFleetStatusToggle(bus.id, bus.status)}
-                                    className={`w-full py-3 rounded-lg font-bold text-sm transition-colors shadow-sm ${
-                                        bus.status === 'MAINTENANCE' 
-                                        ? 'bg-green-600 text-white hover:bg-green-700' 
-                                        : 'bg-red-600 text-white hover:bg-red-700'
-                                    }`}
-                                >
-                                    {bus.status === 'MAINTENANCE' ? 'LIBERAR VEÍCULO' : 'POR EM MANUTENÇÃO'}
-                                </button>
-                            </div>
-                        </div>
-                    ))}
-                </div>
-            </div>
-        )}
 
         {/* DRIVER REPORTS TAB */}
         {activeTab === 'reports' && (
@@ -322,179 +155,6 @@ const MaintenanceView: React.FC = () => {
                         })
                     )}
                 </div>
-            </div>
-        )}
-
-        {/* FUEL TAB */}
-        {activeTab === 'fuel' && (
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-                <div className="flex justify-between items-start mb-6">
-                    <div>
-                        <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-                            <span className="bg-green-100 text-green-600 p-1.5 rounded">⛽</span>
-                            Registrar Abastecimento
-                        </h3>
-                        <p className="text-sm text-slate-500">Registre o abastecimento feito por você ou pela equipe.</p>
-                    </div>
-                    <div className="bg-green-50 px-3 py-2 rounded text-right border border-green-100">
-                        <p className="text-[10px] uppercase font-bold text-green-700">Estoque Tanque (Garagem)</p>
-                        <p className="text-lg font-bold text-green-800">{fuelStockLevel} Litros</p>
-                    </div>
-                </div>
-
-                <form onSubmit={handleFuelSubmit} className="space-y-5 max-w-3xl">
-                    <div className="grid grid-cols-2 gap-3 p-1 bg-slate-100 rounded-lg">
-                          <button
-                            type="button"
-                            onClick={() => setFuelForm({...fuelForm, location: 'GARAGE'})}
-                            className={`py-3 text-sm font-bold rounded-md transition-all ${fuelForm.location === 'GARAGE' ? 'bg-white shadow-md text-blue-700 ring-1 ring-blue-100' : 'text-slate-500 hover:text-slate-700'}`}
-                          >
-                              🏢 Na Garagem (Tanque)
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setFuelForm({...fuelForm, location: 'STREET'})}
-                            className={`py-3 text-sm font-bold rounded-md transition-all ${fuelForm.location === 'STREET' ? 'bg-white shadow-md text-orange-600 ring-1 ring-orange-100' : 'text-slate-500 hover:text-slate-700'}`}
-                          >
-                              🛣️ Na Rua (Posto)
-                          </button>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-1">Veículo</label>
-                            <select 
-                                required value={fuelForm.busId}
-                                onChange={handleBusChangeFuel}
-                                className="w-full border p-2 rounded bg-slate-50"
-                            >
-                                <option value="">Selecione o ônibus...</option>
-                                {buses.map(b => (
-                                    <option key={b.id} value={b.id}>{b.plate} - {b.model}</option>
-                                ))}
-                            </select>
-                        </div>
-                         <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-1">Data</label>
-                            <input 
-                                type="date" required 
-                                value={fuelForm.date} onChange={e => setFuelForm({...fuelForm, date: e.target.value})}
-                                className="w-full border p-2 rounded bg-slate-50"
-                            />
-                        </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3 p-3 bg-slate-100 rounded-lg border border-slate-200">
-                        <div>
-                            <label className="block text-xs font-bold text-slate-700 mb-1">KM Inicial</label>
-                            <input 
-                                type="number" min="0" required
-                                value={fuelForm.kmStart || ''}
-                                onChange={e => setFuelForm({...fuelForm, kmStart: parseInt(e.target.value)})}
-                                className="w-full border p-2 rounded text-sm text-center font-bold text-slate-600"
-                                placeholder="0"
-                            />
-                        </div>
-                        <div>
-                            <label className="block text-xs font-bold text-slate-700 mb-1">KM Final (Atual)</label>
-                            <input 
-                                type="number" min="0" required
-                                value={fuelForm.kmEnd || ''}
-                                onChange={e => setFuelForm({...fuelForm, kmEnd: parseInt(e.target.value)})}
-                                className="w-full border p-2 rounded text-sm text-center font-bold text-slate-800"
-                                placeholder="0"
-                            />
-                        </div>
-                        {fuelForm.kmEnd > fuelForm.kmStart && (
-                            <div className="col-span-2 text-center text-xs text-slate-500">
-                                Rodado: <strong>{fuelForm.kmEnd - fuelForm.kmStart} km</strong>
-                            </div>
-                        )}
-                    </div>
-
-                    <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
-                        <label className="block text-sm font-bold text-slate-800 mb-2">Quantidade Diesel (Litros)</label>
-                        <input 
-                            type="number" step="0.1" min="0" required
-                            value={fuelForm.dieselLiters || ''} 
-                            onChange={e => setFuelForm({...fuelForm, dieselLiters: parseFloat(e.target.value)})}
-                            className="w-full border p-3 rounded-lg text-lg font-bold outline-none"
-                            placeholder="0.0 L"
-                        />
-                    </div>
-
-                    {fuelForm.location === 'STREET' && (
-                        <div className="bg-orange-50 p-4 rounded-xl border border-orange-100 space-y-3 animate-fade-in">
-                            <h4 className="text-sm font-bold text-orange-800 uppercase tracking-wide">Detalhes do Posto</h4>
-                            <div>
-                                <label className="block text-xs font-bold text-orange-700 mb-1">
-                                    {fuelForm.hasArla ? 'Valor Diesel (R$)' : 'Valor Pago (R$)'}
-                                </label>
-                                <input 
-                                type="number" step="0.01"
-                                value={fuelForm.cost || ''} onChange={e => setFuelForm({...fuelForm, cost: parseFloat(e.target.value)})}
-                                className="w-full border border-orange-200 p-2 rounded text-sm" placeholder="0.00"
-                                />
-                            </div>
-
-                            {fuelForm.hasArla && (
-                                <div>
-                                    <label className="block text-xs font-bold text-blue-800 mb-1">
-                                        Valor Arla (R$)
-                                    </label>
-                                    <input 
-                                    type="number" step="0.01"
-                                    value={fuelForm.arlaCost || ''} onChange={e => setFuelForm({...fuelForm, arlaCost: parseFloat(e.target.value)})}
-                                    className="w-full border border-blue-300 p-2 rounded text-sm text-blue-900 font-bold" placeholder="0.00"
-                                    />
-                                </div>
-                            )}
-
-                            <div>
-                                <label className="block text-xs font-bold text-orange-700 mb-1">Nome do Posto</label>
-                                <input 
-                                value={fuelForm.stationName} onChange={e => setFuelForm({...fuelForm, stationName: e.target.value})}
-                                className="w-full border border-orange-200 p-2 rounded text-sm" placeholder="Ex: Posto Shell"
-                                />
-                            </div>
-                        </div>
-                    )}
-
-                    <div className="bg-blue-50 p-4 rounded-xl border border-blue-100 transition-all">
-                        <label className="flex items-center justify-between cursor-pointer select-none">
-                            <span className="font-bold text-blue-800 text-sm">Abasteceu Arla 32?</span>
-                            <div className={`w-12 h-6 flex items-center rounded-full p-1 transition-colors ${fuelForm.hasArla ? 'bg-blue-600' : 'bg-gray-300'}`}>
-                                <input 
-                                    type="checkbox" 
-                                    className="hidden" 
-                                    checked={fuelForm.hasArla}
-                                    onChange={e => setFuelForm({...fuelForm, hasArla: e.target.checked})}
-                                />
-                                <div className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform duration-200 ${fuelForm.hasArla ? 'translate-x-6' : ''}`}></div>
-                            </div>
-                        </label>
-                        
-                        {fuelForm.hasArla && (
-                            <div className="mt-4 animate-fade-in">
-                                <label className="block text-xs font-bold text-blue-700 mb-1 uppercase">Quantidade Obrigatória (Litros)</label>
-                                <div className="flex items-center border-2 border-blue-200 rounded-lg overflow-hidden bg-white focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-200 transition-all">
-                                    <input 
-                                        type="number" step="0.1" min="0" required
-                                        value={fuelForm.arlaLiters || ''} 
-                                        onChange={e => setFuelForm({...fuelForm, arlaLiters: parseFloat(e.target.value)})}
-                                        className="w-full p-2 outline-none text-blue-900 font-bold text-lg"
-                                        placeholder="0.0"
-                                    />
-                                    <span className="bg-blue-100 text-blue-700 px-4 py-3 font-bold border-l border-blue-200 text-sm">L</span>
-                                </div>
-                            </div>
-                        )}
-                    </div>
-
-                    <button type="submit" className="w-full bg-green-600 text-white font-bold py-3 rounded-xl hover:bg-green-700 shadow-md">
-                        Confirmar Abastecimento
-                    </button>
-                </form>
             </div>
         )}
 

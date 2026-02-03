@@ -1,9 +1,8 @@
-
 import React, { useState } from 'react';
 import { useStore } from '../services/store';
 
 const VehiclesView: React.FC = () => {
-  const { buses, addBus, updateBusStatus, deleteBus } = useStore();
+  const { buses, addBus, updateBusStatus } = useStore();
   const [showAddForm, setShowAddForm] = useState(false);
   const [newBus, setNewBus] = useState({ 
     plate: '', 
@@ -32,21 +31,10 @@ const VehiclesView: React.FC = () => {
   };
 
   const handleStatusToggle = (busId: string, currentStatus: string) => {
-    // Permitir forçar manutenção mesmo se estiver em viagem (BUSY)
-    if (currentStatus === 'BUSY') {
-        if (!window.confirm("⚠️ ATENÇÃO: Este veículo está marcado como EM VIAGEM.\n\nDeseja forçar a mudança para MANUTENÇÃO?")) {
-            return;
-        }
-    }
-
+    // If it's maintenance, make it available. If available, make it maintenance.
+    // We ignore BUSY status for this simple toggle, or we can force it to MAINTENANCE from BUSY too.
     const newStatus = currentStatus === 'MAINTENANCE' ? 'AVAILABLE' : 'MAINTENANCE';
     updateBusStatus(busId, newStatus);
-  };
-
-  const handleDelete = async (id: string, plate: string) => {
-      if (window.confirm(`Tem certeza que deseja excluir o veículo ${plate}? Esta ação não pode ser desfeita.`)) {
-          await deleteBus(id);
-      }
   };
 
   return (
@@ -121,7 +109,7 @@ const VehiclesView: React.FC = () => {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {buses.map(bus => (
-              <div key={bus.id} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col relative group">
+              <div key={bus.id} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
                   <div className={`h-2 w-full ${bus.status === 'AVAILABLE' ? 'bg-green-500' : bus.status === 'MAINTENANCE' ? 'bg-red-500' : 'bg-blue-500'}`}></div>
                   <div className="p-5 flex-1">
                       <div className="flex justify-between items-start mb-2">
@@ -149,25 +137,18 @@ const VehiclesView: React.FC = () => {
                       </div>
                   </div>
                   
-                  <div className="bg-slate-50 p-3 border-t border-slate-100 flex justify-between items-center gap-2">
-                      <button 
-                        onClick={() => handleDelete(bus.id, bus.plate)}
-                        className="text-xs bg-white border border-red-200 text-red-600 px-3 py-2 rounded hover:bg-red-50 font-bold flex items-center gap-1 shadow-sm"
-                        title="Excluir Veículo do Sistema"
-                      >
-                        🗑️ EXCLUIR
-                      </button>
-
+                  <div className="bg-slate-50 p-3 border-t border-slate-100 flex justify-between items-center">
+                      <span className="text-xs text-slate-500 font-medium uppercase tracking-wider">Ações Rápidas</span>
                       <button 
                         onClick={() => handleStatusToggle(bus.id, bus.status)}
-                        className={`flex-1 text-xs font-bold px-3 py-2 rounded transition-colors shadow-sm ${
+                        disabled={bus.status === 'BUSY'}
+                        className={`text-xs font-bold px-3 py-1.5 rounded transition-colors ${
                             bus.status === 'MAINTENANCE' 
                             ? 'bg-green-600 text-white hover:bg-green-700' 
-                            : 'bg-slate-800 text-white hover:bg-slate-700'
+                            : 'bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed'
                         }`}
-                        title={bus.status === 'BUSY' ? 'Forçar Manutenção' : ''}
                       >
-                          {bus.status === 'MAINTENANCE' ? 'LIBERAR VEÍCULO' : 'POR EM MANUTENÇÃO'}
+                          {bus.status === 'MAINTENANCE' ? 'Liberar Veículo' : 'Por em Manutenção'}
                       </button>
                   </div>
               </div>

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useStore } from '../services/store';
 import { PackagePassenger, TravelPackage, Client, PackageLead } from '../types';
@@ -307,8 +308,7 @@ const TravelPackagesView: React.FC = () => {
                       rg: saleForm.rg,
                       birthDate: saleForm.birthDate,
                       phone: saleForm.phone,
-                      address: saleForm.address,
-                      type: saleForm.cpf.replace(/\D/g, '').length > 11 ? 'PJ' : 'PF'
+                      address: saleForm.address
                   },
                   {
                       packageId: selectedPackage.id,
