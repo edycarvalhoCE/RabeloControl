@@ -71,6 +71,8 @@ interface StoreContextType {
   updateBusStatus: (id: string, status: Bus['status']) => void;
   deleteBus: (id: string) => Promise<void>;
   addCharterContract: (contract: Omit<CharterContract, 'id' | 'status'>) => void;
+  updateCharterContract: (id: string, data: Partial<CharterContract>) => Promise<void>; // NEW
+  deleteCharterContract: (id: string) => Promise<void>; // NEW
   addTravelPackage: (pkg: Omit<TravelPackage, 'id' | 'status'>) => void;
   registerPackageSale: (
       clientData: Omit<Client, 'id'>, 
@@ -462,6 +464,17 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   const updateBusStatus = async (id: string, status: Bus['status']) => { if (isConfigured) await updateDoc(doc(db, 'buses', id), { status }); };
   const deleteBus = async (id: string) => { if (isConfigured) await deleteDoc(doc(db, 'buses', id)); };
   const addCharterContract = async (contract: Omit<CharterContract, 'id' | 'status'>) => { if (!isConfigured) return; await addDoc(collection(db, 'charterContracts'), { ...contract, status: 'ACTIVE' }); }; 
+  
+  const updateCharterContract = async (id: string, data: Partial<CharterContract>) => {
+      if (!isConfigured) return;
+      await updateDoc(doc(db, 'charterContracts', id), data);
+  };
+
+  const deleteCharterContract = async (id: string) => {
+      if (!isConfigured) return;
+      await deleteDoc(doc(db, 'charterContracts', id));
+  };
+
   const addTravelPackage = async (pkg: Omit<TravelPackage, 'id' | 'status'>) => { if (isConfigured) await addDoc(collection(db, 'travelPackages'), { ...pkg, status: 'OPEN' }); };
   
   const addClient = async (client: Omit<Client, 'id'>) => { if (!isConfigured) return; await addDoc(collection(db, 'clients'), client); };
@@ -814,7 +827,9 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   return (
     <StoreContext.Provider value={{
       currentUser: currentUser!, isAuthenticated, settings, users, buses, bookings, parts, transactions, timeOffs, documents, maintenanceRecords, purchaseRequests, maintenanceReports, charterContracts, travelPackages, packagePassengers, packagePayments, clients, packageLeads, fuelRecords, fuelSupplies, fuelStockLevel, driverLiabilities, quotes, priceRoutes, driverFees, scheduleConfirmations,
-      switchUser, addUser, updateUser, deleteUser, addBooking, updateBooking, updateBookingStatus, addPart, updateStock, addTransaction, addTimeOff, updateTimeOffStatus, deleteTimeOff, addDocument, deleteDocument, addMaintenanceRecord, addPurchaseRequest, updatePurchaseRequestStatus, addMaintenanceReport, updateMaintenanceReportStatus, addBus, updateBusStatus, deleteBus, addCharterContract, addTravelPackage, registerPackageSale, updatePackagePassenger, deletePackagePassenger, addPackagePayment, addPackageLead, updatePackageLead, deletePackageLead, addFuelRecord, updateFuelRecord, deleteFuelRecord, addFuelSupply, addDriverLiability, payDriverLiability,
+      switchUser, addUser, updateUser, deleteUser, addBooking, updateBooking, updateBookingStatus, addPart, updateStock, addTransaction, addTimeOff, updateTimeOffStatus, deleteTimeOff, addDocument, deleteDocument, addMaintenanceRecord, addPurchaseRequest, updatePurchaseRequestStatus, addMaintenanceReport, updateMaintenanceReportStatus, addBus, updateBusStatus, deleteBus, 
+      addCharterContract, updateCharterContract, deleteCharterContract, // New Export
+      addTravelPackage, registerPackageSale, updatePackagePassenger, deletePackagePassenger, addPackagePayment, addPackageLead, updatePackageLead, deletePackageLead, addFuelRecord, updateFuelRecord, deleteFuelRecord, addFuelSupply, addDriverLiability, payDriverLiability,
       login, logout, register, updateSettings, seedDatabase, restoreDatabase,
       addQuote, updateQuote, convertQuoteToBooking, deleteQuote,
       addPriceRoute, updatePriceRoute, deletePriceRoute, importDefaultPrices, clearPriceTable,

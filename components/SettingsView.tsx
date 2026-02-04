@@ -6,11 +6,10 @@ import { UserRole } from '../types';
 const SettingsView: React.FC = () => {
   const { 
       settings, updateSettings, currentUser, restoreDatabase, resetSystemData,
-      // Destructure all data collections for Backup
       users, buses, bookings, parts, transactions, timeOffs, documents, 
       maintenanceRecords, purchaseRequests, maintenanceReports, charterContracts, 
       travelPackages, packagePassengers, packagePayments, packageLeads, clients, 
-      fuelRecords, fuelSupplies, driverLiabilities, driverFees, quotes, priceRoutes 
+      fuelRecords, fuelSupplies, driverLiabilities, driverFees, quotes, priceRoutes, scheduleConfirmations
   } = useStore();
 
   const [form, setForm] = useState({
@@ -48,8 +47,9 @@ const SettingsView: React.FC = () => {
       if (e.target.files && e.target.files[0]) {
           const file = e.target.files[0];
           
-          if (file.size > 2 * 1024 * 1024) { // 2MB limit
-              alert("A imagem é muito grande. Tente usar uma imagem menor que 2MB.");
+          // Validação de tamanho (Limitando a 500KB para não pesar o Firestore)
+          if (file.size > 500 * 1024) { 
+              alert("A imagem é muito grande (Máx 500KB). Por favor, use uma imagem menor ou comprima-a.");
               return;
           }
 
@@ -61,6 +61,12 @@ const SettingsView: React.FC = () => {
               setUploading(false);
           };
           reader.readAsDataURL(file);
+      }
+  };
+
+  const handleRemoveLogo = () => {
+      if (confirm("Deseja remover o logo personalizado e voltar ao padrão?")) {
+          setForm(prev => ({ ...prev, logoUrl: '' }));
       }
   };
 
@@ -100,7 +106,8 @@ const SettingsView: React.FC = () => {
               driverLiabilities,
               driverFees,
               quotes,
-              priceRoutes
+              priceRoutes,
+              scheduleConfirmations
           }
       };
 
@@ -189,23 +196,41 @@ const SettingsView: React.FC = () => {
             <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 h-fit">
                 <h3 className="font-bold text-slate-700 mb-4">Logotipo da Empresa</h3>
                 
-                <div className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-slate-300 rounded-lg bg-slate-50 mb-4">
+                <div className="flex flex-col items-center justify-center p-4 border-2 border-dashed border-slate-300 rounded-lg bg-slate-50 mb-4 h-40 relative group">
                     {form.logoUrl ? (
-                        <img src={form.logoUrl} alt="Logo Preview" className="max-h-32 object-contain" />
+                        <>
+                            <img src={form.logoUrl} alt="Logo Preview" className="max-h-full max-w-full object-contain" />
+                            <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity rounded-lg">
+                                <span className="text-white font-bold text-sm">Visualização</span>
+                            </div>
+                        </>
                     ) : (
                         <div className="text-slate-400 text-center">
                             <svg className="w-12 h-12 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-                            <p className="text-sm">Nenhuma logo definida</p>
+                            <p className="text-sm">Sem Logo Definida</p>
                         </div>
                     )}
                 </div>
 
-                <label className="block w-full cursor-pointer bg-slate-800 text-white text-center py-2 rounded hover:bg-slate-700 transition-colors font-bold text-sm">
-                    {uploading ? 'Processando...' : 'Selecionar Imagem (PNG/JPG)'}
-                    <input type="file" accept="image/png, image/jpeg" className="hidden" onChange={handleFileChange} disabled={uploading} />
-                </label>
-                <p className="text-xs text-slate-500 mt-2 text-center">
-                    Recomendado: Imagem PNG com fundo transparente. <br/> Tamanho ideal: 500x200 pixels.
+                <div className="space-y-2">
+                    <label className="block w-full cursor-pointer bg-blue-600 text-white text-center py-2 rounded-lg hover:bg-blue-700 transition-colors font-bold text-sm shadow-sm">
+                        {uploading ? 'Carregando...' : '📤 Carregar Nova Logo'}
+                        <input type="file" accept="image/png, image/jpeg, image/jpg" className="hidden" onChange={handleFileChange} disabled={uploading} />
+                    </label>
+                    
+                    {form.logoUrl && (
+                        <button 
+                            type="button"
+                            onClick={handleRemoveLogo}
+                            className="block w-full bg-red-100 text-red-600 text-center py-2 rounded-lg hover:bg-red-200 transition-colors font-bold text-sm border border-red-200"
+                        >
+                            🗑️ Remover Logo
+                        </button>
+                    )}
+                </div>
+                
+                <p className="text-[10px] text-slate-500 mt-3 text-center leading-tight">
+                    Formatos: PNG ou JPG.<br/>Fundo transparente recomendado.<br/>Máx: 500KB.
                 </p>
             </div>
 

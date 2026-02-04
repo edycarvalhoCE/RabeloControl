@@ -20,9 +20,8 @@ export const Logo: React.FC<LogoProps> = ({ variant = 'dark', className = '', si
       xl: 'h-28',       // Splash/Hero (112px)
   };
 
-  // Se houver uma URL configurada nas settings, usa ela.
-  // Se não, tenta o arquivo logo.png padrão.
-  const logoSrc = settings?.logoUrl || './logo.png';
+  // Prioriza o logo das configurações, senão usa o padrão
+  const logoSrc = settings?.logoUrl && settings.logoUrl.length > 50 ? settings.logoUrl : './logo.png';
 
   return (
     <div className={`flex items-center justify-center ${className}`}>

@@ -308,7 +308,8 @@ const TravelPackagesView: React.FC = () => {
                       rg: saleForm.rg,
                       birthDate: saleForm.birthDate,
                       phone: saleForm.phone,
-                      address: saleForm.address
+                      address: saleForm.address,
+                      type: saleForm.cpf.replace(/\D/g, '').length > 11 ? 'PJ' : 'PF'
                   },
                   {
                       packageId: selectedPackage.id,

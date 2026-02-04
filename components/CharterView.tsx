@@ -1,11 +1,12 @@
 
 import React, { useState } from 'react';
 import { useStore } from '../services/store';
-import { UserRole } from '../types';
+import { UserRole, CharterContract } from '../types';
 
 const CharterView: React.FC = () => {
-  const { buses, users, addCharterContract, charterContracts } = useStore();
+  const { buses, users, addCharterContract, updateCharterContract, deleteCharterContract, charterContracts } = useStore();
   const [showForm, setShowForm] = useState(false);
+  const [editingContract, setEditingContract] = useState<CharterContract | null>(null);
   
   const [contract, setContract] = useState({
       clientName: 'Carbografite',
@@ -41,7 +42,31 @@ const CharterView: React.FC = () => {
       }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleEdit = (c: CharterContract) => {
+      setEditingContract(c);
+      setContract({
+          clientName: c.clientName,
+          route: c.route,
+          busId: c.busId,
+          driverId: c.driverId || '',
+          freelanceDriverName: c.freelanceDriverName || '',
+          isFreelance: !c.driverId && !!c.freelanceDriverName,
+          weekDays: c.weekDays,
+          morningDeparture: c.morningDeparture,
+          afternoonDeparture: c.afternoonDeparture,
+          startDate: c.startDate,
+          endDate: c.endDate
+      });
+      setShowForm(true);
+  };
+
+  const handleDelete = async (id: string) => {
+      if (confirm("Tem certeza que deseja excluir este contrato? Isso irá remover as viagens futuras do calendário.")) {
+          await deleteCharterContract(id);
+      }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
       e.preventDefault();
       if (!contract.busId || (!contract.driverId && !contract.freelanceDriverName) || contract.weekDays.length === 0) {
           alert('Preencha os campos obrigatórios e selecione o motorista e dias da semana.');
@@ -61,9 +86,17 @@ const CharterView: React.FC = () => {
           endDate: contract.endDate
       };
 
-      addCharterContract(payload);
+      if (editingContract) {
+          await updateCharterContract(editingContract.id, payload);
+          alert('Contrato atualizado! A escala foi ajustada automaticamente.');
+      } else {
+          await addCharterContract(payload);
+          alert('Contrato salvo! A escala foi gerada automaticamente para o período selecionado.');
+      }
+
+      setEditingContract(null);
       setShowForm(false);
-      alert('Contrato salvo! A escala foi gerada automaticamente para o período selecionado.');
+      // Reset form default state if needed, or keep last values for convenience
   };
 
   return (
@@ -71,7 +104,7 @@ const CharterView: React.FC = () => {
         <div className="flex justify-between items-center">
             <h2 className="text-2xl font-bold text-slate-800">Fretamento Contínuo</h2>
             <button 
-                onClick={() => setShowForm(!showForm)}
+                onClick={() => { setShowForm(!showForm); setEditingContract(null); }}
                 className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-medium shadow-sm transition-colors"
             >
                 {showForm ? 'Cancelar' : '+ Novo Contrato'}
@@ -80,7 +113,7 @@ const CharterView: React.FC = () => {
 
         {showForm && (
             <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-                <h3 className="font-bold text-lg mb-4 text-slate-700">Configurar Fretamento</h3>
+                <h3 className="font-bold text-lg mb-4 text-slate-700">{editingContract ? 'Editar Contrato' : 'Configurar Fretamento'}</h3>
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
@@ -224,11 +257,11 @@ const CharterView: React.FC = () => {
                     </div>
                     
                     <div className="text-sm text-slate-500 bg-yellow-50 p-2 rounded border border-yellow-100">
-                        Nota: Ao salvar, o sistema irá criar automaticamente todas as viagens na agenda para o período selecionado.
+                        Nota: Ao salvar, o sistema irá atualizar automaticamente a agenda para o período selecionado.
                     </div>
 
                     <button type="submit" className="w-full bg-slate-800 text-white py-3 rounded-lg font-bold hover:bg-slate-700">
-                        Gerar Escala de Fretamento
+                        {editingContract ? 'Atualizar Contrato' : 'Gerar Escala de Fretamento'}
                     </button>
                 </form>
             </div>
@@ -241,10 +274,29 @@ const CharterView: React.FC = () => {
                  const driverDisplay = c.driverId ? driver?.name : c.freelanceDriverName ? `${c.freelanceDriverName} (Freelance)` : 'Não atribuído';
 
                  return (
-                     <div key={c.id} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden relative">
+                     <div key={c.id} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden relative flex flex-col group">
                          <div className="h-1 bg-indigo-500 w-full top-0 absolute"></div>
-                         <div className="p-5">
-                             <h3 className="text-lg font-bold text-slate-800">{c.clientName}</h3>
+                         
+                         {/* Action Buttons (Visible on Hover/Mobile) */}
+                         <div className="absolute top-3 right-3 flex gap-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity bg-white/90 p-1 rounded-lg shadow-sm">
+                             <button 
+                                onClick={() => handleEdit(c)}
+                                className="p-1.5 text-blue-600 hover:bg-blue-50 rounded"
+                                title="Editar"
+                             >
+                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                             </button>
+                             <button 
+                                onClick={() => handleDelete(c.id)}
+                                className="p-1.5 text-red-600 hover:bg-red-50 rounded"
+                                title="Excluir"
+                             >
+                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                             </button>
+                         </div>
+
+                         <div className="p-5 flex-1">
+                             <h3 className="text-lg font-bold text-slate-800 pr-12">{c.clientName}</h3>
                              <p className="text-sm text-indigo-600 font-medium mb-3">{c.route}</p>
                              
                              <div className="space-y-2 text-sm text-slate-600">
