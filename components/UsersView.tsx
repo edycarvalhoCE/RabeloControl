@@ -7,15 +7,21 @@ const UsersView: React.FC = () => {
   const { users, addUser, updateUser, deleteUser, currentUser } = useStore();
   const [showForm, setShowForm] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
 
   // Form State
   const [formData, setFormData] = useState({ name: '', email: '', role: UserRole.DRIVER as UserRole, dailyRate: 0 });
 
   const isManager = currentUser.role === UserRole.DEVELOPER || currentUser.role === UserRole.MANAGER;
 
-  // Filter pending users (only visible to managers)
-  const pendingUsers = users.filter(u => u.status === 'PENDING');
-  const activeUsers = users.filter(u => u.status !== 'PENDING');
+  // Filter users based on search
+  const filteredUsers = users.filter(u => 
+      u.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+      u.email.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const pendingUsers = filteredUsers.filter(u => u.status === 'PENDING');
+  const activeUsers = filteredUsers.filter(u => u.status !== 'PENDING');
 
   const handleEdit = (user: User) => {
       setEditingUser(user);
@@ -33,8 +39,9 @@ const UsersView: React.FC = () => {
           alert("Você não pode excluir a si mesmo!");
           return;
       }
-      if (window.confirm(`Tem certeza que deseja excluir o usuário ${user.name}?`)) {
+      if (window.confirm(`Tem certeza que deseja excluir o usuário ${user.name} (${user.email})?`)) {
           await deleteUser(user.id);
+          alert("Usuário excluído com sucesso.");
       }
   };
 
@@ -61,11 +68,9 @@ const UsersView: React.FC = () => {
     e.preventDefault();
     if(formData.name && formData.email) {
         if (editingUser) {
-            // Update existing
             await updateUser(editingUser.id, formData);
             alert("Usuário atualizado com sucesso!");
         } else {
-            // Create new
             addUser(formData);
             alert("Usuário criado com sucesso!");
         }
@@ -83,14 +88,31 @@ const UsersView: React.FC = () => {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold text-slate-800">Gestão de Usuários</h2>
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div>
+            <h2 className="text-2xl font-bold text-slate-800">Gestão de Usuários</h2>
+            <p className="text-sm text-slate-500">Controle quem acessa o sistema e quais as permissões.</p>
+        </div>
         <button 
           onClick={() => { setShowForm(!showForm); setEditingUser(null); setFormData({ name: '', email: '', role: UserRole.DRIVER, dailyRate: 0 }); }}
           className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium shadow-sm transition-colors"
         >
           {showForm ? 'Cancelar' : '+ Novo Usuário'}
         </button>
+      </div>
+
+      {/* SEARCH BAR */}
+      <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+          <div className="relative">
+              <span className="absolute left-3 top-2.5 text-slate-400">🔍</span>
+              <input 
+                type="text" 
+                placeholder="Localizar e-mail (ex: vendas@rabelotour.com.br) ou nome..."
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-slate-50"
+              />
+          </div>
       </div>
 
       {/* PENDING APPROVAL SECTION */}
@@ -105,9 +127,9 @@ const UsersView: React.FC = () => {
                       <div key={user.id} className="bg-white p-4 rounded-lg shadow-sm border border-orange-100 flex flex-col gap-3">
                           <div className="flex items-center gap-3">
                                <img src={user.avatar} alt={user.name} className="w-10 h-10 rounded-full bg-slate-100" />
-                               <div>
-                                   <p className="font-bold text-slate-800 text-sm">{user.name}</p>
-                                   <p className="text-xs text-slate-500">{user.email}</p>
+                               <div className="overflow-hidden">
+                                   <p className="font-bold text-slate-800 text-sm truncate">{user.name}</p>
+                                   <p className="text-xs text-slate-500 truncate">{user.email}</p>
                                    <span className="text-[10px] bg-slate-100 px-2 py-0.5 rounded border border-slate-200 uppercase font-bold text-slate-600 mt-1 inline-block">
                                        {user.role}
                                    </span>
@@ -134,7 +156,7 @@ const UsersView: React.FC = () => {
       )}
 
       {showForm && (
-          <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 max-w-2xl">
+          <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 max-w-2xl animate-fade-in">
               <h3 className="font-bold text-lg mb-4 text-slate-700">
                   {editingUser ? 'Editar Usuário' : 'Cadastrar Usuário / Motorista'}
               </h3>
@@ -156,7 +178,7 @@ const UsersView: React.FC = () => {
                             onChange={e => setFormData({...formData, email: e.target.value})}
                             className="w-full border p-2 rounded focus:ring-2 focus:ring-blue-500 outline-none"
                             placeholder="joao@rabelo.com"
-                            disabled={!!editingUser} // Email is ID in Auth generally, keep specific for now
+                            disabled={!!editingUser}
                           />
                       </div>
                   </div>
@@ -180,7 +202,6 @@ const UsersView: React.FC = () => {
                           </select>
                       </div>
                       
-                      {/* Driver Daily Rate Field */}
                       {formData.role === UserRole.DRIVER && (
                           <div className="animate-fade-in">
                               <label className="block text-sm font-medium text-slate-700 mb-1">Valor Diária Padrão</label>
@@ -212,21 +233,18 @@ const UsersView: React.FC = () => {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {activeUsers.map(user => (
-              <div key={user.id} className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex justify-between items-center group">
-                  <div className="flex items-center space-x-4">
-                      <img src={user.avatar} alt={user.name} className="w-12 h-12 rounded-full border border-slate-200" />
-                      <div>
-                          <h4 className="font-bold text-slate-800">{user.name}</h4>
-                          <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full border border-slate-200">
+              <div key={user.id} className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex justify-between items-center group hover:border-blue-300 transition-colors">
+                  <div className="flex items-center space-x-4 overflow-hidden">
+                      <img src={user.avatar} alt={user.name} className="w-12 h-12 rounded-full border border-slate-200 shrink-0" />
+                      <div className="overflow-hidden">
+                          <h4 className="font-bold text-slate-800 truncate">{user.name}</h4>
+                          <span className={`text-[10px] px-2 py-0.5 rounded-full border border-slate-200 font-bold ${user.role === UserRole.AGENT ? 'bg-indigo-50 text-indigo-600 border-indigo-100' : 'bg-slate-100 text-slate-600'}`}>
                               {user.role}
                           </span>
-                          <p className="text-xs text-slate-400 mt-1">{user.email}</p>
-                          {user.role === UserRole.DRIVER && user.dailyRate && user.dailyRate > 0 && (
-                              <p className="text-xs text-green-600 font-bold mt-1">Diária: R$ {user.dailyRate.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</p>
-                          )}
+                          <p className="text-xs text-slate-400 mt-1 truncate">{user.email}</p>
                       </div>
                   </div>
-                  <div className="flex flex-col gap-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                  <div className="flex flex-col gap-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity shrink-0">
                       <button 
                         onClick={() => handleEdit(user)}
                         className="p-2 bg-blue-50 text-blue-600 rounded hover:bg-blue-100" title="Editar"
@@ -235,13 +253,18 @@ const UsersView: React.FC = () => {
                       </button>
                       <button 
                         onClick={() => handleDelete(user)}
-                        className="p-2 bg-red-50 text-red-600 rounded hover:bg-red-100" title="Excluir"
+                        className="p-2 bg-red-50 text-red-600 rounded hover:bg-red-100" title="Excluir Permanentemente"
                       >
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                       </button>
                   </div>
               </div>
           ))}
+          {activeUsers.length === 0 && (
+              <div className="col-span-full py-10 text-center text-slate-400 italic">
+                  Nenhum usuário encontrado com este critério de busca.
+              </div>
+          )}
       </div>
     </div>
   );

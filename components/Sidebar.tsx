@@ -26,15 +26,23 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setView, isMobileOpen, s
     { id: 'charter', label: 'Fretamento', icon: '🏭', roles: [UserRole.MANAGER, UserRole.DEVELOPER, UserRole.AGENT] },
     { id: 'vehicles', label: 'Veículos / Frota', icon: '🚐', roles: [UserRole.MANAGER, UserRole.DEVELOPER, UserRole.AGENT] },
     { id: 'maintenance', label: 'Manutenção', icon: '🛠️', roles: [UserRole.MANAGER, UserRole.MECHANIC, UserRole.DEVELOPER] },
-    { id: 'inventory', label: 'Estoque de Peças', icon: '🔧', roles: [UserRole.MANAGER, UserRole.MECHANIC, UserRole.FINANCE, UserRole.DEVELOPER] }, // Oculto para Agente
+    { id: 'inventory', label: 'Estoque de Peças', icon: '🔧', roles: [UserRole.MANAGER, UserRole.MECHANIC, UserRole.FINANCE, UserRole.DEVELOPER] }, 
     { id: 'documents', label: 'Documentos', icon: '📂', roles: [UserRole.MANAGER, UserRole.DEVELOPER] },
     { id: 'finance', label: 'Financeiro (Caixa)', icon: '💰', roles: [UserRole.MANAGER, UserRole.FINANCE, UserRole.DEVELOPER] },
     { id: 'users', label: 'Usuários', icon: '👤', roles: [UserRole.MANAGER, UserRole.DEVELOPER] },
-    { id: 'settings', label: 'Configurações', icon: '⚙️', roles: [UserRole.MANAGER, UserRole.DEVELOPER] }, // Oculto para Agente
-    { id: 'driver-portal', label: 'Portal do Colaborador', icon: 'steering-wheel', roles: [UserRole.DRIVER, UserRole.GARAGE_AUX, UserRole.DEVELOPER] }, // Oculto para Agente
+    { id: 'settings', label: 'Configurações', icon: '⚙️', roles: [UserRole.MANAGER, UserRole.DEVELOPER] },
+    { id: 'driver-portal', label: 'Portal do Colaborador', icon: 'steering-wheel', roles: [UserRole.DRIVER, UserRole.GARAGE_AUX, UserRole.DEVELOPER] },
   ];
 
-  const filteredMenu = menuItems.filter(item => item.roles.includes(currentUser.role as UserRole));
+  // Regra rigorosa: O Agente Comercial NÃO vê Estoque, Configurações e Portal do Motorista
+  const filteredMenu = menuItems.filter(item => {
+      const hasRole = item.roles.includes(currentUser.role as UserRole);
+      // Trava extra de segurança visual
+      if (currentUser.role === UserRole.AGENT) {
+          if (['settings', 'inventory', 'driver-portal'].includes(item.id)) return false;
+      }
+      return hasRole;
+  });
 
   const getRoleLabel = (role: UserRole | string) => {
     switch (role) {
@@ -59,12 +67,11 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setView, isMobileOpen, s
 
   const handleMenuClick = (viewId: string) => {
       setView(viewId);
-      setIsMobileOpen(false); // Close menu on mobile when clicked
+      setIsMobileOpen(false); 
   };
 
   return (
     <>
-      {/* Mobile Overlay */}
       {isMobileOpen && (
         <div 
           className="fixed inset-0 bg-black/50 z-20 md:hidden"
@@ -72,14 +79,12 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setView, isMobileOpen, s
         ></div>
       )}
 
-      {/* Sidebar Content */}
       <div className={`
         fixed inset-y-0 left-0 z-30 w-64 bg-slate-900 text-white flex flex-col h-full shadow-2xl transition-transform duration-300 ease-in-out
         ${isMobileOpen ? 'translate-x-0' : '-translate-x-full'} 
         md:translate-x-0 md:static md:h-screen
       `}>
         <div className="p-6 border-b border-slate-700 flex flex-col items-center text-center relative">
-          {/* Close button for mobile */}
           <button 
             onClick={() => setIsMobileOpen(false)}
             className="absolute top-4 right-4 md:hidden text-slate-400 hover:text-white"
@@ -87,7 +92,6 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setView, isMobileOpen, s
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
           </button>
 
-          {/* Company Logo in White Box for Visibility */}
           <div className="mb-2 w-full flex justify-center py-3 bg-white rounded-lg shadow-sm">
               <Logo size="md" />
           </div>
@@ -119,9 +123,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setView, isMobileOpen, s
             </div>
           </div>
 
-          {/* Action Buttons */}
           <div className="mt-2 space-y-2 border-t border-slate-600 pt-4">
-              {/* Share Button */}
               <button 
                   onClick={handleShareLink}
                   className="w-full flex items-center justify-center space-x-2 bg-slate-700 hover:bg-slate-600 text-blue-300 hover:text-white py-2 rounded transition-colors text-xs font-medium border border-slate-600"
@@ -130,7 +132,6 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setView, isMobileOpen, s
                   <span>{copyMsg || 'Compartilhar App'}</span>
               </button>
 
-              {/* Logout Button */}
               <button 
                   onClick={logout}
                   className="w-full flex items-center justify-center space-x-2 bg-slate-700 hover:bg-red-600 text-slate-200 hover:text-white py-2 rounded transition-colors text-xs font-medium"
