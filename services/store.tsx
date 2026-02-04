@@ -52,7 +52,7 @@ interface StoreContextType {
   addUser: (user: Omit<User, 'id' | 'avatar'>) => void;
   updateUser: (id: string, data: Partial<User>) => Promise<void>;
   deleteUser: (id: string) => Promise<void>;
-  addBooking: (booking: Omit<Booking, 'id' | 'status'>, driverFeeTotal?: number) => Promise<{ success: boolean; message: string }>;
+  addBooking: (booking: Omit<Booking, 'id' | 'status'>, driverFeeTotal?: number, driver2FeeTotal?: number) => Promise<{ success: boolean; message: string }>;
   updateBooking: (id: string, data: Partial<Booking>) => Promise<{ success: boolean; message: string }>;
   updateBookingStatus: (id: string, status: Booking['status']) => void;
   addPart: (part: Omit<Part, 'id'>) => void;
@@ -252,16 +252,42 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     });
   };
 
-  const addBooking = async (bookingData: Omit<Booking, 'id' | 'status'>, driverFeeTotal?: number) => {
+  const addBooking = async (bookingData: Omit<Booking, 'id' | 'status'>, driverFeeTotal?: number, driver2FeeTotal?: number) => {
     if (!checkAvailability(bookingData.busId, bookingData.startTime, bookingData.endTime)) return { success: false, message: 'Conflito: Ônibus ocupado!' };
     try {
         const docRef = await addDoc(collection(db, 'bookings'), { ...bookingData, status: 'CONFIRMED' });
+        
+        // Registrar Transação de Receita se houver valor
         if (bookingData.value > 0 && bookingData.paymentStatus !== 'PENDING') {
             await addDoc(collection(db, 'transactions'), { type: 'INCOME', status: bookingData.paymentStatus === 'PAID' ? 'COMPLETED' : 'PENDING', category: 'Locação', amount: bookingData.value, date: bookingData.paymentDate || new Date().toISOString(), description: `Locação: ${bookingData.clientName}`, relatedBookingId: docRef.id });
         }
+        
+        // Registrar Diária do 1º Motorista
         if (driverFeeTotal && driverFeeTotal > 0) {
-            await addDoc(collection(db, 'driverFees'), { driverId: bookingData.driverId, freelanceDriverName: bookingData.freelanceDriverName, amount: driverFeeTotal, date: bookingData.startTime.split('T')[0], description: `Diária: ${bookingData.destination}`, relatedBookingId: docRef.id, status: 'PENDING' });
+            await addDoc(collection(db, 'driverFees'), { 
+                driverId: bookingData.driverId, 
+                freelanceDriverName: bookingData.freelanceDriverName, 
+                amount: driverFeeTotal, 
+                date: bookingData.startTime.split('T')[0], 
+                description: `Diária (1º Mot): ${bookingData.destination}`, 
+                relatedBookingId: docRef.id, 
+                status: 'PENDING' 
+            });
         }
+
+        // Registrar Diária do 2º Motorista
+        if (driver2FeeTotal && driver2FeeTotal > 0) {
+            await addDoc(collection(db, 'driverFees'), { 
+                driverId: bookingData.driver2Id, 
+                freelanceDriverName: bookingData.freelanceDriver2Name, 
+                amount: driver2FeeTotal, 
+                date: bookingData.startTime.split('T')[0], 
+                description: `Diária (2º Mot): ${bookingData.destination}`, 
+                relatedBookingId: docRef.id, 
+                status: 'PENDING' 
+            });
+        }
+        
         return { success: true, message: 'Salvo!' };
     } catch (e: any) { return { success: false, message: e.message }; }
   };

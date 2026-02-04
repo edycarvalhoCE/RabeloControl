@@ -114,7 +114,8 @@ const ClientsView: React.FC = () => {
                   let birthDate = '';
                   const rawDate = findVal(['nasc', 'data']);
                   if (rawDate) { if (typeof rawDate === 'number') { const dateObj = new Date(Math.round((rawDate - 25569) * 86400 * 1000)); birthDate = dateObj.toISOString().split('T')[0]; } else if (typeof rawDate === 'string' && rawDate.includes('/')) { const parts = rawDate.split('/'); if (parts.length === 3) birthDate = `${parts[2]}-${parts[1]}-${parts[0]}`; } }
-                  return { name: String(name).trim(), phone: String(phone).trim(), cpf: String(cpf).replace(/\D/g, ''), address: String(address).trim(), rg: String(rg).trim(), birthDate, code: String(code), type: String(cpf).length > 11 ? 'PJ' : 'PF', email: '', observations: 'Importado via Planilha' };
+                  // Fix: Explicitly cast 'type' to 'PF' | 'PJ' to satisfy Omit<Client, 'id'> interface and avoid string inference error
+                  return { name: String(name).trim(), phone: String(phone).trim(), cpf: String(cpf).replace(/\D/g, ''), address: String(address).trim(), rg: String(rg).trim(), birthDate, code: String(code), type: (String(cpf).length > 11 ? 'PJ' : 'PF') as 'PF' | 'PJ', email: '', observations: 'Importado via Planilha' };
               }).filter(c => c.name && c.name !== 'Sem Nome');
               if (clientsToImport.length === 0) alert("Nenhum dado válido encontrado na planilha."); else { const result = await importClients(clientsToImport); alert(result.message); }
           } catch (err: any) { alert("Erro ao ler arquivo: " + err.message); } finally { setIsImporting(false); e.target.value = ''; }

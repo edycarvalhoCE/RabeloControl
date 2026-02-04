@@ -83,6 +83,8 @@ export interface Booking {
   busId: string;
   driverId: string | null;
   freelanceDriverName?: string | null;
+  driver2Id?: string | null; // Novo
+  freelanceDriver2Name?: string | null; // Novo
   clientName: string;
   clientPhone?: string;
   destination: string;
