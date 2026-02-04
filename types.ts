@@ -309,3 +309,13 @@ export interface DriverLiability {
   installments: number; 
   status: 'OPEN' | 'PAID';
 }
+
+export interface ScheduleConfirmation {
+  id: string;
+  driverId: string;
+  type: 'BOOKING' | 'CHARTER';
+  referenceId: string; // Booking ID or Charter Contract ID
+  date: string; // YYYY-MM-DD
+  status: 'CONFIRMED';
+  confirmedAt: string;
+}

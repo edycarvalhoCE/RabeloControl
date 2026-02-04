@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useStore } from '../services/store';
 import CalendarView from './CalendarView';
@@ -5,7 +6,7 @@ import { Booking, UserRole } from '../types';
 import { Logo } from './Logo';
 
 const DriverPortal: React.FC = () => {
-  const { currentUser, bookings, timeOffs, addTimeOff, documents, buses, addMaintenanceReport, maintenanceReports, addFuelRecord, driverLiabilities, charterContracts, driverFees, fuelRecords, users } = useStore();
+  const { currentUser, bookings, timeOffs, addTimeOff, documents, buses, addMaintenanceReport, maintenanceReports, addFuelRecord, driverLiabilities, charterContracts, driverFees, fuelRecords, users, scheduleConfirmations, confirmTrip } = useStore();
   
   // Check if Garage Aux
   const isAux = currentUser.role === UserRole.GARAGE_AUX;
@@ -100,7 +101,8 @@ const DriverPortal: React.FC = () => {
                       status: 'CONFIRMED',
                       isCharter: true,
                       observations: `Rota: ${c.route}`,
-                      sortTime: new Date(`${dStr}T${c.morningDeparture}`).getTime()
+                      sortTime: new Date(`${dStr}T${c.morningDeparture}`).getTime(),
+                      originalContractId: c.id // Keep ref for confirmation
                   });
               }
           });
@@ -238,6 +240,20 @@ const DriverPortal: React.FC = () => {
       setSelectedBooking(booking);
   };
 
+  // CONFIRM TRIP HANDLER
+  const handleConfirmTrip = async (e: React.MouseEvent, booking: any) => {
+      e.stopPropagation();
+      e.preventDefault();
+
+      if (!confirm("Confirma que está ciente desta viagem na sua escala?")) return;
+
+      const type = booking.isCharter ? 'CHARTER' : 'BOOKING';
+      const refId = booking.isCharter ? booking.originalContractId : booking.id;
+      const date = booking.startTime.split('T')[0];
+
+      await confirmTrip(type, refId, date);
+  };
+
   // HELPER: Format date string YYYY-MM-DD to DD/MM/YYYY manually to avoid timezone bugs
   const formatDateString = (dateStr: string) => {
       if(!dateStr) return '';
@@ -348,6 +364,18 @@ const DriverPortal: React.FC = () => {
                                 // For aux view, get bus details clearly
                                 const bus = buses.find(b => b.id === booking.busId);
                                 
+                                // Check confirmation
+                                const tripDate = booking.startTime.split('T')[0];
+                                const refId = booking.isCharter ? booking.originalContractId : booking.id;
+                                const tripType = booking.isCharter ? 'CHARTER' : 'BOOKING';
+                                
+                                const isConfirmed = scheduleConfirmations.some(c => 
+                                    c.driverId === currentUser.id && 
+                                    c.type === tripType && 
+                                    c.referenceId === refId &&
+                                    c.date === tripDate
+                                );
+
                                 return (
                                     <div 
                                         key={booking.id} 
@@ -360,9 +388,17 @@ const DriverPortal: React.FC = () => {
                                     >
                                         <div className="flex justify-between items-start mb-2">
                                             <h3 className="font-bold text-base text-slate-800">{booking.destination}</h3>
-                                            <span className={`text-[10px] font-bold px-2 py-1 rounded ${booking.isCharter ? 'bg-orange-200 text-orange-800' : 'bg-blue-100 text-blue-600'}`}>
-                                                {booking.isCharter ? 'FRETAMENTO' : 'LOCAÇÃO'}
-                                            </span>
+                                            <div className="flex flex-col items-end gap-1">
+                                                <span className={`text-[10px] font-bold px-2 py-1 rounded ${booking.isCharter ? 'bg-orange-200 text-orange-800' : 'bg-blue-100 text-blue-600'}`}>
+                                                    {booking.isCharter ? 'FRETAMENTO' : 'LOCAÇÃO'}
+                                                </span>
+                                                {/* Confirmation Badge for Driver */}
+                                                {!isAux && isConfirmed && (
+                                                    <span className="text-[10px] bg-green-100 text-green-700 px-2 py-0.5 rounded font-bold flex items-center gap-1 border border-green-200">
+                                                        ✅ Confirmado
+                                                    </span>
+                                                )}
+                                            </div>
                                         </div>
                                         <div className="text-xs text-slate-600 space-y-1">
                                             {isAux && (
@@ -373,6 +409,18 @@ const DriverPortal: React.FC = () => {
                                             <p className="font-semibold">📅 {new Date(booking.startTime).toLocaleDateString()} • {new Date(booking.startTime).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</p>
                                             {!booking.isCharter && <p>🏁 Retorno: {new Date(booking.endTime).toLocaleDateString()}</p>}
                                         </div>
+
+                                        {/* CONFIRMATION BUTTON FOR DRIVER */}
+                                        {!isAux && !isConfirmed && (
+                                            <div className="mt-3 border-t border-slate-200/50 pt-2">
+                                                <button 
+                                                    onClick={(e) => handleConfirmTrip(e, booking)}
+                                                    className="w-full bg-green-600 hover:bg-green-700 text-white text-xs font-bold py-2 rounded shadow-sm transition-colors flex justify-center items-center gap-2"
+                                                >
+                                                    <span>✅</span> Confirmar Escala
+                                                </button>
+                                            </div>
+                                        )}
                                     </div>
                                 );
                             })
