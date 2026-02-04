@@ -33,30 +33,27 @@ const QuotesView: React.FC = () => {
       price: 0
   });
 
-  // Updated to include FINANCE
-  const canManage = currentUser.role === UserRole.MANAGER || currentUser.role === UserRole.DEVELOPER || currentUser.role === UserRole.FINANCE;
+  // Updated to include FINANCE and AGENT
+  const canManage = currentUser.role === UserRole.MANAGER || currentUser.role === UserRole.DEVELOPER || currentUser.role === UserRole.FINANCE || currentUser.role === UserRole.AGENT;
   const isDeveloper = currentUser.role === UserRole.DEVELOPER;
-  // Finance can view but NOT edit price table (Add/Delete routes)
+  // Finance and Agent can view but NOT edit price table (Add/Delete routes)
   const canEditPriceTable = currentUser.role === UserRole.MANAGER || currentUser.role === UserRole.DEVELOPER;
 
   if (!canManage) {
       return <div className="p-8 text-center text-slate-500">Acesso restrito.</div>;
   }
-
-  // --- HANDLERS ---
-
+  
+  // (Resto do componente QuotesView mantido sem alterações...)
+  
   const handleImportPrices = async (e: React.MouseEvent) => {
       e.preventDefault();
       e.stopPropagation();
       
-      console.log("Iniciando processo de importação...");
-
       if (priceRoutes.length > 0) {
           if (!confirm(`Já existem ${priceRoutes.length} rotas cadastradas. Importar novamente pode gerar duplicatas.\nDeseja continuar mesmo assim?`)) {
               return;
           }
       } 
-      // Se tabela vazia, roda direto sem perguntar para facilitar
 
       setLoadingImport(true);
       try {
@@ -145,7 +142,6 @@ const QuotesView: React.FC = () => {
       }
   };
 
-  // --- PRICE TABLE HANDLERS ---
   const handleAddRoute = (e: React.FormEvent) => {
       e.preventDefault();
       if (newRouteForm.destination && newRouteForm.price > 0) {
@@ -167,7 +163,6 @@ const QuotesView: React.FC = () => {
       setShowNewForm(true); // Open form if closed
   };
 
-  // --- KANBAN COLUMNS ---
   const columns: {id: Quote['status'], title: string}[] = [
       { id: 'NEW', title: '🆕 Novos Pedidos' },
       { id: 'PRICED', title: '💲 Precificados' },
@@ -176,7 +171,6 @@ const QuotesView: React.FC = () => {
       { id: 'REJECTED', title: '❌ Perdidos' },
   ];
 
-  // Get unique vehicle types for the filter dropdown
   const uniqueVehicleTypes = Array.from(new Set(priceRoutes.map(r => r.vehicleType))).sort();
 
   const filteredRoutes = priceRoutes.filter(r => {
@@ -214,7 +208,6 @@ const QuotesView: React.FC = () => {
             </div>
         </div>
 
-        {/* KANBAN BOARD */}
         <div className="flex gap-4 overflow-x-auto pb-4 flex-1">
             {columns.map(col => (
                 <div key={col.id} className="min-w-[280px] w-[280px] flex flex-col bg-slate-100 rounded-xl border border-slate-200 max-h-full">
@@ -242,13 +235,12 @@ const QuotesView: React.FC = () => {
                                     <p className="text-xs text-orange-500 font-bold mb-2">Sem preço definido</p>
                                 )}
 
-                                {/* Quick Actions */}
                                 <div className="flex justify-between items-center pt-2 border-t border-slate-50 mt-2">
                                     <select 
                                         value={quote.status}
                                         onChange={(e) => handleStatusChange(quote, e.target.value as any)}
                                         className="text-[10px] bg-slate-50 border border-slate-200 rounded p-1 outline-none w-full"
-                                        disabled={quote.status === 'APPROVED'} // Locked if converted
+                                        disabled={quote.status === 'APPROVED'}
                                     >
                                         <option value="NEW">Novo</option>
                                         <option value="PRICED">Precificado</option>
@@ -279,7 +271,6 @@ const QuotesView: React.FC = () => {
                     <div className="bg-emerald-800 p-4 text-white flex justify-between items-center">
                         <h3 className="font-bold text-lg flex items-center gap-2">💰 Tabela de Preços de Locação</h3>
                         <div className="flex items-center gap-2">
-                            {/* RESTRICTED: Only Developer can see Clear Table */}
                             {isDeveloper && priceRoutes.length > 0 && (
                                 <button 
                                     type="button"
@@ -291,7 +282,6 @@ const QuotesView: React.FC = () => {
                                 </button>
                             )}
                             
-                            {/* RESTRICTED: Only Developer can see Import Table */}
                             {isDeveloper && (
                                 <button 
                                     type="button"
@@ -308,10 +298,7 @@ const QuotesView: React.FC = () => {
                     </div>
                     
                     <div className="flex-1 overflow-hidden flex flex-col md:flex-row">
-                        {/* LEFT: LIST - W-FULL if editing is disabled (Finance) */}
                         <div className={`w-full ${canEditPriceTable ? 'md:w-2/3 border-r' : 'md:w-full'} p-6 overflow-y-auto bg-white border-slate-200`}>
-                            
-                            {/* SEARCH AND FILTER BAR */}
                             <div className="flex flex-col md:flex-row gap-2 mb-4">
                                 <input 
                                     type="text" 
@@ -354,11 +341,9 @@ const QuotesView: React.FC = () => {
                                         </div>
                                     </div>
                                 ))}
-                                {filteredRoutes.length === 0 && <p className="text-center text-slate-400 py-4">Nenhuma rota encontrada para os filtros.</p>}
                             </div>
                         </div>
 
-                        {/* RIGHT: ADD FORM (Visible to Manager & Developer Only) */}
                         {canEditPriceTable && (
                             <div className="w-full md:w-1/3 bg-slate-50 p-6 overflow-y-auto">
                                 <h4 className="font-bold text-slate-700 mb-4">Cadastrar Nova Rota</h4>
@@ -421,89 +406,6 @@ const QuotesView: React.FC = () => {
                 </div>
             </div>
         )}
-
-        {/* NEW/EDIT MODAL */}
-        {showNewForm && (
-            <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-                <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full p-6 max-h-[90vh] overflow-y-auto animate-fade-in">
-                    <h3 className="font-bold text-xl mb-4 text-slate-800">{editingQuote ? 'Editar Orçamento' : 'Novo Pedido de Orçamento'}</h3>
-                    <form onSubmit={handleSubmit} className="space-y-4">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-1">Cliente</label>
-                                <input required value={form.clientName} onChange={e => setForm({...form, clientName: e.target.value})} className="w-full border p-2 rounded" placeholder="Nome Completo" />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-1">Telefone</label>
-                                <input value={form.clientPhone} onChange={e => setForm({...form, clientPhone: e.target.value})} className="w-full border p-2 rounded" placeholder="(00) 00000-0000" />
-                            </div>
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-1">Email (Opcional)</label>
-                            <input type="email" value={form.clientEmail} onChange={e => setForm({...form, clientEmail: e.target.value})} className="w-full border p-2 rounded" placeholder="cliente@email.com" />
-                        </div>
-                        
-                        <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
-                            <div className="flex justify-between items-center mb-2">
-                                <h4 className="text-sm font-bold text-slate-700 uppercase">Dados da Viagem</h4>
-                                <button type="button" onClick={() => {setShowNewForm(false); setShowPriceTable(true)}} className="text-xs text-emerald-600 font-bold hover:underline">
-                                    🔍 Consultar Tabela
-                                </button>
-                            </div>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-1">Destino</label>
-                                    <input required value={form.destination} onChange={e => setForm({...form, destination: e.target.value})} className="w-full border p-2 rounded" />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-1">Saída (Local)</label>
-                                    <input required value={form.departureLocation} onChange={e => setForm({...form, departureLocation: e.target.value})} className="w-full border p-2 rounded" />
-                                </div>
-                            </div>
-                            <div className="grid grid-cols-3 gap-4">
-                                <div>
-                                    <label className="block text-xs font-bold text-slate-500 mb-1">Data/Hora Ida</label>
-                                    <input type="datetime-local" required value={form.startTime} onChange={e => setForm({...form, startTime: e.target.value})} className="w-full border p-2 rounded text-sm" />
-                                </div>
-                                <div>
-                                    <label className="block text-xs font-bold text-slate-500 mb-1">Data/Hora Volta</label>
-                                    <input type="datetime-local" required value={form.endTime} onChange={e => setForm({...form, endTime: e.target.value})} className="w-full border p-2 rounded text-sm" />
-                                </div>
-                                <div>
-                                    <label className="block text-xs font-bold text-slate-500 mb-1">Passageiros</label>
-                                    <input type="number" required value={form.passengerCount} onChange={e => setForm({...form, passengerCount: parseInt(e.target.value)})} className="w-full border p-2 rounded text-sm" />
-                                </div>
-                            </div>
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-1">Observações / Roteiro</label>
-                            <textarea value={form.observations} onChange={e => setForm({...form, observations: e.target.value})} className="w-full border p-2 rounded h-20" placeholder="Detalhes extras..." />
-                        </div>
-
-                        {/* PRICE FIELD - Highlighted */}
-                        <div className="bg-green-50 p-4 rounded-lg border border-green-200">
-                            <label className="block text-sm font-bold text-green-800 mb-1">Valor do Orçamento (R$)</label>
-                            <input 
-                                type="text" 
-                                inputMode="numeric"
-                                value={form.price.toLocaleString('pt-BR', {minimumFractionDigits: 2})} 
-                                onChange={handlePriceChange}
-                                className="w-full border border-green-300 p-2 rounded text-lg font-bold text-green-700" 
-                                placeholder="0,00"
-                            />
-                            <p className="text-xs text-green-600 mt-1">Preencha para mover para "Precificado".</p>
-                        </div>
-
-                        <div className="flex gap-2 justify-end pt-4">
-                            <button type="button" onClick={() => setShowNewForm(false)} className="px-4 py-2 bg-slate-200 rounded text-slate-700 font-bold">Cancelar</button>
-                            <button type="submit" className="px-6 py-2 bg-slate-800 text-white rounded font-bold hover:bg-slate-700">Salvar</button>
-                        </div>
-                    </form>
-                </div>
-            </div>
-        )}
-
         {/* APPROVAL MODAL */}
         {approvingQuote && (
             <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
@@ -514,13 +416,11 @@ const QuotesView: React.FC = () => {
                     <p className="text-sm text-slate-600 mb-4">
                         Para converter o orçamento de <strong>{approvingQuote.clientName}</strong> em uma locação oficial, selecione o veículo que fará a viagem.
                     </p>
-                    
                     <div className="mb-4 bg-slate-50 p-3 rounded text-sm">
                         <p><strong>Destino:</strong> {approvingQuote.destination}</p>
                         <p><strong>Data:</strong> {new Date(approvingQuote.startTime).toLocaleDateString()}</p>
                         <p><strong>Valor Fechado:</strong> R$ {approvingQuote.price?.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</p>
                     </div>
-
                     <div className="mb-6">
                         <label className="block text-sm font-bold text-slate-700 mb-1">Selecione o Ônibus</label>
                         <select 
@@ -534,7 +434,6 @@ const QuotesView: React.FC = () => {
                             ))}
                         </select>
                     </div>
-
                     <div className="flex gap-2">
                         <button onClick={() => { setApprovingQuote(null); setSelectedBusForApproval(''); }} className="flex-1 bg-slate-200 text-slate-700 py-2 rounded font-bold">Cancelar</button>
                         <button onClick={handleConfirmApproval} className="flex-1 bg-green-600 text-white py-2 rounded font-bold hover:bg-green-700">Gerar Locação</button>

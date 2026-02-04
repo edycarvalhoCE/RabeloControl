@@ -5,7 +5,8 @@ export enum UserRole {
   FINANCE = 'FINANCEIRO',
   DRIVER = 'MOTORISTA',
   MECHANIC = 'MECANICO',
-  GARAGE_AUX = 'AUX_GARAGEM' // Novo perfil
+  GARAGE_AUX = 'AUX_GARAGEM',
+  AGENT = 'AGENTE' // Novo perfil comercial
 }
 
 export interface PaymentRateProfile {

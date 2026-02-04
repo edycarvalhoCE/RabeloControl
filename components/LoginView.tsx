@@ -37,7 +37,6 @@ const LoginView: React.FC = () => {
                       <div className="bg-slate-50 border-l-4 border-slate-400 p-4">
                           <p className="text-slate-700 font-medium">Você precisa criar um projeto gratuito no Firebase para que os dados sejam salvos e compartilhados entre os computadores.</p>
                       </div>
-                      {/* ... instructions ... */}
                   </div>
               </div>
           </div>
@@ -80,7 +79,7 @@ const LoginView: React.FC = () => {
             <div className="flex flex-col items-center mb-8">
                 {/* Logo Container - Clean and Centered */}
                 <div className="mb-4 transform transition-transform duration-300">
-                    <Logo size="lg" /> {/* Reduzido de 'xl' para 'lg' */}
+                    <Logo size="lg" />
                 </div>
                 <p className="text-slate-500 text-sm font-medium uppercase tracking-wide">Sistema Integrado de Gestão</p>
             </div>
@@ -109,6 +108,7 @@ const LoginView: React.FC = () => {
                                 value={regRole} onChange={e => setRegRole(e.target.value as UserRole)}
                                 className="w-full border border-slate-300 p-3 rounded-lg bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-600 outline-none transition-all"
                             >
+                                <option value={UserRole.AGENT}>Agente Comercial</option>
                                 <option value={UserRole.DRIVER}>Motorista</option>
                                 <option value={UserRole.GARAGE_AUX}>Aux. Garagem / Limpeza</option>
                                 <option value={UserRole.MANAGER}>Gerente</option>

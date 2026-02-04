@@ -168,6 +168,7 @@ const UsersView: React.FC = () => {
                             onChange={e => setFormData({...formData, role: e.target.value as UserRole})}
                             className="w-full border p-2 rounded focus:ring-2 focus:ring-blue-500 outline-none"
                           >
+                              <option value={UserRole.AGENT}>Agente Comercial</option>
                               <option value={UserRole.DRIVER}>Motorista</option>
                               <option value={UserRole.GARAGE_AUX}>Aux. Garagem / Limpeza</option>
                               <option value={UserRole.MECHANIC}>Mecânico</option>
