@@ -1,7 +1,8 @@
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useStore } from '../services/store';
 import { UserRole, Quote, Bus, PriceRoute } from '../types';
+import * as XLSX from 'xlsx';
 
 const QuotesView: React.FC = () => {
   const { quotes, addQuote, updateQuote, convertQuoteToBooking, deleteQuote, currentUser, buses, priceRoutes, addPriceRoute, deletePriceRoute, importDefaultPrices, clearPriceTable } = useStore();
@@ -10,6 +11,8 @@ const QuotesView: React.FC = () => {
   const [showPriceTable, setShowPriceTable] = useState(false);
   const [loadingImport, setLoadingImport] = useState(false);
   
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   // State for Conversion (Approval)
   const [approvingQuote, setApprovingQuote] = useState<Quote | null>(null);
   const [selectedBusForApproval, setSelectedBusForApproval] = useState('');
@@ -41,24 +44,58 @@ const QuotesView: React.FC = () => {
       return <div className="p-8 text-center text-slate-500">Acesso restrito.</div>;
   }
   
-  const handleImportPrices = async (e: React.MouseEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
-      if (priceRoutes.length > 0) {
-          if (!confirm(`Já existem ${priceRoutes.length} rotas cadastradas. Importar novamente pode gerar duplicatas.\nDeseja continuar mesmo assim?`)) {
-              return;
-          }
-      } 
+  const handleDownloadPriceTemplate = () => {
+      const templateData = [
+          { "Origem": "Petrópolis", "Destino": "Cabo Frio", "Veículo": "Convencional", "Valor": 1800.00 },
+          { "Origem": "Petrópolis", "Destino": "Rio de Janeiro", "Veículo": "Micro", "Valor": 950.00 },
+          { "Origem": "Petrópolis", "Destino": "Aparecida", "Veículo": "Semi-Leito", "Valor": 4200.00 },
+      ];
+      const ws = XLSX.utils.json_to_sheet(templateData);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Modelo_Precos");
+      XLSX.writeFile(wb, "modelo_tabela_precos_rabelotour.xlsx");
+  };
+
+  const handlePriceFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+
       setLoadingImport(true);
-      try {
-          const result = await importDefaultPrices();
-          if (result.success) alert(result.message);
-          else alert("Falha na importação: " + result.message);
-      } catch (err: any) {
-          alert("Erro crítico: " + err.message);
-      } finally {
-          setLoadingImport(false);
-      }
+      const reader = new FileReader();
+      reader.onload = async (evt) => {
+          try {
+              const bstr = evt.target?.result;
+              const wb = XLSX.read(bstr, { type: 'binary' });
+              const wsname = wb.SheetNames[0];
+              const ws = wb.Sheets[wsname];
+              const data = XLSX.utils.sheet_to_json(ws);
+
+              let count = 0;
+              for (const row of data as any[]) {
+                  const origin = row['Origem'] || row['origem'] || 'Petrópolis';
+                  const destination = row['Destino'] || row['destino'];
+                  const vehicleType = row['Veículo'] || row['veiculo'] || row['Tipo'] || 'Convencional';
+                  const price = parseFloat(row['Valor'] || row['valor'] || row['Preço'] || 0);
+
+                  if (destination && price > 0) {
+                      await addPriceRoute({
+                          origin: String(origin).trim(),
+                          destination: String(destination).trim(),
+                          vehicleType: String(vehicleType).trim(),
+                          price: price
+                      });
+                      count++;
+                  }
+              }
+              alert(`${count} rotas importadas com sucesso!`);
+          } catch (err: any) {
+              alert("Erro ao ler arquivo: " + err.message);
+          } finally {
+              setLoadingImport(false);
+              if (fileInputRef.current) fileInputRef.current.value = '';
+          }
+      };
+      reader.readAsBinaryString(file);
   };
 
   const handleClearTable = async () => {
@@ -94,7 +131,7 @@ const QuotesView: React.FC = () => {
           clientEmail: quote.clientEmail || '',
           destination: quote.destination,
           departureLocation: quote.departureLocation,
-          startTime: quote.startTime.slice(0,16), // Ajuste para datetime-local
+          startTime: quote.startTime.slice(0,16), 
           endTime: quote.endTime ? quote.endTime.slice(0,16) : '',
           passengerCount: quote.passengerCount,
           observations: quote.observations || '',
@@ -244,9 +281,6 @@ const QuotesView: React.FC = () => {
                                 </div>
                             </div>
                         ))}
-                        {quotes.filter(q => q.status === col.id).length === 0 && (
-                            <p className="text-center text-xs text-slate-400 italic py-4">Vazio</p>
-                        )}
                     </div>
                 </div>
             ))}
@@ -339,7 +373,26 @@ const QuotesView: React.FC = () => {
                                 <button type="button" onClick={handleClearTable} disabled={loadingImport} className="text-xs bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded font-bold border border-red-500 shadow-sm mr-2">🗑️ Limpar Tabela</button>
                             )}
                             {isDeveloper && (
-                                <button type="button" onClick={handleImportPrices} disabled={loadingImport} className="text-xs bg-emerald-700 hover:bg-emerald-600 text-white px-3 py-1.5 rounded font-bold border border-emerald-600 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">{loadingImport ? 'Importando...' : '📥 Importar Tabela Padrão'}</button>
+                                <div className="flex gap-1">
+                                    <button 
+                                        type="button" 
+                                        onClick={handleDownloadPriceTemplate}
+                                        className="text-xs bg-slate-700 hover:bg-slate-600 text-white px-3 py-1.5 rounded font-bold border border-slate-600 shadow-sm"
+                                    >
+                                        📑 Baixar Modelo
+                                    </button>
+                                    <label className={`cursor-pointer text-xs bg-emerald-700 hover:bg-emerald-600 text-white px-3 py-1.5 rounded font-bold border border-emerald-600 shadow-sm flex items-center gap-1 ${loadingImport ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                                        <span>{loadingImport ? 'Importando...' : '📥 Importar Planilha'}</span>
+                                        <input 
+                                            type="file" 
+                                            accept=".xlsx, .xls" 
+                                            onChange={handlePriceFileUpload} 
+                                            disabled={loadingImport} 
+                                            className="hidden" 
+                                            ref={fileInputRef}
+                                        />
+                                    </label>
+                                </div>
                             )}
                             <button onClick={() => setShowPriceTable(false)} className="text-emerald-200 hover:text-white text-xl ml-2">&times;</button>
                         </div>
