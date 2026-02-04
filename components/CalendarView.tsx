@@ -16,7 +16,7 @@ type GenericEventType = {
 };
 
 const CalendarView: React.FC<CalendarViewProps> = ({ onEventClick }) => {
-  const { bookings, timeOffs, users, currentUser, addTimeOff, updateTimeOffStatus, deleteTimeOff, buses, charterContracts } = useStore();
+  const { bookings, timeOffs, users, currentUser, addTimeOff, updateTimeOffStatus, deleteTimeOff, buses, charterContracts, scheduleConfirmations } = useStore();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [showModal, setShowModal] = useState(false);
   
@@ -333,6 +333,15 @@ const CalendarView: React.FC<CalendarViewProps> = ({ onEventClick }) => {
                             {dayCharters.map(c => {
                                 const driver = users.find(u => u.id === c.driverId);
                                 const driverName = driver ? driver.name : c.freelanceDriverName ? `${c.freelanceDriverName} (F)` : 'S/ Mot';
+                                
+                                // Check confirmation for Charter
+                                const isConfirmed = scheduleConfirmations.some(conf => 
+                                    conf.referenceId === c.id && 
+                                    conf.type === 'CHARTER' &&
+                                    conf.date === cellDateStr &&
+                                    conf.driverId === c.driverId
+                                );
+
                                 return (
                                     <div 
                                         key={`charter-${c.id}-${day}`} 
@@ -349,12 +358,20 @@ const CalendarView: React.FC<CalendarViewProps> = ({ onEventClick }) => {
                                         title={`Fretamento: ${c.clientName}`}
                                     >
                                         🏭 {canViewAllSchedule ? `${c.route.substring(0,12)}.. (${driverName.split(' ')[0]})` : c.route}
+                                        {isConfirmed && <span className="ml-1 text-green-600 font-bold" title="Motorista Confirmou">✓</span>}
                                     </div>
                                 )
                             })}
 
                             {visibleBookings.map(b => {
                                 const driver = users.find(u => u.id === b.driverId);
+                                
+                                // Check confirmation for Booking
+                                const isConfirmed = scheduleConfirmations.some(conf => 
+                                    conf.referenceId === b.id && 
+                                    conf.type === 'BOOKING'
+                                );
+
                                 return (
                                     <div 
                                         key={b.id} 
@@ -375,6 +392,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ onEventClick }) => {
                                         title={`${b.destination} - ${driver?.name || 'S/ Motorista'}`}
                                     >
                                         🚌 {canViewAllSchedule ? `${b.destination} (${driver?.name?.split(' ')[0] || '?'})` : b.destination}
+                                        {isConfirmed && <span className="ml-1 font-bold" title="Motorista Confirmou">✓</span>}
                                     </div>
                                 );
                             })}

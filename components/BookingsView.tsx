@@ -1,9 +1,10 @@
+
 import React, { useState } from 'react';
 import { useStore } from '../services/store';
 import { UserRole, Bus, Booking } from '../types';
 
 const BookingsView: React.FC = () => {
-  const { bookings, buses, users, updateBooking, updateBookingStatus } = useStore();
+  const { bookings, buses, users, updateBooking, updateBookingStatus, scheduleConfirmations } = useStore();
   
   // --- FILTER STATE ---
   const [filters, setFilters] = useState({
@@ -218,6 +219,7 @@ const BookingsView: React.FC = () => {
   };
 
   const handlePrintContract = (booking: Booking) => {
+    // ... (Existing Contract Print Logic - Unchanged for brevity)
     const bus = buses.find(b => b.id === booking.busId);
     
     const companyInfo = {
@@ -238,24 +240,15 @@ const BookingsView: React.FC = () => {
           <style>
               body { font-family: 'Times New Roman', serif; font-size: 11px; padding: 20px; line-height: 1.2; color: #000; }
               .header { text-align: center; border-bottom: 2px solid #000; margin-bottom: 10px; padding-bottom: 5px; }
-              .header h1 { margin: 0; font-size: 24px; font-weight: bold; font-style: italic; color: #1e3a8a; } /* Blueish similar to logo */
+              .header h1 { margin: 0; font-size: 24px; font-weight: bold; font-style: italic; color: #1e3a8a; }
               .header span { font-size: 10px; }
-              
-              .top-table { width: 100%; border-collapse: collapse; margin-bottom: 10px; }
-              .top-table td { border: 1px solid #000; padding: 4px; vertical-align: top; }
-              .label { font-weight: bold; font-size: 10px; display: block; margin-bottom: 2px; }
-              
               .section-title { background: #eee; font-weight: bold; border: 1px solid #000; padding: 2px 5px; margin-top: 10px; font-size: 11px; }
-              
               .info-box { border: 1px solid #000; padding: 5px; border-top: none; }
               .row { display: flex; justify-content: space-between; margin-bottom: 2px; }
-              
               .clauses { font-size: 9px; text-align: justify; margin-top: 10px; line-height: 1.1; }
               .clauses p { margin-bottom: 6px; }
-              
               .signatures { margin-top: 40px; display: flex; justify-content: space-between; text-align: center; }
               .sig-line { border-top: 1px solid #000; width: 45%; padding-top: 5px; font-size: 10px; }
-              
               .footer { font-size: 9px; text-align: center; margin-top: 20px; border-top: 1px solid #ccc; padding-top: 5px; }
           </style>
       </head>
@@ -595,6 +588,12 @@ const BookingsView: React.FC = () => {
             const bus = buses.find(b => b.id === booking.busId);
             const driverName = getDriverName(booking);
             
+            // Check Confirmation
+            const confirmedAt = scheduleConfirmations.find(c => 
+                c.referenceId === booking.id && 
+                c.type === 'BOOKING'
+            );
+
             return (
               <div key={booking.id} className="bg-white p-5 rounded-lg shadow-sm border border-slate-200 flex flex-col md:flex-row justify-between items-start gap-4">
                 <div className="flex-1">
@@ -628,9 +627,20 @@ const BookingsView: React.FC = () => {
                     </div>
                     <div>
                         <span className="font-medium text-slate-700 block">Motorista</span> 
-                        <span className={`font-medium ${booking.driverId ? 'text-slate-600' : booking.freelanceDriverName ? 'text-purple-600' : 'text-red-500'}`}>
-                            {driverName}
-                        </span>
+                        <div className="flex items-center gap-1">
+                            <span className={`font-medium ${booking.driverId ? 'text-slate-600' : booking.freelanceDriverName ? 'text-purple-600' : 'text-red-500'}`}>
+                                {driverName}
+                            </span>
+                            {/* Confirmation Badge */}
+                            {confirmedAt && (
+                                <span 
+                                    className="bg-green-100 text-green-700 text-[10px] px-1.5 py-0.5 rounded border border-green-200 cursor-help font-bold"
+                                    title={`Confirmado pelo motorista em: ${new Date(confirmedAt.confirmedAt).toLocaleString()}`}
+                                >
+                                    ✅ Ciente
+                                </span>
+                            )}
+                        </div>
                     </div>
                   </div>
                 </div>
