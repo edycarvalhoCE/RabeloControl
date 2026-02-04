@@ -15,20 +15,22 @@ import UsersView from './components/UsersView';
 import VehiclesView from './components/VehiclesView';
 import CharterView from './components/CharterView';
 import TravelPackagesView from './components/TravelPackagesView';
-import ClientsView from './components/ClientsView'; // Import
+import ClientsView from './components/ClientsView'; 
 import LoginView from './components/LoginView';
 import SettingsView from './components/SettingsView';
 import QuotesView from './components/QuotesView';
 import { useStore } from './services/store';
+import { UserRole } from './types';
 
 const MainContent = () => {
   const { currentUser, isAuthenticated, logout } = useStore();
   
-  // Default view logic
+  // Default view logic per role
   const getDefaultView = () => {
     if (!currentUser) return 'dashboard';
-    if (currentUser.role === 'MOTORISTA' || currentUser.role === 'AUX_GARAGEM') return 'driver-portal';
-    if (currentUser.role === 'MECANICO') return 'maintenance';
+    if (currentUser.role === UserRole.DRIVER || currentUser.role === UserRole.GARAGE_AUX) return 'driver-portal';
+    if (currentUser.role === UserRole.MECHANIC) return 'maintenance';
+    if (currentUser.role === UserRole.AGENT) return 'dashboard';
     return 'dashboard';
   };
 
@@ -40,13 +42,12 @@ const MainContent = () => {
     if (isAuthenticated && currentUser) {
         setCurrentView(getDefaultView());
     }
-  }, [isAuthenticated, currentUser?.role]);
+  }, [isAuthenticated, currentUser?.id, currentUser?.role]);
 
   if (!isAuthenticated) {
       return <LoginView />;
   }
 
-  // Prevent crash if authenticated but user profile not yet loaded from Firestore
   if (!currentUser) {
       return (
           <div className="min-h-screen flex items-center justify-center bg-slate-900">
@@ -94,7 +95,7 @@ const MainContent = () => {
       case 'new-booking': return <NewBookingView />;
       case 'bookings': return <BookingsView />;
       case 'travel-packages': return <TravelPackagesView />;
-      case 'clients': return <ClientsView />; // Nova Rota
+      case 'clients': return <ClientsView />;
       case 'vehicles': return <VehiclesView />;
       case 'charter': return <CharterView />;
       case 'inventory': return <InventoryView />;

@@ -5,16 +5,26 @@ import { UserRole, Part, FuelRecord } from '../types';
 
 const InventoryView: React.FC = () => {
   const { parts, updateStock, addPart, currentUser, purchaseRequests, users, buses, updatePurchaseRequestStatus, addFuelRecord, fuelRecords, fuelSupplies, addFuelSupply, fuelStockLevel, restockPart, updateFuelRecord, deleteFuelRecord } = useStore();
+  
+  // SEGURANÇA: Trava de acesso para Agente Comercial
+  if (currentUser.role === UserRole.AGENT) {
+    return (
+      <div className="p-8 text-center bg-white rounded-xl shadow-sm border border-slate-200">
+        <div className="text-red-500 text-5xl mb-4">🚫</div>
+        <h2 className="text-2xl font-bold text-slate-800 mb-2">Acesso Restrito</h2>
+        <p className="text-slate-500">O perfil de Agente Comercial não possui permissão para gerenciar o estoque de peças.</p>
+      </div>
+    );
+  }
+
   const [showAddForm, setShowAddForm] = useState(false);
   
-  // Helper to get local date string YYYY-MM-DD
   const getTodayLocal = () => {
     const d = new Date();
     d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
     return d.toISOString().split('T')[0];
   };
 
-  // Helper for safe date display (DD/MM/YYYY)
   const formatDate = (dateStr: string) => {
       if (!dateStr) return '-';
       const parts = dateStr.split('-');
@@ -27,7 +37,6 @@ const InventoryView: React.FC = () => {
   const [viewMode, setViewMode] = useState<'STOCK' | 'REQUESTS' | 'FUEL_CONSUMPTION' | 'FUEL_SUPPLY'>('STOCK');
   const [searchTerm, setSearchTerm] = useState('');
 
-  // Fuel CONSUMPTION Form State
   const [fuelForm, setFuelForm] = useState({
       date: getTodayLocal(),
       busId: '',
@@ -42,7 +51,6 @@ const InventoryView: React.FC = () => {
       kmEnd: 0
   });
 
-  // Fuel SUPPLY (Purchase) Form State
   const [supplyForm, setSupplyForm] = useState({
       date: getTodayLocal(),
       liters: 0,
@@ -51,11 +59,9 @@ const InventoryView: React.FC = () => {
       registeredInFinance: true
   });
   
-  // DATE FILTERS for History (Persistent across fuel tabs)
   const [supplyFilterStart, setSupplyFilterStart] = useState('');
   const [supplyFilterEnd, setSupplyFilterEnd] = useState('');
 
-  // RESTOCK MODAL STATE
   const [restockItem, setRestockItem] = useState<Part | null>(null);
   const [restockForm, setRestockForm] = useState({
       quantity: 1,
@@ -64,7 +70,6 @@ const InventoryView: React.FC = () => {
       nfe: ''
   });
 
-  const isMechanic = currentUser.role === UserRole.MECHANIC;
   const canManageStock = currentUser.role === UserRole.MANAGER || currentUser.role === UserRole.DEVELOPER || currentUser.role === UserRole.FINANCE;
 
   const handleAddPart = (e: React.FormEvent) => {
@@ -72,13 +77,6 @@ const InventoryView: React.FC = () => {
     addPart(newPart);
     setShowAddForm(false);
     setNewPart({ name: '', quantity: 0, minQuantity: 5, price: 0, lastSupplier: '', lastNfe: '' });
-  };
-
-  const handlePriceChange = (e: React.ChangeEvent<HTMLInputElement>, setter: any) => {
-    const value = e.target.value;
-    const digits = value.replace(/\D/g, "");
-    const realValue = Number(digits) / 100;
-    setter((prev: any) => ({ ...prev, price: realValue }));
   };
 
   const handleRestockPriceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -159,17 +157,14 @@ const InventoryView: React.FC = () => {
       setSupplyForm({ date: getTodayLocal(), liters: 0, cost: 0, receiverName: currentUser.name || '', registeredInFinance: true });
   };
 
-  // --- FILTERING LOGIC ---
   const filteredParts = parts.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()));
 
-  // Filter fuel records (Consumption)
   const filteredFuelRecords = fuelRecords.filter(r => {
     if(supplyFilterStart && r.date < supplyFilterStart) return false;
     if(supplyFilterEnd && r.date > supplyFilterEnd) return false;
     return true;
   }).sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
-  // Filter fuel supplies (Purchases)
   const filteredSupplies = fuelSupplies.filter(s => {
     if(supplyFilterStart && s.date < supplyFilterStart) return false;
     if(supplyFilterEnd && s.date > supplyFilterEnd) return false;
