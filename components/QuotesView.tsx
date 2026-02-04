@@ -16,7 +16,7 @@ const QuotesView: React.FC = () => {
 
   // Price Table State
   const [priceSearch, setPriceSearch] = useState('');
-  const [priceVehicleFilter, setPriceVehicleFilter] = useState(''); // NEW FILTER STATE
+  const [priceVehicleFilter, setPriceVehicleFilter] = useState(''); 
   const [newRouteForm, setNewRouteForm] = useState({ origin: 'Petrópolis', destination: '', vehicleType: 'Convencional', price: 0 });
 
   // New Quote Form State
@@ -33,36 +33,27 @@ const QuotesView: React.FC = () => {
       price: 0
   });
 
-  // Updated to include FINANCE and AGENT
   const canManage = currentUser.role === UserRole.MANAGER || currentUser.role === UserRole.DEVELOPER || currentUser.role === UserRole.FINANCE || currentUser.role === UserRole.AGENT;
   const isDeveloper = currentUser.role === UserRole.DEVELOPER;
-  // Finance and Agent can view but NOT edit price table (Add/Delete routes)
   const canEditPriceTable = currentUser.role === UserRole.MANAGER || currentUser.role === UserRole.DEVELOPER;
 
   if (!canManage) {
       return <div className="p-8 text-center text-slate-500">Acesso restrito.</div>;
   }
   
-  // (Resto do componente QuotesView mantido sem alterações...)
-  
   const handleImportPrices = async (e: React.MouseEvent) => {
       e.preventDefault();
       e.stopPropagation();
-      
       if (priceRoutes.length > 0) {
           if (!confirm(`Já existem ${priceRoutes.length} rotas cadastradas. Importar novamente pode gerar duplicatas.\nDeseja continuar mesmo assim?`)) {
               return;
           }
       } 
-
       setLoadingImport(true);
       try {
           const result = await importDefaultPrices();
-          if (result.success) {
-              alert(result.message);
-          } else {
-              alert("Falha na importação: " + result.message);
-          }
+          if (result.success) alert(result.message);
+          else alert("Falha na importação: " + result.message);
       } catch (err: any) {
           alert("Erro crítico: " + err.message);
       } finally {
@@ -87,9 +78,7 @@ const QuotesView: React.FC = () => {
               alert("Orçamento atualizado!");
               setEditingQuote(null);
           } else {
-              addQuote({
-                  ...form,
-              });
+              addQuote(form);
               alert("Solicitação de orçamento criada!");
           }
           setShowNewForm(false);
@@ -105,8 +94,8 @@ const QuotesView: React.FC = () => {
           clientEmail: quote.clientEmail || '',
           destination: quote.destination,
           departureLocation: quote.departureLocation,
-          startTime: quote.startTime,
-          endTime: quote.endTime,
+          startTime: quote.startTime.slice(0,16), // Ajuste para datetime-local
+          endTime: quote.endTime ? quote.endTime.slice(0,16) : '',
           passengerCount: quote.passengerCount,
           observations: quote.observations || '',
           price: quote.price || 0
@@ -160,7 +149,7 @@ const QuotesView: React.FC = () => {
           observations: `${prev.observations ? prev.observations + '\n' : ''}Preço baseado na tabela: ${route.vehicleType}`
       }));
       setShowPriceTable(false);
-      setShowNewForm(true); // Open form if closed
+      setShowNewForm(true); 
   };
 
   const columns: {id: Quote['status'], title: string}[] = [
@@ -177,7 +166,6 @@ const QuotesView: React.FC = () => {
       const matchText = r.destination.toLowerCase().includes(priceSearch.toLowerCase()) || 
                         r.origin.toLowerCase().includes(priceSearch.toLowerCase());
       const matchVehicle = priceVehicleFilter ? r.vehicleType === priceVehicleFilter : true;
-      
       return matchText && matchVehicle;
   });
 
@@ -264,6 +252,82 @@ const QuotesView: React.FC = () => {
             ))}
         </div>
 
+        {/* MODAL: NOVO/EDITAR ORÇAMENTO */}
+        {showNewForm && (
+            <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[70] p-4">
+                <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto animate-fade-in">
+                    <div className="bg-indigo-600 p-4 text-white flex justify-between items-center sticky top-0 z-10">
+                        <h3 className="font-bold text-lg">{editingQuote ? 'Editar Orçamento' : 'Novo Pedido de Orçamento'}</h3>
+                        <button onClick={() => setShowNewForm(false)} className="text-white hover:text-indigo-200 text-xl font-bold">&times;</button>
+                    </div>
+                    <form onSubmit={handleSubmit} className="p-6 space-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Nome do Cliente *</label>
+                                <input required value={form.clientName} onChange={e => setForm({...form, clientName: e.target.value})} className="w-full border p-2 rounded focus:ring-2 focus:ring-indigo-500 outline-none" />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Telefone</label>
+                                <input value={form.clientPhone} onChange={e => setForm({...form, clientPhone: e.target.value})} className="w-full border p-2 rounded focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="(00) 00000-0000" />
+                            </div>
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">E-mail do Cliente</label>
+                            <input type="email" value={form.clientEmail} onChange={e => setForm({...form, clientEmail: e.target.value})} className="w-full border p-2 rounded focus:ring-2 focus:ring-indigo-500 outline-none" />
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Local de Saída</label>
+                                <input value={form.departureLocation} onChange={e => setForm({...form, departureLocation: e.target.value})} className="w-full border p-2 rounded focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="Ex: Petrópolis" />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Destino *</label>
+                                <input required value={form.destination} onChange={e => setForm({...form, destination: e.target.value})} className="w-full border p-2 rounded focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="Ex: Cabo Frio" />
+                            </div>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Data/Hora Saída *</label>
+                                <input type="datetime-local" required value={form.startTime} onChange={e => setForm({...form, startTime: e.target.value})} className="w-full border p-2 rounded focus:ring-2 focus:ring-indigo-500 outline-none" />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Data/Hora Retorno</label>
+                                <input type="datetime-local" value={form.endTime} onChange={e => setForm({...form, endTime: e.target.value})} className="w-full border p-2 rounded focus:ring-2 focus:ring-indigo-500 outline-none" />
+                            </div>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Qtd. Passageiros</label>
+                                <input type="number" value={form.passengerCount} onChange={e => setForm({...form, passengerCount: parseInt(e.target.value)})} className="w-full border p-2 rounded focus:ring-2 focus:ring-indigo-500 outline-none" />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Valor do Orçamento (R$)</label>
+                                <div className="flex items-center border border-slate-300 rounded overflow-hidden bg-white focus-within:ring-2 focus-within:ring-emerald-500">
+                                    <span className="bg-slate-100 text-slate-600 px-2 py-2 font-bold border-r border-slate-300 text-xs">R$</span>
+                                    <input 
+                                        type="text" inputMode="numeric"
+                                        value={form.price.toLocaleString('pt-BR', {minimumFractionDigits: 2})} 
+                                        onChange={handlePriceChange}
+                                        className="w-full p-2 outline-none text-right font-bold text-slate-800"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Observações Internas</label>
+                            <textarea value={form.observations} onChange={e => setForm({...form, observations: e.target.value})} className="w-full border p-2 rounded h-20 focus:ring-2 focus:ring-indigo-500 outline-none" />
+                        </div>
+                        <div className="flex gap-2 pt-4 border-t sticky bottom-0 bg-white">
+                            <button type="button" onClick={() => setShowNewForm(false)} className="flex-1 bg-slate-200 py-3 rounded font-bold hover:bg-slate-300 transition-colors">Cancelar</button>
+                            <button type="submit" className="flex-1 bg-indigo-600 text-white py-3 rounded font-bold hover:bg-indigo-700 transition-colors shadow-lg">
+                                {editingQuote ? 'Salvar Alterações' : 'Criar Orçamento'}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        )}
+
         {/* PRICE TABLE MODAL */}
         {showPriceTable && (
             <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[60] p-4">
@@ -272,27 +336,11 @@ const QuotesView: React.FC = () => {
                         <h3 className="font-bold text-lg flex items-center gap-2">💰 Tabela de Preços de Locação</h3>
                         <div className="flex items-center gap-2">
                             {isDeveloper && priceRoutes.length > 0 && (
-                                <button 
-                                    type="button"
-                                    onClick={handleClearTable}
-                                    disabled={loadingImport}
-                                    className="text-xs bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded font-bold border border-red-500 shadow-sm mr-2"
-                                >
-                                    🗑️ Limpar Tabela
-                                </button>
+                                <button type="button" onClick={handleClearTable} disabled={loadingImport} className="text-xs bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded font-bold border border-red-500 shadow-sm mr-2">🗑️ Limpar Tabela</button>
                             )}
-                            
                             {isDeveloper && (
-                                <button 
-                                    type="button"
-                                    onClick={handleImportPrices} 
-                                    disabled={loadingImport}
-                                    className="text-xs bg-emerald-700 hover:bg-emerald-600 text-white px-3 py-1.5 rounded font-bold border border-emerald-600 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                                >
-                                    {loadingImport ? 'Importando...' : '📥 Importar Tabela Padrão'}
-                                </button>
+                                <button type="button" onClick={handleImportPrices} disabled={loadingImport} className="text-xs bg-emerald-700 hover:bg-emerald-600 text-white px-3 py-1.5 rounded font-bold border border-emerald-600 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">{loadingImport ? 'Importando...' : '📥 Importar Tabela Padrão'}</button>
                             )}
-                            
                             <button onClick={() => setShowPriceTable(false)} className="text-emerald-200 hover:text-white text-xl ml-2">&times;</button>
                         </div>
                     </div>
@@ -300,18 +348,8 @@ const QuotesView: React.FC = () => {
                     <div className="flex-1 overflow-hidden flex flex-col md:flex-row">
                         <div className={`w-full ${canEditPriceTable ? 'md:w-2/3 border-r' : 'md:w-full'} p-6 overflow-y-auto bg-white border-slate-200`}>
                             <div className="flex flex-col md:flex-row gap-2 mb-4">
-                                <input 
-                                    type="text" 
-                                    placeholder="🔍 Buscar Destino ou Origem..." 
-                                    value={priceSearch}
-                                    onChange={(e) => setPriceSearch(e.target.value)}
-                                    className="flex-1 border p-2 rounded bg-slate-50 text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
-                                />
-                                <select 
-                                    value={priceVehicleFilter}
-                                    onChange={(e) => setPriceVehicleFilter(e.target.value)}
-                                    className="md:w-1/3 border p-2 rounded bg-slate-50 text-sm font-medium text-slate-700 focus:ring-2 focus:ring-emerald-500 outline-none"
-                                >
+                                <input type="text" placeholder="🔍 Buscar Destino ou Origem..." value={priceSearch} onChange={(e) => setPriceSearch(e.target.value)} className="flex-1 border p-2 rounded bg-slate-50 text-sm focus:ring-2 focus:ring-emerald-500 outline-none" />
+                                <select value={priceVehicleFilter} onChange={(e) => setPriceVehicleFilter(e.target.value)} className="md:w-1/3 border p-2 rounded bg-slate-50 text-sm font-medium text-slate-700 focus:ring-2 focus:ring-emerald-500 outline-none">
                                     <option value="">Todos os Veículos</option>
                                     {uniqueVehicleTypes.map(type => (
                                         <option key={type} value={type}>{type}</option>
@@ -350,24 +388,15 @@ const QuotesView: React.FC = () => {
                                 <form onSubmit={handleAddRoute} className="space-y-4">
                                     <div>
                                         <label className="block text-xs font-bold text-slate-500 mb-1">Origem</label>
-                                        <input 
-                                            required value={newRouteForm.origin} onChange={e => setNewRouteForm({...newRouteForm, origin: e.target.value})}
-                                            className="w-full border p-2 rounded text-sm" placeholder="Ex: Petrópolis"
-                                        />
+                                        <input required value={newRouteForm.origin} onChange={e => setNewRouteForm({...newRouteForm, origin: e.target.value})} className="w-full border p-2 rounded text-sm" placeholder="Ex: Petrópolis" />
                                     </div>
                                     <div>
                                         <label className="block text-xs font-bold text-slate-500 mb-1">Destino</label>
-                                        <input 
-                                            required value={newRouteForm.destination} onChange={e => setNewRouteForm({...newRouteForm, destination: e.target.value})}
-                                            className="w-full border p-2 rounded text-sm" placeholder="Ex: Cabo Frio"
-                                        />
+                                        <input required value={newRouteForm.destination} onChange={e => setNewRouteForm({...newRouteForm, destination: e.target.value})} className="w-full border p-2 rounded text-sm" placeholder="Ex: Cabo Frio" />
                                     </div>
                                     <div>
                                         <label className="block text-xs font-bold text-slate-500 mb-1">Tipo de Veículo</label>
-                                        <select 
-                                            value={newRouteForm.vehicleType} onChange={e => setNewRouteForm({...newRouteForm, vehicleType: e.target.value})}
-                                            className="w-full border p-2 rounded text-sm bg-white"
-                                        >
+                                        <select value={newRouteForm.vehicleType} onChange={e => setNewRouteForm({...newRouteForm, vehicleType: e.target.value})} className="w-full border p-2 rounded text-sm bg-white">
                                             <option value="Convencional">Convencional (46 lug)</option>
                                             <option value="Executivo">Executivo (50 lug)</option>
                                             <option value="Semi-Leito">Semi-Leito</option>
@@ -382,23 +411,10 @@ const QuotesView: React.FC = () => {
                                         <label className="block text-xs font-bold text-slate-500 mb-1">Valor Tabela (R$)</label>
                                         <div className="flex items-center border border-slate-300 rounded overflow-hidden bg-white">
                                             <span className="bg-slate-100 text-slate-600 px-2 py-1 font-bold border-r border-slate-300 text-xs">R$</span>
-                                            <input 
-                                                type="text" 
-                                                inputMode="numeric"
-                                                required
-                                                value={newRouteForm.price.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
-                                                onChange={e => {
-                                                    const val = Number(e.target.value.replace(/\D/g, "")) / 100;
-                                                    setNewRouteForm({...newRouteForm, price: val});
-                                                }}
-                                                className="w-full p-2 outline-none text-right font-bold text-slate-800 text-sm"
-                                                placeholder="0,00"
-                                            />
+                                            <input type="text" inputMode="numeric" required value={newRouteForm.price.toLocaleString('pt-BR', {minimumFractionDigits: 2})} onChange={e => { const val = Number(e.target.value.replace(/\D/g, "")) / 100; setNewRouteForm({...newRouteForm, price: val}); }} className="w-full p-2 outline-none text-right font-bold text-slate-800 text-sm" placeholder="0,00" />
                                         </div>
                                     </div>
-                                    <button type="submit" className="w-full bg-slate-800 text-white py-2 rounded font-bold text-sm hover:bg-slate-700">
-                                        Salvar na Tabela
-                                    </button>
+                                    <button type="submit" className="w-full bg-slate-800 text-white py-2 rounded font-bold text-sm hover:bg-slate-700">Salvar na Tabela</button>
                                 </form>
                             </div>
                         )}
@@ -406,16 +422,13 @@ const QuotesView: React.FC = () => {
                 </div>
             </div>
         )}
+
         {/* APPROVAL MODAL */}
         {approvingQuote && (
             <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
                 <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6 animate-bounce-in">
-                    <h3 className="font-bold text-xl mb-2 text-green-800 flex items-center gap-2">
-                        <span>🎉</span> Fechamento de Venda!
-                    </h3>
-                    <p className="text-sm text-slate-600 mb-4">
-                        Para converter o orçamento de <strong>{approvingQuote.clientName}</strong> em uma locação oficial, selecione o veículo que fará a viagem.
-                    </p>
+                    <h3 className="font-bold text-xl mb-2 text-green-800 flex items-center gap-2"><span>🎉</span> Fechamento de Venda!</h3>
+                    <p className="text-sm text-slate-600 mb-4">Para converter o orçamento de <strong>{approvingQuote.clientName}</strong> em uma locação oficial, selecione o veículo que fará a viagem.</p>
                     <div className="mb-4 bg-slate-50 p-3 rounded text-sm">
                         <p><strong>Destino:</strong> {approvingQuote.destination}</p>
                         <p><strong>Data:</strong> {new Date(approvingQuote.startTime).toLocaleDateString()}</p>
@@ -423,11 +436,7 @@ const QuotesView: React.FC = () => {
                     </div>
                     <div className="mb-6">
                         <label className="block text-sm font-bold text-slate-700 mb-1">Selecione o Ônibus</label>
-                        <select 
-                            value={selectedBusForApproval} 
-                            onChange={e => setSelectedBusForApproval(e.target.value)}
-                            className="w-full border p-2 rounded focus:ring-2 focus:ring-green-500 outline-none"
-                        >
+                        <select value={selectedBusForApproval} onChange={e => setSelectedBusForApproval(e.target.value)} className="w-full border p-2 rounded focus:ring-2 focus:ring-green-500 outline-none">
                             <option value="">Escolha um veículo...</option>
                             {buses.filter(b => b.status !== 'MAINTENANCE').map(b => (
                                 <option key={b.id} value={b.id}>{b.plate} - {b.model} ({b.capacity} lug)</option>
