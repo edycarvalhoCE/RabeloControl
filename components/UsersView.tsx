@@ -4,10 +4,11 @@ import { useStore } from '../services/store';
 import { UserRole, User } from '../types';
 
 const UsersView: React.FC = () => {
-  const { users, addUser, updateUser, deleteUser, currentUser } = useStore();
+  const { users, addUser, updateUser, deleteUser, currentUser, sendPasswordReset } = useStore();
   const [showForm, setShowForm] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [resetMsg, setResetMsg] = useState<{id: string, text: string} | null>(null);
 
   // Form State
   const [formData, setFormData] = useState({ name: '', email: '', role: UserRole.DRIVER as UserRole, dailyRate: 0 });
@@ -32,6 +33,18 @@ const UsersView: React.FC = () => {
           dailyRate: user.dailyRate || 0
       });
       setShowForm(true);
+  };
+
+  const handleResetPassword = async (user: User) => {
+      if (window.confirm(`Enviar um e-mail de redefinição de senha para ${user.email}?`)) {
+          const res = await sendPasswordReset(user.email);
+          if (res.success) {
+              setResetMsg({id: user.id, text: 'E-mail enviado!'});
+              setTimeout(() => setResetMsg(null), 3000);
+          } else {
+              alert("Erro: " + res.message);
+          }
+      }
   };
 
   const handleDelete = async (user: User) => {
@@ -107,7 +120,7 @@ const UsersView: React.FC = () => {
               <span className="absolute left-3 top-2.5 text-slate-400">🔍</span>
               <input 
                 type="text" 
-                placeholder="Localizar e-mail (ex: vendas@rabelotour.com.br) ou nome..."
+                placeholder="Localizar e-mail ou nome..."
                 value={searchTerm}
                 onChange={e => setSearchTerm(e.target.value)}
                 className="w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-slate-50"
@@ -130,24 +143,11 @@ const UsersView: React.FC = () => {
                                <div className="overflow-hidden">
                                    <p className="font-bold text-slate-800 text-sm truncate">{user.name}</p>
                                    <p className="text-xs text-slate-500 truncate">{user.email}</p>
-                                   <span className="text-[10px] bg-slate-100 px-2 py-0.5 rounded border border-slate-200 uppercase font-bold text-slate-600 mt-1 inline-block">
-                                       {user.role}
-                                   </span>
                                </div>
                           </div>
                           <div className="flex gap-2 mt-1">
-                              <button 
-                                onClick={() => handleApprove(user)}
-                                className="flex-1 bg-green-600 hover:bg-green-700 text-white text-xs font-bold py-2 rounded transition-colors"
-                              >
-                                  Aprovar
-                              </button>
-                              <button 
-                                onClick={() => handleReject(user)}
-                                className="flex-1 bg-red-100 hover:bg-red-200 text-red-700 text-xs font-bold py-2 rounded transition-colors"
-                              >
-                                  Recusar
-                              </button>
+                              <button onClick={() => handleApprove(user)} className="flex-1 bg-green-600 hover:bg-green-700 text-white text-xs font-bold py-2 rounded transition-colors">Aprovar</button>
+                              <button onClick={() => handleReject(user)} className="flex-1 bg-red-100 hover:bg-red-200 text-red-700 text-xs font-bold py-2 rounded transition-colors">Recusar</button>
                           </div>
                       </div>
                   ))}
@@ -157,75 +157,32 @@ const UsersView: React.FC = () => {
 
       {showForm && (
           <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 max-w-2xl animate-fade-in">
-              <h3 className="font-bold text-lg mb-4 text-slate-700">
-                  {editingUser ? 'Editar Usuário' : 'Cadastrar Usuário / Motorista'}
-              </h3>
+              <h3 className="font-bold text-lg mb-4 text-slate-700">{editingUser ? 'Editar Usuário' : 'Cadastrar Usuário'}</h3>
               <form onSubmit={handleSubmit} className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
                           <label className="block text-sm font-medium text-slate-700 mb-1">Nome Completo</label>
-                          <input 
-                            required value={formData.name}
-                            onChange={e => setFormData({...formData, name: e.target.value})}
-                            className="w-full border p-2 rounded focus:ring-2 focus:ring-blue-500 outline-none"
-                            placeholder="Ex: João da Silva"
-                          />
+                          <input required value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="w-full border p-2 rounded outline-none" />
                       </div>
                       <div>
                           <label className="block text-sm font-medium text-slate-700 mb-1">Email</label>
-                          <input 
-                            required type="email" value={formData.email}
-                            onChange={e => setFormData({...formData, email: e.target.value})}
-                            className="w-full border p-2 rounded focus:ring-2 focus:ring-blue-500 outline-none"
-                            placeholder="joao@rabelo.com"
-                            disabled={!!editingUser}
-                          />
+                          <input required type="email" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} className="w-full border p-2 rounded outline-none" disabled={!!editingUser} />
                       </div>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
-                          <label className="block text-sm font-medium text-slate-700 mb-1">Função no Sistema</label>
-                          <select 
-                            value={formData.role}
-                            onChange={e => setFormData({...formData, role: e.target.value as UserRole})}
-                            className="w-full border p-2 rounded focus:ring-2 focus:ring-blue-500 outline-none"
-                          >
+                          <label className="block text-sm font-medium text-slate-700 mb-1">Função</label>
+                          <select value={formData.role} onChange={e => setFormData({...formData, role: e.target.value as UserRole})} className="w-full border p-2 rounded">
                               <option value={UserRole.AGENT}>Agente Comercial</option>
                               <option value={UserRole.DRIVER}>Motorista</option>
-                              <option value={UserRole.GARAGE_AUX}>Aux. Garagem / Limpeza</option>
-                              <option value={UserRole.MECHANIC}>Mecânico</option>
                               <option value={UserRole.FINANCE}>Financeiro</option>
                               <option value={UserRole.MANAGER}>Gerente</option>
-                              {currentUser.role === UserRole.DEVELOPER && (
-                                  <option value={UserRole.DEVELOPER}>Desenvolvedor (Admin)</option>
-                              )}
                           </select>
                       </div>
-                      
-                      {formData.role === UserRole.DRIVER && (
-                          <div className="animate-fade-in">
-                              <label className="block text-sm font-medium text-slate-700 mb-1">Valor Diária Padrão</label>
-                              <div className="flex items-center border border-slate-300 rounded overflow-hidden bg-white focus-within:ring-2 focus-within:ring-blue-500">
-                                  <span className="bg-slate-100 text-slate-600 px-3 py-2 font-bold border-r border-slate-300 text-sm">R$</span>
-                                  <input 
-                                      type="text" 
-                                      inputMode="numeric"
-                                      value={formData.dailyRate.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} 
-                                      onChange={handleDailyRateChange}
-                                      className="w-full p-2 outline-none text-right font-bold text-slate-800"
-                                      placeholder="0,00"
-                                  />
-                              </div>
-                          </div>
-                      )}
                   </div>
                   <div className="flex gap-2 pt-2">
-                      <button type="button" onClick={handleCancel} className="flex-1 bg-slate-200 text-slate-800 py-2 rounded font-bold hover:bg-slate-300">
-                          Cancelar
-                      </button>
-                      <button type="submit" className="flex-1 bg-slate-800 text-white py-2 rounded font-bold hover:bg-slate-700">
-                          {editingUser ? 'Salvar Alterações' : 'Salvar Cadastro'}
-                      </button>
+                      <button type="button" onClick={handleCancel} className="flex-1 bg-slate-200 py-2 rounded font-bold">Cancelar</button>
+                      <button type="submit" className="flex-1 bg-slate-800 text-white py-2 rounded font-bold">Salvar</button>
                   </div>
               </form>
           </div>
@@ -238,33 +195,24 @@ const UsersView: React.FC = () => {
                       <img src={user.avatar} alt={user.name} className="w-12 h-12 rounded-full border border-slate-200 shrink-0" />
                       <div className="overflow-hidden">
                           <h4 className="font-bold text-slate-800 truncate">{user.name}</h4>
-                          <span className={`text-[10px] px-2 py-0.5 rounded-full border border-slate-200 font-bold ${user.role === UserRole.AGENT ? 'bg-indigo-50 text-indigo-600 border-indigo-100' : 'bg-slate-100 text-slate-600'}`}>
-                              {user.role}
-                          </span>
+                          <span className="text-[10px] px-2 py-0.5 rounded-full border bg-slate-100 text-slate-600 font-bold uppercase">{user.role}</span>
                           <p className="text-xs text-slate-400 mt-1 truncate">{user.email}</p>
                       </div>
                   </div>
                   <div className="flex flex-col gap-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity shrink-0">
-                      <button 
-                        onClick={() => handleEdit(user)}
-                        className="p-2 bg-blue-50 text-blue-600 rounded hover:bg-blue-100" title="Editar"
-                      >
+                      <button onClick={() => handleEdit(user)} className="p-2 bg-blue-50 text-blue-600 rounded hover:bg-blue-100" title="Editar">
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
                       </button>
-                      <button 
-                        onClick={() => handleDelete(user)}
-                        className="p-2 bg-red-50 text-red-600 rounded hover:bg-red-100" title="Excluir Permanentemente"
-                      >
+                      <button onClick={() => handleResetPassword(user)} className="p-2 bg-yellow-50 text-yellow-600 rounded hover:bg-yellow-100 relative" title="Redefinir Senha (Enviar E-mail)">
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" /></svg>
+                          {resetMsg?.id === user.id && <span className="absolute -top-8 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-[10px] px-2 py-1 rounded whitespace-nowrap animate-bounce">{resetMsg.text}</span>}
+                      </button>
+                      <button onClick={() => handleDelete(user)} className="p-2 bg-red-50 text-red-600 rounded hover:bg-red-100" title="Excluir">
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                       </button>
                   </div>
               </div>
           ))}
-          {activeUsers.length === 0 && (
-              <div className="col-span-full py-10 text-center text-slate-400 italic">
-                  Nenhum usuário encontrado com este critério de busca.
-              </div>
-          )}
       </div>
     </div>
   );

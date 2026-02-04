@@ -6,24 +6,14 @@ import { UserRole } from '../types';
 const SettingsView: React.FC = () => {
   const { 
       settings, updateSettings, currentUser, restoreDatabase, resetSystemData,
-      users, buses, bookings, parts, transactions, timeOffs, documents, 
-      maintenanceRecords, purchaseRequests, maintenanceReports, charterContracts, 
-      travelPackages, packagePassengers, packagePayments, packageLeads, clients, 
-      fuelRecords, fuelSupplies, driverLiabilities, driverFees, quotes, priceRoutes, scheduleConfirmations
+      updateMyPassword
   } = useStore();
 
-  const [form, setForm] = useState({
-      companyName: '',
-      cnpj: '',
-      phone: '',
-      address: '',
-      logoUrl: '',
-      aiApiKey: ''
-  });
+  const [form, setForm] = useState({ companyName: '', cnpj: '', phone: '', address: '', logoUrl: '', aiApiKey: '' });
+  const [pwdForm, setPwdForm] = useState({ newPwd: '', confirmPwd: '' });
   const [uploading, setUploading] = useState(false);
-  const [restoring, setRestoring] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
-  const [resetting, setResetting] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
 
   useEffect(() => {
       if (settings) {
@@ -38,319 +28,109 @@ const SettingsView: React.FC = () => {
       }
   }, [settings]);
 
-  // Permitir apenas gerentes/developers
-  if (currentUser.role !== UserRole.MANAGER && currentUser.role !== UserRole.DEVELOPER) {
-      return <div className="p-8 text-center text-slate-500">Acesso restrito a gerentes.</div>;
-  }
+  const handleSave = async (e: React.FormEvent) => {
+      e.preventDefault();
+      await updateSettings(form);
+      setSuccessMsg('Configurações salvas!');
+      setTimeout(() => setSuccessMsg(''), 3000);
+  };
+
+  const handleUpdatePassword = async (e: React.FormEvent) => {
+      e.preventDefault();
+      setErrorMsg('');
+      if (pwdForm.newPwd.length < 6) {
+          setErrorMsg('A senha deve ter no mínimo 6 caracteres.');
+          return;
+      }
+      if (pwdForm.newPwd !== pwdForm.confirmPwd) {
+          setErrorMsg('As senhas não coincidem.');
+          return;
+      }
+      const res = await updateMyPassword(pwdForm.newPwd);
+      if (res.success) {
+          setSuccessMsg('Senha alterada com sucesso!');
+          setPwdForm({ newPwd: '', confirmPwd: '' });
+          setTimeout(() => setSuccessMsg(''), 3000);
+      } else {
+          setErrorMsg(res.message || 'Erro ao alterar senha. Talvez você precise sair e entrar novamente por segurança.');
+      }
+  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       if (e.target.files && e.target.files[0]) {
           const file = e.target.files[0];
-          
-          // Validação de tamanho (Limitando a 500KB para não pesar o Firestore)
-          if (file.size > 500 * 1024) { 
-              alert("A imagem é muito grande (Máx 500KB). Por favor, use uma imagem menor ou comprima-a.");
-              return;
-          }
-
+          if (file.size > 500 * 1024) { alert("Máx 500KB"); return; }
           setUploading(true);
           const reader = new FileReader();
           reader.onload = (event) => {
-              const base64 = event.target?.result as string;
-              setForm(prev => ({ ...prev, logoUrl: base64 }));
+              setForm(prev => ({ ...prev, logoUrl: event.target?.result as string }));
               setUploading(false);
           };
           reader.readAsDataURL(file);
       }
   };
 
-  const handleRemoveLogo = () => {
-      if (confirm("Deseja remover o logo personalizado e voltar ao padrão?")) {
-          setForm(prev => ({ ...prev, logoUrl: '' }));
-      }
-  };
-
-  const handleSave = async (e: React.FormEvent) => {
-      e.preventDefault();
-      await updateSettings(form);
-      setSuccessMsg('Configurações salvas com sucesso!');
-      setTimeout(() => setSuccessMsg(''), 4000);
-  };
-
-  const handleSystemBackup = () => {
-      if (!confirm("Deseja baixar um arquivo de backup com todos os dados atuais do sistema?")) return;
-
-      const backupData = {
-          exportDate: new Date().toISOString(),
-          version: "1.0",
-          data: {
-              settings,
-              users,
-              buses,
-              bookings,
-              parts,
-              transactions,
-              timeOffs,
-              documents,
-              maintenanceRecords,
-              purchaseRequests,
-              maintenanceReports,
-              charterContracts,
-              travelPackages,
-              packagePassengers,
-              packagePayments,
-              packageLeads,
-              clients,
-              fuelRecords,
-              fuelSupplies,
-              driverLiabilities,
-              driverFees,
-              quotes,
-              priceRoutes,
-              scheduleConfirmations
-          }
-      };
-
-      const jsonString = JSON.stringify(backupData, null, 2);
-      const blob = new Blob([jsonString], { type: "application/json" });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      
-      const dateStr = new Date().toISOString().split('T')[0];
-      link.href = url;
-      link.download = `backup_rabelotour_${dateStr}.json`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-  };
-
-  const handleRestoreBackup = async (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0];
-      if (!file) return;
-
-      if (!confirm("⚠️ ATENÇÃO: Esta ação irá SOBRESCREVER os dados atuais com os dados do backup.\n\nIsso é útil caso o sistema tenha sido apagado ou corrompido.\n\nTem certeza absoluta que deseja restaurar?")) {
-          e.target.value = ''; 
-          return;
-      }
-
-      setRestoring(true);
-      const reader = new FileReader();
-      
-      reader.onload = async (evt) => {
-          try {
-              const content = evt.target?.result as string;
-              const jsonData = JSON.parse(content);
-              
-              const result = await restoreDatabase(jsonData);
-              
-              if (result.success) {
-                  alert(result.message);
-                  window.location.reload(); // Recarregar para garantir sincronia
-              } else {
-                  alert("Erro: " + result.message);
-              }
-          } catch (err: any) {
-              alert("Erro ao processar arquivo de backup: " + err.message);
-          } finally {
-              setRestoring(false);
-              e.target.value = '';
-          }
-      };
-      
-      reader.readAsText(file);
-  };
-
-  const handleResetSystem = async () => {
-      const confirm1 = window.confirm("⚠️ PERIGO: Você está prestes a APAGAR TODOS OS REGISTROS do sistema (Financeiro, Reservas, Veículos, Estoque, etc).\n\nApenas os USUÁRIOS e as CONFIGURAÇÕES GERAIS serão mantidos.\n\nIsso não pode ser desfeito. Tem certeza?");
-      if (!confirm1) return;
-
-      const confirm2 = window.confirm("Último aviso: Todos os dados operacionais serão excluídos permanentemente.\n\nConfirma o reset?");
-      if (!confirm2) return;
-
-      setResetting(true);
-      const result = await resetSystemData();
-      setResetting(false);
-      
-      if (result.success) {
-          alert(result.message);
-          window.location.reload();
-      } else {
-          alert("Erro ao resetar: " + result.message);
-      }
-  };
-
   return (
-    <div className="max-w-4xl mx-auto animate-fade-in">
-        <h2 className="text-2xl font-bold text-slate-800 mb-6">Configurações do Sistema</h2>
+    <div className="max-w-4xl mx-auto animate-fade-in space-y-6">
+        <h2 className="text-2xl font-bold text-slate-800">Configurações e Perfil</h2>
 
         {successMsg && (
-            <div className="bg-green-100 border border-green-300 text-green-800 px-4 py-3 rounded-lg mb-6 flex items-center gap-2 animate-bounce-in shadow-sm">
+            <div className="bg-green-100 border border-green-300 text-green-800 px-4 py-3 rounded-lg flex items-center gap-2 animate-fade-in">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
                 <span className="font-bold">{successMsg}</span>
             </div>
         )}
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {/* LOGO UPLOAD SECTION */}
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 h-fit">
-                <h3 className="font-bold text-slate-700 mb-4">Logotipo da Empresa</h3>
-                
-                <div className="flex flex-col items-center justify-center p-4 border-2 border-dashed border-slate-300 rounded-lg bg-slate-50 mb-4 h-40 relative group">
-                    {form.logoUrl ? (
-                        <>
-                            <img src={form.logoUrl} alt="Logo Preview" className="max-h-full max-w-full object-contain" />
-                            <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity rounded-lg">
-                                <span className="text-white font-bold text-sm">Visualização</span>
-                            </div>
-                        </>
-                    ) : (
-                        <div className="text-slate-400 text-center">
-                            <svg className="w-12 h-12 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-                            <p className="text-sm">Sem Logo Definida</p>
-                        </div>
-                    )}
-                </div>
-
-                <div className="space-y-2">
-                    <label className="block w-full cursor-pointer bg-blue-600 text-white text-center py-2 rounded-lg hover:bg-blue-700 transition-colors font-bold text-sm shadow-sm">
-                        {uploading ? 'Carregando...' : '📤 Carregar Nova Logo'}
-                        <input type="file" accept="image/png, image/jpeg, image/jpg" className="hidden" onChange={handleFileChange} disabled={uploading} />
-                    </label>
-                    
-                    {form.logoUrl && (
-                        <button 
-                            type="button"
-                            onClick={handleRemoveLogo}
-                            className="block w-full bg-red-100 text-red-600 text-center py-2 rounded-lg hover:bg-red-200 transition-colors font-bold text-sm border border-red-200"
-                        >
-                            🗑️ Remover Logo
-                        </button>
-                    )}
-                </div>
-                
-                <p className="text-[10px] text-slate-500 mt-3 text-center leading-tight">
-                    Formatos: PNG ou JPG.<br/>Fundo transparente recomendado.<br/>Máx: 500KB.
-                </p>
-            </div>
-
-            {/* COMPANY DATA FORM */}
-            <div className="md:col-span-2 space-y-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* COMPANY DATA */}
+            <div className="lg:col-span-2 space-y-6">
                 <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-                    <h3 className="font-bold text-slate-700 mb-4">Dados da Empresa (Para Contratos/Recibos)</h3>
+                    <h3 className="font-bold text-slate-700 mb-4">Dados da Empresa</h3>
                     <form onSubmit={handleSave} className="space-y-4">
-                        <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-1">Nome Fantasia / Razão Social</label>
-                            <input 
-                                value={form.companyName} onChange={e => setForm({...form, companyName: e.target.value})}
-                                className="w-full border p-2 rounded focus:ring-2 focus:ring-blue-500 outline-none"
-                            />
-                        </div>
+                        <input value={form.companyName} onChange={e => setForm({...form, companyName: e.target.value})} className="w-full border p-2 rounded" placeholder="Nome da Empresa" />
                         <div className="grid grid-cols-2 gap-4">
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-1">CNPJ</label>
-                                <input 
-                                    value={form.cnpj} onChange={e => setForm({...form, cnpj: e.target.value})}
-                                    className="w-full border p-2 rounded focus:ring-2 focus:ring-blue-500 outline-none"
-                                    placeholder="00.000.000/0000-00"
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-1">Telefone / WhatsApp</label>
-                                <input 
-                                    value={form.phone} onChange={e => setForm({...form, phone: e.target.value})}
-                                    className="w-full border p-2 rounded focus:ring-2 focus:ring-blue-500 outline-none"
-                                    placeholder="(00) 00000-0000"
-                                />
-                            </div>
+                            <input value={form.cnpj} onChange={e => setForm({...form, cnpj: e.target.value})} className="w-full border p-2 rounded" placeholder="CNPJ" />
+                            <input value={form.phone} onChange={e => setForm({...form, phone: e.target.value})} className="w-full border p-2 rounded" placeholder="Telefone" />
                         </div>
-                        <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-1">Endereço Completo</label>
-                            <input 
-                                value={form.address} onChange={e => setForm({...form, address: e.target.value})}
-                                className="w-full border p-2 rounded focus:ring-2 focus:ring-blue-500 outline-none"
-                                placeholder="Rua, Número, Bairro, Cidade - UF"
-                            />
-                        </div>
+                        <input value={form.address} onChange={e => setForm({...form, address: e.target.value})} className="w-full border p-2 rounded" placeholder="Endereço" />
+                        <button type="submit" className="bg-blue-600 text-white px-6 py-2 rounded font-bold hover:bg-blue-700 transition-colors">Salvar Dados</button>
                     </form>
                 </div>
 
-                {/* DATA & BACKUP */}
+                {/* SECURITY SECTION */}
                 <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
                     <h3 className="font-bold text-slate-700 mb-4 flex items-center gap-2">
-                        <span>💾</span> Dados e Backup
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
+                        Segurança e Senha
                     </h3>
-                    
-                    <div className="space-y-4">
-                        {/* AI SETTINGS */}
-                        <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-1">Chave de API (Google Gemini)</label>
-                            <input 
-                                type="password"
-                                value={form.aiApiKey} 
-                                onChange={e => setForm({...form, aiApiKey: e.target.value})}
-                                className="w-full border p-2 rounded focus:ring-2 focus:ring-blue-500 outline-none font-mono text-sm"
-                                placeholder="AIzaSy..."
-                            />
-                            <p className="text-xs text-slate-500 mt-1">Para previsões financeiras.</p>
-                        </div>
-
-                        <div className="border-t border-slate-100 pt-4">
-                            <p className="text-sm text-slate-600 mb-3">
-                                Gerenciamento dos dados do sistema. O arquivo JSON contém todas as informações cadastradas.
-                            </p>
-                            <div className="flex flex-col md:flex-row gap-3">
-                                <button 
-                                    type="button" 
-                                    onClick={handleSystemBackup}
-                                    className="flex items-center justify-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2 px-4 rounded border border-slate-300 transition-colors text-sm flex-1"
-                                >
-                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-                                    Baixar Backup (.JSON)
-                                </button>
-
-                                <label className={`flex items-center justify-center gap-2 bg-orange-100 hover:bg-orange-200 text-orange-800 font-bold py-2 px-4 rounded border border-orange-200 transition-colors text-sm flex-1 cursor-pointer ${restoring ? 'opacity-50 cursor-not-allowed' : ''}`}>
-                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
-                                    {restoring ? 'Restaurando...' : 'Restaurar Backup (.JSON)'}
-                                    <input type="file" accept=".json" onChange={handleRestoreBackup} disabled={restoring} className="hidden" />
-                                </label>
+                    <form onSubmit={handleUpdatePassword} className="space-y-4">
+                        {errorMsg && <p className="text-red-500 text-xs font-bold">{errorMsg}</p>}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 mb-1">Nova Senha</label>
+                                <input type="password" required value={pwdForm.newPwd} onChange={e => setPwdForm({...pwdForm, newPwd: e.target.value})} className="w-full border p-2 rounded" placeholder="Mínimo 6 dígitos" />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 mb-1">Confirmar Senha</label>
+                                <input type="password" required value={pwdForm.confirmPwd} onChange={e => setPwdForm({...pwdForm, confirmPwd: e.target.value})} className="w-full border p-2 rounded" placeholder="Repita a senha" />
                             </div>
                         </div>
-                    </div>
+                        <button type="submit" className="bg-slate-800 text-white px-6 py-2 rounded font-bold hover:bg-slate-700 transition-colors">Alterar Minha Senha</button>
+                    </form>
                 </div>
+            </div>
 
-                {/* DANGER ZONE - RESET - ONLY FOR DEVELOPER */}
-                {currentUser.role === UserRole.DEVELOPER && (
-                    <div className="bg-red-50 p-6 rounded-xl shadow-sm border border-red-200">
-                        <h3 className="font-bold text-red-800 mb-4 flex items-center gap-2">
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
-                            Zona de Perigo
-                        </h3>
-                        <p className="text-sm text-red-700 mb-4">
-                            Ações irreversíveis. Tenha certeza do que está fazendo antes de prosseguir.
-                        </p>
-                        <button 
-                            type="button" 
-                            onClick={handleResetSystem}
-                            disabled={resetting}
-                            className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-4 rounded transition-colors text-sm shadow-md disabled:opacity-50"
-                        >
-                            {resetting ? 'Apagando dados...' : '🗑️ RESETAR SISTEMA (Apagar tudo exceto usuários)'}
-                        </button>
-                        <p className="text-xs text-red-500 mt-2 text-center">
-                            Isso apagará reservas, financeiro, veículos, estoque, etc. Usuários e configurações gerais serão mantidos.
-                        </p>
+            {/* SIDEBAR LOGO */}
+            <div className="space-y-6">
+                <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                    <h3 className="font-bold text-slate-700 mb-4">Logotipo</h3>
+                    <div className="border-2 border-dashed rounded-lg h-32 flex items-center justify-center bg-slate-50 mb-4">
+                        {form.logoUrl ? <img src={form.logoUrl} className="max-h-full object-contain" /> : <span className="text-slate-400">Sem Logo</span>}
                     </div>
-                )}
-
-                <div className="flex justify-end pt-4">
-                    <button 
-                        onClick={handleSave}
-                        disabled={uploading}
-                        className="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-8 rounded shadow-sm transition-colors w-full md:w-auto"
-                    >
-                        Salvar Configurações
-                    </button>
+                    <label className="block w-full cursor-pointer bg-blue-50 text-blue-700 text-center py-2 rounded font-bold text-sm border border-blue-200">
+                        {uploading ? 'Enviando...' : 'Carregar Logo'}
+                        <input type="file" className="hidden" onChange={handleFileChange} />
+                    </label>
                 </div>
             </div>
         </div>

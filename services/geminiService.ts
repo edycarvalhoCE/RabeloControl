@@ -13,11 +13,13 @@ export const getFinancialInsight = async (summary: string, apiKeyFromSettings?: 
   try {
     const ai = new GoogleGenAI({ apiKey });
     
+    // Fix: Updated to recommended model for Basic Text Tasks
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash-preview', // Updated to newer model if available, or fall back to known working one
+      model: 'gemini-3-flash-preview',
       contents: `You are a financial analyst for a bus rental company. Analyze this data summary and give 3 bullet points of advice or insight. Keep it brief and professional (Portuguese). Data: ${summary}`,
     });
     
+    // Fix: Using the .text property as per GenerateContentResponse guidelines
     return response.text || "Sem insights no momento.";
   } catch (error: any) {
     console.error("Gemini Error:", error);
