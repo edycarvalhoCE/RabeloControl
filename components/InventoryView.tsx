@@ -14,19 +14,17 @@ const InventoryView: React.FC = () => {
     return d.toISOString().split('T')[0];
   };
 
-  // Helper for safe date display
+  // Helper for safe date display (DD/MM/YYYY)
   const formatDate = (dateStr: string) => {
       if (!dateStr) return '-';
-      const [year, month, day] = dateStr.split('-');
+      const parts = dateStr.split('-');
+      if (parts.length !== 3) return dateStr;
+      const [year, month, day] = parts;
       return `${day}/${month}/${year}`;
   };
   
-  // New Item State (Added supplier/nfe fields)
   const [newPart, setNewPart] = useState({ name: '', quantity: 0, minQuantity: 5, price: 0, lastSupplier: '', lastNfe: '' });
-  
   const [viewMode, setViewMode] = useState<'STOCK' | 'REQUESTS' | 'FUEL_CONSUMPTION' | 'FUEL_SUPPLY'>('STOCK');
-
-  // Search State
   const [searchTerm, setSearchTerm] = useState('');
 
   // Fuel CONSUMPTION Form State
@@ -37,19 +35,14 @@ const InventoryView: React.FC = () => {
       hasArla: false,
       arlaLiters: 0,
       location: 'GARAGE' as 'GARAGE' | 'STREET',
-      cost: 0, // This will serve as Diesel Cost (or Total if Arla not separate)
-      arlaCost: 0, // Explicit Arla Cost
+      cost: 0,
+      arlaCost: 0,
       stationName: '',
-      // NEW KM FIELDS
       kmStart: 0,
       kmEnd: 0
   });
 
-  // Fuel EDIT Form State
-  const [editingFuel, setEditingFuel] = useState<FuelRecord | null>(null);
-  const [editFuelForm, setEditFuelForm] = useState<any>({});
-
-  // Fuel SUPPLY Form State
+  // Fuel SUPPLY (Purchase) Form State
   const [supplyForm, setSupplyForm] = useState({
       date: getTodayLocal(),
       liters: 0,
@@ -58,7 +51,7 @@ const InventoryView: React.FC = () => {
       registeredInFinance: true
   });
   
-  // Fuel History Filters
+  // DATE FILTERS for History (Persistent across fuel tabs)
   const [supplyFilterStart, setSupplyFilterStart] = useState('');
   const [supplyFilterEnd, setSupplyFilterEnd] = useState('');
 
@@ -72,7 +65,6 @@ const InventoryView: React.FC = () => {
   });
 
   const isMechanic = currentUser.role === UserRole.MECHANIC;
-  // Finance user is treated like manager here
   const canManageStock = currentUser.role === UserRole.MANAGER || currentUser.role === UserRole.DEVELOPER || currentUser.role === UserRole.FINANCE;
 
   const handleAddPart = (e: React.FormEvent) => {
@@ -109,166 +101,79 @@ const InventoryView: React.FC = () => {
   const handleRestockSubmit = async (e: React.FormEvent) => {
       e.preventDefault();
       if (!restockItem) return;
-      if (restockForm.quantity <= 0) {
-          alert("Quantidade inválida.");
-          return;
-      }
-
       await restockPart(restockItem.id, restockForm.quantity, restockForm.unitCost, restockForm.supplier, restockForm.nfe);
       alert("Entrada registrada com sucesso!");
       setRestockItem(null);
   };
 
-  // Lógica para preencher KM Inicial automaticamente
   const handleBusChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
       const selectedBusId = e.target.value;
       let lastKm = 0;
-
       if (selectedBusId) {
-          // Filtra registros deste ônibus
           const busRecords = fuelRecords.filter(r => r.busId === selectedBusId);
           if (busRecords.length > 0) {
-              // Ordena pelo maior KM Final registrado
               busRecords.sort((a, b) => (b.kmEnd || 0) - (a.kmEnd || 0));
               lastKm = busRecords[0].kmEnd || 0;
           }
       }
-
-      setFuelForm(prev => ({
-          ...prev,
-          busId: selectedBusId,
-          kmStart: lastKm, // Preenche automaticamente
-          kmEnd: 0 // Reseta o final para evitar confusão
-      }));
+      setFuelForm(prev => ({ ...prev, busId: selectedBusId, kmStart: lastKm, kmEnd: 0 }));
   };
 
   const handleFuelConsumptionSubmit = (e: React.FormEvent) => {
       e.preventDefault();
       if (!fuelForm.busId || fuelForm.dieselLiters <= 0) {
-          alert("Selecione o ônibus e informe a quantidade de Diesel.");
+          alert("Informe o veículo e os litros.");
           return;
       }
-      
-      if (fuelForm.hasArla && (fuelForm.arlaLiters <= 0 || !fuelForm.arlaLiters)) {
-         alert("⚠️ Atenção: Você marcou que abasteceu Arla.\nÉ obrigatório informar a quantidade de litros de Arla.");
-         return;
-      }
-
-      // KM VALIDATION
       if (fuelForm.kmEnd <= fuelForm.kmStart) {
-          alert("⚠️ Erro de Quilometragem: O KM Final deve ser MAIOR que o KM Inicial.");
+          alert("KM Final deve ser maior que o Inicial.");
           return;
       }
-
-      // Calculate Average (Distance / Liters)
       const distance = fuelForm.kmEnd - fuelForm.kmStart;
       const average = distance / fuelForm.dieselLiters;
-      
-      // Calculate Total Cost (Diesel + Arla)
-      // Note: fuelForm.cost is used as Diesel Cost when Street + Arla is active
       const totalCost = fuelForm.location === 'STREET' ? (fuelForm.cost + (fuelForm.hasArla ? fuelForm.arlaCost : 0)) : 0;
 
       addFuelRecord({
-          date: fuelForm.date,
-          busId: fuelForm.busId,
-          dieselLiters: fuelForm.dieselLiters,
+          ...fuelForm,
           arlaLiters: fuelForm.hasArla ? fuelForm.arlaLiters : 0,
-          hasArla: fuelForm.hasArla,
-          location: fuelForm.location,
-          cost: totalCost, // Salva o custo total para o financeiro
-          arlaCost: fuelForm.hasArla && fuelForm.location === 'STREET' ? fuelForm.arlaCost : 0, // Salva custo específico
-          stationName: fuelForm.location === 'STREET' ? fuelForm.stationName : '',
+          cost: totalCost,
+          arlaCost: fuelForm.hasArla && fuelForm.location === 'STREET' ? fuelForm.arlaCost : 0,
           loggedBy: currentUser.id,
-          // Add new KM fields
-          kmStart: fuelForm.kmStart,
-          kmEnd: fuelForm.kmEnd,
           averageConsumption: average
       });
-      alert(`Consumo registrado!\nMédia calculada: ${average.toFixed(2)} km/L`);
-      setFuelForm({
-        date: getTodayLocal(),
-        busId: '',
-        dieselLiters: 0,
-        hasArla: false,
-        arlaLiters: 0,
-        location: 'GARAGE',
-        cost: 0,
-        arlaCost: 0,
-        stationName: '',
-        kmStart: 0,
-        kmEnd: 0
-      });
-  };
-
-  const handleEditFuelClick = (record: FuelRecord) => {
-      setEditingFuel(record);
-      setEditFuelForm({
-          date: record.date,
-          busId: record.busId,
-          dieselLiters: record.dieselLiters,
-          hasArla: record.hasArla,
-          arlaLiters: record.arlaLiters,
-          location: record.location,
-          cost: record.cost,
-          arlaCost: record.arlaCost || 0,
-          stationName: record.stationName || '',
-          kmStart: record.kmStart || 0,
-          kmEnd: record.kmEnd || 0
-      });
-  };
-
-  const handleUpdateFuel = async (e: React.FormEvent) => {
-      e.preventDefault();
-      if (!editingFuel) return;
-      
-      const distance = editFuelForm.kmEnd - editFuelForm.kmStart;
-      const average = distance / editFuelForm.dieselLiters;
-
-      await updateFuelRecord(editingFuel.id, {
-          ...editFuelForm,
-          averageConsumption: average
-      });
-      setEditingFuel(null);
-      alert("Registro atualizado!");
+      alert(`Consumo registrado! Média: ${average.toFixed(2)} km/L`);
+      setFuelForm({ date: getTodayLocal(), busId: '', dieselLiters: 0, hasArla: false, arlaLiters: 0, location: 'GARAGE', cost: 0, arlaCost: 0, stationName: '', kmStart: 0, kmEnd: 0 });
   };
 
   const handleDeleteFuel = async (id: string) => {
-      if (confirm("Tem certeza que deseja excluir este abastecimento? Esta ação não pode ser desfeita.")) {
+      if (confirm("Excluir este abastecimento permanentemente?")) {
           await deleteFuelRecord(id);
       }
   };
 
   const handleFuelSupplySubmit = (e: React.FormEvent) => {
       e.preventDefault();
-      if (supplyForm.liters <= 0 || !supplyForm.receiverName) return;
-
-      addFuelSupply({
-          date: supplyForm.date,
-          liters: supplyForm.liters,
-          cost: supplyForm.cost,
-          receiverName: supplyForm.receiverName,
-          registeredInFinance: supplyForm.registeredInFinance,
-          type: 'DIESEL' 
-      });
-
-      alert("Entrada de combustível registrada!");
-      setSupplyForm({
-          date: getTodayLocal(),
-          liters: 0,
-          cost: 0,
-          receiverName: currentUser.name || '',
-          registeredInFinance: true
-      });
+      if (supplyForm.liters <= 0) return;
+      addFuelSupply({ ...supplyForm, type: 'DIESEL' });
+      alert("Entrada de combustível salva!");
+      setSupplyForm({ date: getTodayLocal(), liters: 0, cost: 0, receiverName: currentUser.name || '', registeredInFinance: true });
   };
 
-  const filteredParts = parts.filter(p => 
-      p.name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // --- FILTERING LOGIC ---
+  const filteredParts = parts.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()));
 
+  // Filter fuel records (Consumption)
+  const filteredFuelRecords = fuelRecords.filter(r => {
+    if(supplyFilterStart && r.date < supplyFilterStart) return false;
+    if(supplyFilterEnd && r.date > supplyFilterEnd) return false;
+    return true;
+  }).sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+  // Filter fuel supplies (Purchases)
   const filteredSupplies = fuelSupplies.filter(s => {
-      if(supplyFilterStart && new Date(s.date) < new Date(supplyFilterStart)) return false;
-      if(supplyFilterEnd && new Date(s.date) > new Date(supplyFilterEnd)) return false;
-      return true;
+    if(supplyFilterStart && s.date < supplyFilterStart) return false;
+    if(supplyFilterEnd && s.date > supplyFilterEnd) return false;
+    return true;
   }).sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
   return (
@@ -277,205 +182,22 @@ const InventoryView: React.FC = () => {
       {/* RESTOCK MODAL */}
       {restockItem && (
           <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-              <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6 animate-fade-in">
-                  <h3 className="font-bold text-lg mb-4 text-slate-800 flex items-center gap-2">
-                      <span className="bg-green-100 text-green-600 p-1.5 rounded text-sm">📦</span>
-                      Entrada de Estoque: {restockItem.name}
-                  </h3>
+              <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6">
+                  <h3 className="font-bold text-lg mb-4 text-slate-800 flex items-center gap-2">📦 Entrada: {restockItem.name}</h3>
                   <form onSubmit={handleRestockSubmit} className="space-y-3">
                       <div>
-                          <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Quantidade (Entrada)</label>
-                          <input 
-                              type="number" min="1" required
-                              value={restockForm.quantity} 
-                              onChange={e => setRestockForm({...restockForm, quantity: parseInt(e.target.value)})}
-                              className="w-full border p-2 rounded text-lg font-bold text-slate-800"
-                          />
+                          <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Quantidade</label>
+                          <input type="number" min="1" required value={restockForm.quantity} onChange={e => setRestockForm({...restockForm, quantity: parseInt(e.target.value)})} className="w-full border p-2 rounded text-lg font-bold" />
                       </div>
                       <div>
                           <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Custo Unitário (R$)</label>
-                          <input 
-                              type="text" inputMode="numeric" required
-                              value={restockForm.unitCost.toLocaleString('pt-BR', {minimumFractionDigits: 2})} 
-                              onChange={handleRestockPriceChange}
-                              className="w-full border p-2 rounded"
-                          />
+                          <input type="text" inputMode="numeric" required value={restockForm.unitCost.toLocaleString('pt-BR', {minimumFractionDigits: 2})} onChange={handleRestockPriceChange} className="w-full border p-2 rounded" />
                       </div>
-                      <div>
-                          <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Fornecedor</label>
-                          <input 
-                              required
-                              value={restockForm.supplier} 
-                              onChange={e => setRestockForm({...restockForm, supplier: e.target.value})}
-                              className="w-full border p-2 rounded"
-                              placeholder="Ex: Auto Peças Silva"
-                          />
-                      </div>
-                      <div>
-                          <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Número Nota Fiscal</label>
-                          <input 
-                              required
-                              value={restockForm.nfe} 
-                              onChange={e => setRestockForm({...restockForm, nfe: e.target.value})}
-                              className="w-full border p-2 rounded"
-                              placeholder="Ex: 12345"
-                          />
-                      </div>
-                      
-                      <div className="bg-yellow-50 p-2 rounded text-xs text-yellow-800 border border-yellow-200 mt-2">
-                          Esta operação criará automaticamente uma despesa no financeiro.
-                      </div>
-
+                      <input required value={restockForm.supplier} onChange={e => setRestockForm({...restockForm, supplier: e.target.value})} className="w-full border p-2 rounded" placeholder="Fornecedor" />
+                      <input required value={restockForm.nfe} onChange={e => setRestockForm({...restockForm, nfe: e.target.value})} className="w-full border p-2 rounded" placeholder="Nota Fiscal" />
                       <div className="flex gap-2 pt-2">
-                          <button type="button" onClick={() => setRestockItem(null)} className="flex-1 bg-slate-200 text-slate-700 py-2 rounded font-bold">Cancelar</button>
-                          <button type="submit" className="flex-1 bg-green-600 text-white py-2 rounded font-bold hover:bg-green-700">Confirmar Entrada</button>
-                      </div>
-                  </form>
-              </div>
-          </div>
-      )}
-
-      {/* EDIT FUEL MODAL */}
-      {editingFuel && (
-          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-              <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full p-6 animate-fade-in max-h-[90vh] overflow-y-auto">
-                  <div className="flex justify-between items-center mb-4">
-                      <h3 className="font-bold text-lg text-slate-800">Editar Abastecimento</h3>
-                      <button onClick={() => setEditingFuel(null)} className="text-slate-400 hover:text-slate-800 text-xl font-bold">&times;</button>
-                  </div>
-                  
-                  <form onSubmit={handleUpdateFuel} className="space-y-4">
-                      <div className="grid grid-cols-2 gap-4">
-                          <div>
-                              <label className="block text-xs font-bold text-slate-500 mb-1">Data</label>
-                              <input 
-                                  type="date" required 
-                                  value={editFuelForm.date} 
-                                  onChange={e => setEditFuelForm({...editFuelForm, date: e.target.value})}
-                                  className="w-full border p-2 rounded"
-                              />
-                          </div>
-                          <div>
-                              <label className="block text-xs font-bold text-slate-500 mb-1">Veículo</label>
-                              <select 
-                                  required 
-                                  value={editFuelForm.busId} 
-                                  onChange={e => setEditFuelForm({...editFuelForm, busId: e.target.value})}
-                                  className="w-full border p-2 rounded"
-                              >
-                                  {buses.map(b => (
-                                      <option key={b.id} value={b.id}>{b.plate} - {b.model}</option>
-                                  ))}
-                              </select>
-                          </div>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-4 bg-slate-50 p-3 rounded">
-                          <div>
-                              <label className="block text-xs font-bold text-slate-500 mb-1">KM Inicial</label>
-                              <input 
-                                  type="number" required 
-                                  value={editFuelForm.kmStart} 
-                                  onChange={e => setEditFuelForm({...editFuelForm, kmStart: parseFloat(e.target.value)})}
-                                  className="w-full border p-2 rounded"
-                              />
-                          </div>
-                          <div>
-                              <label className="block text-xs font-bold text-slate-500 mb-1">KM Final</label>
-                              <input 
-                                  type="number" required 
-                                  value={editFuelForm.kmEnd} 
-                                  onChange={e => setEditFuelForm({...editFuelForm, kmEnd: parseFloat(e.target.value)})}
-                                  className="w-full border p-2 rounded"
-                              />
-                          </div>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-4">
-                          <div>
-                              <label className="block text-xs font-bold text-slate-500 mb-1">Diesel (L)</label>
-                              <input 
-                                  type="number" step="0.1" required 
-                                  value={editFuelForm.dieselLiters} 
-                                  onChange={e => setEditFuelForm({...editFuelForm, dieselLiters: parseFloat(e.target.value)})}
-                                  className="w-full border p-2 rounded"
-                              />
-                          </div>
-                          <div>
-                              <label className="block text-xs font-bold text-slate-500 mb-1">Local</label>
-                              <select 
-                                  value={editFuelForm.location} 
-                                  onChange={e => setEditFuelForm({...editFuelForm, location: e.target.value})}
-                                  className="w-full border p-2 rounded"
-                              >
-                                  <option value="GARAGE">Garagem</option>
-                                  <option value="STREET">Rua</option>
-                              </select>
-                          </div>
-                      </div>
-
-                      <div className="bg-blue-50 p-3 rounded border border-blue-100">
-                          <label className="flex items-center space-x-2 mb-2">
-                              <input 
-                                  type="checkbox" 
-                                  checked={editFuelForm.hasArla} 
-                                  onChange={e => setEditFuelForm({...editFuelForm, hasArla: e.target.checked})}
-                              />
-                              <span className="text-sm font-bold text-blue-800">Com Arla 32?</span>
-                          </label>
-                          {editFuelForm.hasArla && (
-                              <div className="grid grid-cols-2 gap-2">
-                                  <div>
-                                      <label className="block text-xs text-blue-700">Qtd (L)</label>
-                                      <input 
-                                          type="number" step="0.1"
-                                          value={editFuelForm.arlaLiters} 
-                                          onChange={e => setEditFuelForm({...editFuelForm, arlaLiters: parseFloat(e.target.value)})}
-                                          className="w-full border p-1 rounded"
-                                      />
-                                  </div>
-                                  {editFuelForm.location === 'STREET' && (
-                                      <div>
-                                          <label className="block text-xs text-blue-700">Custo Arla (R$)</label>
-                                          <input 
-                                              type="number" step="0.01"
-                                              value={editFuelForm.arlaCost} 
-                                              onChange={e => setEditFuelForm({...editFuelForm, arlaCost: parseFloat(e.target.value)})}
-                                              className="w-full border p-1 rounded"
-                                          />
-                                      </div>
-                                  )}
-                              </div>
-                          )}
-                      </div>
-
-                      {editFuelForm.location === 'STREET' && (
-                          <div className="bg-orange-50 p-3 rounded border border-orange-100">
-                              <div className="grid grid-cols-2 gap-2">
-                                  <div>
-                                      <label className="block text-xs text-orange-800 font-bold mb-1">Custo Diesel (R$)</label>
-                                      <input 
-                                          type="number" step="0.01"
-                                          value={editFuelForm.cost} 
-                                          onChange={e => setEditFuelForm({...editFuelForm, cost: parseFloat(e.target.value)})}
-                                          className="w-full border p-2 rounded"
-                                      />
-                                  </div>
-                                  <div>
-                                      <label className="block text-xs text-orange-800 font-bold mb-1">Posto</label>
-                                      <input 
-                                          value={editFuelForm.stationName} 
-                                          onChange={e => setEditFuelForm({...editFuelForm, stationName: e.target.value})}
-                                          className="w-full border p-2 rounded"
-                                      />
-                                  </div>
-                              </div>
-                          </div>
-                      )}
-
-                      <div className="flex gap-2 pt-2">
-                          <button type="button" onClick={() => setEditingFuel(null)} className="flex-1 bg-slate-200 text-slate-700 py-2 rounded font-bold">Cancelar</button>
-                          <button type="submit" className="flex-1 bg-blue-600 text-white py-2 rounded font-bold hover:bg-blue-700">Salvar Alterações</button>
+                          <button type="button" onClick={() => setRestockItem(null)} className="flex-1 bg-slate-200 py-2 rounded font-bold">Cancelar</button>
+                          <button type="submit" className="flex-1 bg-green-600 text-white py-2 rounded font-bold">Confirmar</button>
                       </div>
                   </form>
               </div>
@@ -484,291 +206,96 @@ const InventoryView: React.FC = () => {
 
       <div className="flex flex-col md:flex-row justify-between items-center gap-4">
         <h2 className="text-2xl font-bold text-slate-800">Controle de Estoque</h2>
-        
-        <div className="flex flex-col md:flex-row gap-2 items-center w-full md:w-auto">
-            {viewMode === 'STOCK' && (
-                <div className="relative w-full md:w-64">
-                    <input 
-                        type="text" 
-                        placeholder="🔍 Buscar peça..." 
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="w-full pl-3 pr-8 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-                    />
-                </div>
-            )}
-
-            <div className="flex gap-2 flex-wrap justify-end">
-                <button 
-                    onClick={() => setViewMode('STOCK')}
-                    className={`px-3 py-2 rounded-lg font-medium text-xs transition-colors ${viewMode === 'STOCK' ? 'bg-slate-800 text-white' : 'bg-white border text-slate-600'}`}
-                >
-                    Peças
-                </button>
-                <button 
-                    onClick={() => setViewMode('FUEL_SUPPLY')}
-                    className={`px-3 py-2 rounded-lg font-medium text-xs transition-colors ${viewMode === 'FUEL_SUPPLY' ? 'bg-green-700 text-white' : 'bg-white border text-slate-600'}`}
-                >
-                    Entrada Comb.
-                </button>
-                <button 
-                    onClick={() => setViewMode('FUEL_CONSUMPTION')}
-                    className={`px-3 py-2 rounded-lg font-medium text-xs transition-colors ${viewMode === 'FUEL_CONSUMPTION' ? 'bg-blue-700 text-white' : 'bg-white border text-slate-600'}`}
-                >
-                    Saída/Consumo
-                </button>
-                <button 
-                    onClick={() => setViewMode('REQUESTS')}
-                    className={`px-3 py-2 rounded-lg font-medium text-xs transition-colors ${viewMode === 'REQUESTS' ? 'bg-slate-800 text-white' : 'bg-white border text-slate-600'}`}
-                >
-                    Solicitações
-                    {purchaseRequests.filter(r => r.status === 'PENDING').length > 0 && (
-                        <span className="ml-1 bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full">
-                            {purchaseRequests.filter(r => r.status === 'PENDING').length}
-                        </span>
-                    )}
-                </button>
-                {canManageStock && viewMode === 'STOCK' && (
-                    <button 
-                    onClick={() => setShowAddForm(!showAddForm)}
-                    className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg font-medium transition-colors ml-1 text-xs"
-                    >
-                    {showAddForm ? 'Cancelar' : '+ Item'}
-                    </button>
-                )}
-            </div>
+        <div className="flex gap-2 flex-wrap justify-end">
+            <button onClick={() => setViewMode('STOCK')} className={`px-3 py-2 rounded-lg font-medium text-xs transition-colors ${viewMode === 'STOCK' ? 'bg-slate-800 text-white' : 'bg-white border text-slate-600'}`}>Peças</button>
+            <button onClick={() => setViewMode('FUEL_SUPPLY')} className={`px-3 py-2 rounded-lg font-medium text-xs transition-colors ${viewMode === 'FUEL_SUPPLY' ? 'bg-green-700 text-white' : 'bg-white border text-slate-600'}`}>Entrada Comb.</button>
+            <button onClick={() => setViewMode('FUEL_CONSUMPTION')} className={`px-3 py-2 rounded-lg font-medium text-xs transition-colors ${viewMode === 'FUEL_CONSUMPTION' ? 'bg-blue-700 text-white' : 'bg-white border text-slate-600'}`}>Saída/Consumo</button>
+            <button onClick={() => setViewMode('REQUESTS')} className={`px-3 py-2 rounded-lg font-medium text-xs transition-colors ${viewMode === 'REQUESTS' ? 'bg-slate-800 text-white' : 'bg-white border text-slate-600'}`}>Solicitações</button>
         </div>
       </div>
 
-      {/* ... STOCK VIEW ... */}
       {viewMode === 'STOCK' && (
-          <>
-            {showAddForm && canManageStock && (
-                <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 mb-6">
-                <h3 className="font-bold text-lg mb-4">Cadastrar Novo Item</h3>
-                <form onSubmit={handleAddPart} className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                    <input 
-                        placeholder="Nome da Peça" required
-                        value={newPart.name} onChange={e => setNewPart({...newPart, name: e.target.value})}
-                        className="border p-2 rounded"
-                    />
-                    <input 
-                        type="number" placeholder="Qtd. Inicial" required
-                        value={newPart.quantity || ''} onChange={e => setNewPart({...newPart, quantity: parseInt(e.target.value)})}
-                        className="border p-2 rounded"
-                    />
-                    <input 
-                        type="number" placeholder="Estoque Mínimo" required
-                        value={newPart.minQuantity || ''} onChange={e => setNewPart({...newPart, minQuantity: parseInt(e.target.value)})}
-                        className="border p-2 rounded"
-                    />
-                    
-                    <div className="flex items-center border border-slate-300 rounded overflow-hidden bg-white focus-within:ring-2 focus-within:ring-blue-500">
-                        <span className="bg-slate-100 text-slate-600 px-2 py-2 font-bold border-r border-slate-300 text-sm">R$</span>
-                        <input 
-                            type="text" 
-                            inputMode="numeric"
-                            required 
-                            value={newPart.price.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} 
-                            onChange={(e) => handlePriceChange(e, setNewPart)}
-                            className="w-full p-2 outline-none text-right font-bold text-slate-800"
-                            placeholder="Custo Unit."
-                        />
-                    </div>
-
-                    {/* Additional fields for initial record */}
-                    <input 
-                        placeholder="Fornecedor Inicial" 
-                        value={newPart.lastSupplier} onChange={e => setNewPart({...newPart, lastSupplier: e.target.value})}
-                        className="border p-2 rounded"
-                    />
-                    <input 
-                        placeholder="Nº Nota Fiscal" 
-                        value={newPart.lastNfe} onChange={e => setNewPart({...newPart, lastNfe: e.target.value})}
-                        className="border p-2 rounded"
-                    />
-
-                    <button type="submit" className="md:col-span-4 bg-green-600 text-white py-2 rounded hover:bg-green-700 font-bold">
-                        Salvar Item no Estoque
-                    </button>
-                </form>
-                </div>
-            )}
-
-            <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                <table className="w-full text-left border-collapse">
-                <thead className="bg-slate-50 text-slate-600 text-sm uppercase font-semibold">
-                    <tr>
-                    <th className="p-4">Item</th>
-                    <th className="p-4">Último Custo</th>
-                    <th className="p-4 text-center">Quantidade</th>
-                    <th className="p-4 text-center">Status</th>
-                    {!isMechanic && <th className="p-4 text-right">Ações</th>}
-                    </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                    {filteredParts.length === 0 ? (
-                        <tr><td colSpan={5} className="p-8 text-center text-slate-500">Nenhuma peça encontrada.</td></tr>
-                    ) : (
-                        filteredParts.map(part => (
-                        <tr key={part.id} className="hover:bg-slate-50">
-                            <td className="p-4 font-medium text-slate-800">
-                                {part.name}
-                                {part.lastSupplier && (
-                                    <span className="block text-[10px] text-slate-400 font-normal">Forn: {part.lastSupplier}</span>
-                                )}
-                            </td>
-                            <td className="p-4 text-slate-600">{part.price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
-                            <td className="p-4 text-center">
-                            <span className="font-bold text-lg">{part.quantity}</span>
-                            <span className="text-xs text-slate-400 block">Min: {part.minQuantity}</span>
-                            </td>
-                            <td className="p-4 text-center">
-                            {part.quantity <= part.minQuantity ? (
-                                <span className="inline-block px-2 py-1 bg-red-100 text-red-700 text-xs rounded-full font-bold">Crítico</span>
-                            ) : (
-                                <span className="inline-block px-2 py-1 bg-green-100 text-green-700 text-xs rounded-full font-bold">Normal</span>
-                            )}
-                            </td>
-                            {!isMechanic && (
-                                <td className="p-4 text-right space-x-2">
-                                <button 
-                                    onClick={() => updateStock(part.id, -1)}
-                                    className="w-8 h-8 rounded-full bg-red-50 text-red-600 hover:bg-red-100 border border-red-200"
-                                    title="Registrar Saída Rápida"
-                                >
-                                    -
-                                </button>
-                                <button 
-                                    onClick={() => handleOpenRestock(part)}
-                                    className="w-8 h-8 rounded-full bg-green-50 text-green-600 hover:bg-green-100 border border-green-200"
-                                    title="Registrar Entrada (Compra)"
-                                >
-                                    +
-                                </button>
-                                </td>
-                            )}
-                        </tr>
-                        ))
-                    )}
-                </tbody>
-                </table>
-            </div>
-          </>
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+              <div className="p-4 border-b flex gap-4">
+                  <input type="text" placeholder="🔍 Buscar peça..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="flex-1 border p-2 rounded-lg text-sm" />
+                  {canManageStock && <button onClick={() => setShowAddForm(!showAddForm)} className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-bold">+ Peça</button>}
+              </div>
+              {showAddForm && (
+                  <div className="p-4 bg-slate-50 border-b border-slate-200">
+                      <form onSubmit={handleAddPart} className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                          <input placeholder="Nome da Peça" required value={newPart.name} onChange={e => setNewPart({...newPart, name: e.target.value})} className="border p-2 rounded" />
+                          <input type="number" placeholder="Qtd" required onChange={e => setNewPart({...newPart, quantity: parseInt(e.target.value)})} className="border p-2 rounded" />
+                          <input type="number" placeholder="Minimo" required onChange={e => setNewPart({...newPart, minQuantity: parseInt(e.target.value)})} className="border p-2 rounded" />
+                          <button type="submit" className="bg-green-600 text-white py-2 rounded font-bold">Salvar</button>
+                      </form>
+                  </div>
+              )}
+              <table className="w-full text-left">
+                  <thead className="bg-slate-50 text-slate-600 text-xs uppercase font-bold">
+                      <tr><th className="p-4">Item</th><th className="p-4">Custo</th><th className="p-4 text-center">Quantidade</th><th className="p-4 text-center">Status</th><th className="p-4 text-right">Ação</th></tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                      {filteredParts.length === 0 ? (
+                          <tr><td colSpan={5} className="p-8 text-center text-slate-500">Nenhuma peça encontrada.</td></tr>
+                      ) : filteredParts.map(p => (
+                          <tr key={p.id} className="hover:bg-slate-50">
+                              <td className="p-4 font-medium">{p.name}</td>
+                              <td className="p-4">R$ {p.price.toLocaleString('pt-BR')}</td>
+                              <td className="p-4 text-center font-bold">{p.quantity}</td>
+                              <td className="p-4 text-center">
+                                  {p.quantity <= p.minQuantity ? <span className="bg-red-100 text-red-700 px-2 py-1 rounded-full text-[10px] font-bold">Crítico</span> : <span className="bg-green-100 text-green-700 px-2 py-1 rounded-full text-[10px] font-bold">Ok</span>}
+                              </td>
+                              <td className="p-4 text-right">
+                                  <button onClick={() => handleOpenRestock(p)} className="text-blue-600 font-bold text-xs hover:underline">Dar Entrada</button>
+                              </td>
+                          </tr>
+                      ))}
+                  </tbody>
+              </table>
+          </div>
       )}
 
       {viewMode === 'FUEL_SUPPLY' && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 h-fit">
-                  <div className="mb-6 bg-green-100 p-4 rounded-lg border border-green-200 text-center">
-                      <p className="text-sm text-green-800 font-bold uppercase mb-1">Estoque Diesel (Tanque)</p>
+              <div className="bg-white p-6 rounded-xl border border-slate-200 h-fit">
+                  <div className="bg-green-100 p-4 rounded-lg text-center mb-6">
+                      <p className="text-xs font-bold text-green-800 uppercase">Estoque Tanque</p>
                       <p className="text-3xl font-bold text-green-900">{fuelStockLevel} L</p>
                   </div>
-
-                  <h3 className="font-bold text-lg text-slate-800 mb-4 flex items-center gap-2">
-                      <span className="bg-green-100 text-green-600 p-1.5 rounded">⬇️</span>
-                      Registrar Entrada (Compra)
-                  </h3>
+                  <h3 className="font-bold mb-4">Nova Compra de Diesel</h3>
                   <form onSubmit={handleFuelSupplySubmit} className="space-y-4">
-                      <div>
-                          <label className="block text-sm font-medium text-slate-700 mb-1">Data Recebimento</label>
-                          <input 
-                              type="date" required 
-                              value={supplyForm.date} 
-                              onChange={e => setSupplyForm({...supplyForm, date: e.target.value})}
-                              className="w-full border p-2 rounded bg-slate-50"
-                          />
-                      </div>
-                      <div>
-                          <label className="block text-sm font-medium text-slate-700 mb-1">Responsável Recebimento</label>
-                          <input 
-                                required value={supplyForm.receiverName}
-                                onChange={e => setSupplyForm({...supplyForm, receiverName: e.target.value})}
-                                placeholder="Nome de quem recebeu"
-                                className="w-full border p-2 rounded"
-                          />
-                      </div>
-                      
-                      <div className="grid grid-cols-2 gap-4">
-                          <div>
-                            <label className="block text-sm font-bold text-slate-800 mb-1">Qtd (Litros)</label>
-                            <input 
-                                type="number" min="1" required
-                                value={supplyForm.liters || ''} 
-                                onChange={e => setSupplyForm({...supplyForm, liters: parseFloat(e.target.value)})}
-                                className="w-full border p-2 rounded outline-none"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-sm font-bold text-slate-800 mb-1">Valor Total (R$)</label>
-                            <input 
-                                type="number" step="0.01" min="0" required
-                                value={supplyForm.cost || ''} 
-                                onChange={e => setSupplyForm({...supplyForm, cost: parseFloat(e.target.value)})}
-                                className="w-full border p-2 rounded outline-none"
-                            />
-                          </div>
-                      </div>
-
-                      <div className="bg-slate-50 p-3 rounded border border-slate-200">
-                          <label className="flex items-center space-x-2 cursor-pointer">
-                              <input 
-                                type="checkbox" 
-                                checked={supplyForm.registeredInFinance}
-                                onChange={e => setSupplyForm({...supplyForm, registeredInFinance: e.target.checked})}
-                                className="rounded text-green-600 focus:ring-green-500"
-                              />
-                              <span className="text-sm font-bold text-slate-700">Lançar saída no Financeiro (Caixa)</span>
-                          </label>
-                          <p className="text-xs text-slate-500 mt-1 pl-6">
-                              Se marcado, criará uma despesa no livro caixa automaticamente.
-                          </p>
-                      </div>
-
-                      <button type="submit" className="w-full bg-green-700 text-white font-bold py-3 rounded hover:bg-green-800 shadow-md">
-                          Confirmar Entrada no Estoque
-                      </button>
+                      <input type="date" value={supplyForm.date} onChange={e => setSupplyForm({...supplyForm, date: e.target.value})} className="w-full border p-2 rounded" />
+                      <input type="number" placeholder="Litros" onChange={e => setSupplyForm({...supplyForm, liters: parseFloat(e.target.value)})} className="w-full border p-2 rounded" />
+                      <input type="number" placeholder="Valor Total (R$)" onChange={e => setSupplyForm({...supplyForm, cost: parseFloat(e.target.value)})} className="w-full border p-2 rounded" />
+                      <button type="submit" className="w-full bg-green-700 text-white py-3 rounded font-bold shadow-md">Salvar Entrada</button>
                   </form>
               </div>
-
-              {/* Histórico Entradas */}
-              <div className="lg:col-span-2 space-y-4">
-                  <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-                    <h3 className="font-bold text-slate-700">Histórico de Recebimento</h3>
-                    <div className="flex gap-2 text-sm items-center">
-                        <input type="date" className="border p-1 rounded" value={supplyFilterStart} onChange={e => setSupplyFilterStart(e.target.value)} />
-                        <span>até</span>
-                        <input type="date" className="border p-1 rounded" value={supplyFilterEnd} onChange={e => setSupplyFilterEnd(e.target.value)} />
-                    </div>
+              <div className="lg:col-span-2">
+                  <div className="flex flex-col md:flex-row justify-between items-center mb-4 bg-white p-4 rounded-lg border border-slate-200 gap-4">
+                      <h3 className="font-bold text-slate-700">Histórico de Recebimento</h3>
+                      <div className="flex gap-2 text-xs items-center font-medium bg-slate-50 p-2 rounded-lg">
+                          <span>Filtrar:</span>
+                          <input type="date" value={supplyFilterStart} onChange={e => setSupplyFilterStart(e.target.value)} className="border p-1 rounded" title="Data Inicial" />
+                          <span>até</span>
+                          <input type="date" value={supplyFilterEnd} onChange={e => setSupplyFilterEnd(e.target.value)} className="border p-1 rounded" title="Data Final" />
+                      </div>
                   </div>
-
-                  <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                  <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
                       <table className="w-full text-left">
-                          <thead className="bg-slate-50 text-slate-600 text-xs uppercase font-bold border-b border-slate-200">
-                              <tr>
-                                  <th className="p-3">Data</th>
-                                  <th className="p-3">Qtd. Litros</th>
-                                  <th className="p-3">Valor Total</th>
-                                  <th className="p-3">Recebido Por</th>
-                                  <th className="p-3 text-center">Financ.</th>
-                              </tr>
+                          <thead className="bg-slate-50 text-slate-600 text-[10px] uppercase font-bold border-b">
+                              <tr><th className="p-3">Data</th><th className="p-3">Qtd</th><th className="p-3">Valor</th><th className="p-3">Responsável</th></tr>
                           </thead>
-                          <tbody className="divide-y divide-slate-100">
+                          <tbody className="divide-y">
                               {filteredSupplies.length === 0 ? (
-                                  <tr><td colSpan={5} className="p-8 text-center text-slate-500">Nenhum registro encontrado no período.</td></tr>
-                              ) : (
-                                  filteredSupplies.map(s => (
-                                      <tr key={s.id} className="hover:bg-slate-50">
-                                          <td className="p-3 text-sm text-slate-600">{formatDate(s.date)}</td>
-                                          <td className="p-3 font-bold text-green-700">{s.liters} L</td>
-                                          <td className="p-3 text-sm">R$ {s.cost.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
-                                          <td className="p-3 text-sm text-slate-700">{s.receiverName}</td>
-                                          <td className="p-3 text-center">
-                                              {s.registeredInFinance ? <span className="text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded">Sim</span> : <span className="text-xs bg-slate-100 text-slate-500 px-2 py-0.5 rounded">Não</span>}
-                                          </td>
-                                      </tr>
-                                  ))
-                              )}
+                                  <tr><td colSpan={4} className="p-8 text-center text-slate-500">Nenhum registro para o período.</td></tr>
+                              ) : filteredSupplies.map(s => (
+                                  <tr key={s.id} className="hover:bg-slate-50">
+                                      <td className="p-3 text-sm">{formatDate(s.date)}</td>
+                                      <td className="p-3 font-bold text-green-700">{s.liters} L</td>
+                                      <td className="p-3 text-sm">R$ {s.cost.toLocaleString('pt-BR')}</td>
+                                      <td className="p-3 text-sm">{s.receiverName}</td>
+                                  </tr>
+                              ))}
                           </tbody>
                       </table>
                   </div>
@@ -778,244 +305,59 @@ const InventoryView: React.FC = () => {
 
       {viewMode === 'FUEL_CONSUMPTION' && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* Form de Abastecimento (Saída) */}
-              <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 h-fit">
-                  <h3 className="font-bold text-lg text-slate-800 mb-4 flex items-center gap-2">
-                      <span className="bg-blue-100 text-blue-600 p-1.5 rounded">⛽</span>
-                      Registrar Consumo
-                  </h3>
+              <div className="bg-white p-6 rounded-xl border border-slate-200 h-fit">
+                  <h3 className="font-bold mb-4 flex items-center gap-2">⛽ Lançar Abastecimento</h3>
                   <form onSubmit={handleFuelConsumptionSubmit} className="space-y-4">
-                      <div>
-                          <label className="block text-sm font-medium text-slate-700 mb-1">Data</label>
-                          <input 
-                              type="date" required 
-                              value={fuelForm.date} 
-                              onChange={e => setFuelForm({...fuelForm, date: e.target.value})}
-                              className="w-full border p-2 rounded bg-slate-50"
-                          />
-                      </div>
-                      
-                      {/* Location Toggle */}
-                      <div className="grid grid-cols-2 gap-2 p-1 bg-slate-100 rounded-lg">
-                          <button
-                            type="button"
-                            onClick={() => setFuelForm({...fuelForm, location: 'GARAGE'})}
-                            className={`py-2 text-sm font-bold rounded ${fuelForm.location === 'GARAGE' ? 'bg-white shadow text-blue-600' : 'text-slate-500'}`}
-                          >
-                              🏢 Na Garagem
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setFuelForm({...fuelForm, location: 'STREET'})}
-                            className={`py-2 text-sm font-bold rounded ${fuelForm.location === 'STREET' ? 'bg-white shadow text-orange-600' : 'text-slate-500'}`}
-                          >
-                              🛣️ Na Rua
-                          </button>
-                      </div>
-
-                      <div>
-                          <label className="block text-sm font-medium text-slate-700 mb-1">Veículo / Modelo</label>
-                          <select 
-                              required 
-                              value={fuelForm.busId} 
-                              onChange={handleBusChange} // Lógica para auto-preencher KM
-                              className="w-full border p-2 rounded bg-slate-50"
-                          >
-                              <option value="">Selecione o ônibus...</option>
-                              {buses.map(b => (
-                                  <option key={b.id} value={b.id}>{b.plate} - {b.model}</option>
-                              ))}
-                          </select>
-                      </div>
-                      
-                      {/* KM CONTROL FIELDS (CRITICAL) */}
-                      <div className="grid grid-cols-2 gap-3 p-3 bg-slate-100 rounded-lg border border-slate-200">
+                      <select onChange={handleBusChange} className="w-full border p-2 rounded bg-slate-50" required>
+                          <option value="">Selecione o ônibus...</option>
+                          {buses.map(b => <option key={b.id} value={b.id}>{b.plate} - {b.model}</option>)}
+                      </select>
+                      <div className="grid grid-cols-2 gap-2">
                           <div>
-                              <label className="block text-xs font-bold text-slate-700 mb-1">KM Inicial</label>
-                              <input 
-                                  type="number" min="0" required
-                                  value={fuelForm.kmStart || ''}
-                                  onChange={e => setFuelForm({...fuelForm, kmStart: parseInt(e.target.value)})}
-                                  className="w-full border p-2 rounded text-sm text-center font-bold text-slate-600"
-                                  placeholder="0"
-                              />
+                              <label className="text-[10px] uppercase font-bold text-slate-400">KM Inicial</label>
+                              <input type="number" placeholder="0" value={fuelForm.kmStart} onChange={e => setFuelForm({...fuelForm, kmStart: parseInt(e.target.value)})} className="w-full border p-2 rounded text-center bg-slate-100" />
                           </div>
                           <div>
-                              <label className="block text-xs font-bold text-slate-700 mb-1">KM Final (Atual)</label>
-                              <input 
-                                  type="number" min="0" required
-                                  value={fuelForm.kmEnd || ''}
-                                  onChange={e => setFuelForm({...fuelForm, kmEnd: parseInt(e.target.value)})}
-                                  className="w-full border p-2 rounded text-sm text-center font-bold text-slate-800"
-                                  placeholder="0"
-                              />
+                              <label className="text-[10px] uppercase font-bold text-slate-400">KM Final</label>
+                              <input type="number" placeholder="0" value={fuelForm.kmEnd || ''} onChange={e => setFuelForm({...fuelForm, kmEnd: parseInt(e.target.value)})} className="w-full border p-2 rounded text-center font-bold" />
                           </div>
-                          {fuelForm.kmEnd > fuelForm.kmStart && (
-                              <div className="col-span-2 text-center text-xs text-slate-500">
-                                  Rodado: <strong>{fuelForm.kmEnd - fuelForm.kmStart} km</strong>
-                              </div>
-                          )}
                       </div>
-
-                      <div className="border-t border-slate-100 pt-3">
-                        <label className="block text-sm font-bold text-slate-800 mb-2">Diesel</label>
-                        <div className="flex items-center border border-slate-300 rounded overflow-hidden bg-white">
-                            <input 
-                                type="number" step="0.1" min="0" required
-                                value={fuelForm.dieselLiters || ''} 
-                                onChange={e => setFuelForm({...fuelForm, dieselLiters: parseFloat(e.target.value)})}
-                                className="w-full p-2 outline-none"
-                                placeholder="Qtd. Litros"
-                            />
-                            <span className="bg-slate-100 text-slate-600 px-3 py-2 font-bold border-l border-slate-300 text-xs">L</span>
-                        </div>
-                        {fuelForm.location === 'GARAGE' && (
-                             <p className="text-xs text-green-600 mt-1">Será descontado do estoque interno ({fuelStockLevel} L)</p>
-                        )}
-                      </div>
-
-                      <div className="bg-blue-50 p-3 rounded-lg border border-blue-100">
-                          <label className="flex items-center justify-between cursor-pointer">
-                              <span className="font-bold text-blue-800 text-sm">Abasteceu Arla 32?</span>
-                              <div className={`w-10 h-5 flex items-center rounded-full p-1 transition-colors ${fuelForm.hasArla ? 'bg-blue-600' : 'bg-gray-300'}`}>
-                                  <input 
-                                      type="checkbox" 
-                                      className="hidden" 
-                                      checked={fuelForm.hasArla}
-                                      onChange={e => setFuelForm({...fuelForm, hasArla: e.target.checked})}
-                                  />
-                                  <div className={`bg-white w-3 h-3 rounded-full shadow-md transform transition-transform ${fuelForm.hasArla ? 'translate-x-5' : ''}`}></div>
-                              </div>
-                          </label>
-                          
-                          {fuelForm.hasArla && (
-                              <div className="mt-3 animate-fade-in">
-                                  <label className="block text-xs font-bold text-blue-700 mb-1">Qtd. Arla (Litros) *</label>
-                                  <div className="flex items-center border border-blue-200 rounded overflow-hidden bg-white">
-                                      <input 
-                                          type="number" step="0.1" min="0" required
-                                          value={fuelForm.arlaLiters || ''} 
-                                          onChange={e => setFuelForm({...fuelForm, arlaLiters: parseFloat(e.target.value)})}
-                                          className="w-full p-2 outline-none text-blue-900 font-bold"
-                                          placeholder="0.0"
-                                      />
-                                      <span className="bg-blue-100 text-blue-600 px-3 py-2 font-bold border-l border-blue-200 text-xs">L</span>
-                                  </div>
-                              </div>
-                          )}
-                      </div>
-
-                      {fuelForm.location === 'STREET' && (
-                          <div className="bg-orange-50 p-3 rounded border border-orange-100 space-y-3 animate-fade-in">
-                              <div>
-                                  <label className="block text-xs font-bold text-orange-800 mb-1">
-                                      {fuelForm.hasArla ? 'Valor Diesel (R$)' : 'Valor Pago (R$)'}
-                                  </label>
-                                  <input 
-                                    type="number" step="0.01"
-                                    value={fuelForm.cost || ''} onChange={e => setFuelForm({...fuelForm, cost: parseFloat(e.target.value)})}
-                                    className="w-full border p-2 rounded text-sm" placeholder="0.00"
-                                  />
-                              </div>
-                              
-                              {/* New Arla Cost Input */}
-                              {fuelForm.hasArla && (
-                                  <div>
-                                      <label className="block text-xs font-bold text-blue-800 mb-1">
-                                          Valor Arla (R$)
-                                      </label>
-                                      <input 
-                                        type="number" step="0.01"
-                                        value={fuelForm.arlaCost || ''} onChange={e => setFuelForm({...fuelForm, arlaCost: parseFloat(e.target.value)})}
-                                        className="w-full border border-blue-300 p-2 rounded text-sm text-blue-900 font-bold" placeholder="0.00"
-                                      />
-                                  </div>
-                              )}
-
-                              <div>
-                                  <label className="block text-xs font-bold text-orange-800 mb-1">Nome do Posto</label>
-                                  <input 
-                                    value={fuelForm.stationName} onChange={e => setFuelForm({...fuelForm, stationName: e.target.value})}
-                                    className="w-full border p-2 rounded text-sm" placeholder="Ex: Posto Shell"
-                                  />
-                              </div>
-                          </div>
-                      )}
-
-                      <button type="submit" className="w-full bg-slate-800 text-white font-bold py-3 rounded hover:bg-slate-700">
-                          Lançar Consumo
-                      </button>
+                      <input type="number" step="0.1" placeholder="Litros Diesel" onChange={e => setFuelForm({...fuelForm, dieselLiters: parseFloat(e.target.value)})} className="w-full border p-2 rounded" />
+                      <button type="submit" className="w-full bg-blue-700 text-white py-3 rounded font-bold shadow-md hover:bg-blue-800 transition-colors">Salvar Saída</button>
                   </form>
               </div>
-
-              {/* Histórico Consumo */}
-              <div className="lg:col-span-2 space-y-4">
-                  <h3 className="font-bold text-slate-700">Histórico de Abastecimentos (Saídas)</h3>
-                  <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+              <div className="lg:col-span-2">
+                  <div className="flex flex-col md:flex-row justify-between items-center mb-4 bg-white p-4 rounded-lg border border-slate-200 gap-4">
+                      <h3 className="font-bold text-slate-700">Histórico de Consumo</h3>
+                      <div className="flex gap-2 text-xs items-center font-medium bg-slate-50 p-2 rounded-lg">
+                          <span>Filtrar período:</span>
+                          <input type="date" value={supplyFilterStart} onChange={e => setSupplyFilterStart(e.target.value)} className="border p-1 rounded" title="Data Inicial" />
+                          <span>até</span>
+                          <input type="date" value={supplyFilterEnd} onChange={e => setSupplyFilterEnd(e.target.value)} className="border p-1 rounded" title="Data Final" />
+                      </div>
+                  </div>
+                  <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
                       <table className="w-full text-left">
-                          <thead className="bg-slate-50 text-slate-600 text-xs uppercase font-bold border-b border-slate-200">
-                              <tr>
-                                  <th className="p-3">Data</th>
-                                  <th className="p-3">Veículo</th>
-                                  <th className="p-3">KM Perc.</th>
-                                  <th className="p-3">Diesel</th>
-                                  <th className="p-3">Arla</th>
-                                  <th className="p-3">Média</th>
-                                  <th className="p-3 text-right">Resp.</th>
-                                  {canManageStock && <th className="p-3 text-right">Ações</th>}
-                              </tr>
+                          <thead className="bg-slate-50 text-slate-600 text-[10px] uppercase font-bold border-b">
+                              <tr><th className="p-3">Data</th><th className="p-3">Veículo</th><th className="p-3">KM Perc.</th><th className="p-3">Diesel</th><th className="p-3">Média</th><th className="p-3 text-right">Ação</th></tr>
                           </thead>
-                          <tbody className="divide-y divide-slate-100">
-                              {fuelRecords.length === 0 ? (
-                                  <tr><td colSpan={canManageStock ? 8 : 7} className="p-8 text-center text-slate-500">Nenhum registro de abastecimento.</td></tr>
-                              ) : (
-                                  fuelRecords.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()).map(record => {
-                                      const bus = buses.find(b => b.id === record.busId);
-                                      const user = users.find(u => u.id === record.loggedBy);
-                                      // Legacy support: if kmEnd/Start missing, fallback
-                                      const dist = (record.kmEnd && record.kmStart) ? record.kmEnd - record.kmStart : 0;
-                                      const avg = record.averageConsumption ? record.averageConsumption.toFixed(2) : '-';
-
-                                      return (
-                                          <tr key={record.id} className="hover:bg-slate-50">
-                                              <td className="p-3 text-sm text-slate-600">{formatDate(record.date)}</td>
-                                              <td className="p-3 font-medium text-slate-800">
-                                                  {bus?.plate} <span className="text-xs text-slate-500 block">{bus?.model}</span>
-                                              </td>
-                                              <td className="p-3 text-sm">
-                                                  {dist > 0 ? `${dist} km` : <span className="text-slate-300">-</span>}
-                                              </td>
-                                              <td className="p-3 text-sm font-bold text-slate-700">{record.dieselLiters} L</td>
-                                              <td className="p-3 text-sm">
-                                                  {record.hasArla ? <span className="text-blue-600 font-bold">{record.arlaLiters} L</span> : <span className="text-slate-300">-</span>}
-                                                  {record.arlaCost && record.arlaCost > 0 && <span className="block text-[9px] text-blue-400">R$ {record.arlaCost}</span>}
-                                              </td>
-                                              <td className="p-3 text-sm font-bold text-blue-600">
-                                                  {avg !== '-' ? `${avg} km/l` : '-'}
-                                              </td>
-                                              <td className="p-3 text-right text-xs text-slate-500">{user?.name?.split(' ')[0] || 'N/A'}</td>
-                                              {canManageStock && (
-                                                  <td className="p-3 text-right flex justify-end gap-2">
-                                                      <button 
-                                                          onClick={() => handleEditFuelClick(record)}
-                                                          className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded hover:bg-blue-200"
-                                                          title="Editar"
-                                                      >
-                                                          ✎
-                                                      </button>
-                                                      <button 
-                                                          onClick={() => handleDeleteFuel(record.id)}
-                                                          className="text-xs bg-red-100 text-red-700 px-2 py-1 rounded hover:bg-red-200"
-                                                          title="Excluir"
-                                                      >
-                                                          ✕
-                                                      </button>
-                                                  </td>
-                                              )}
-                                          </tr>
-                                      );
-                                  })
-                              )}
+                          <tbody className="divide-y">
+                              {filteredFuelRecords.length === 0 ? (
+                                  <tr><td colSpan={6} className="p-8 text-center text-slate-500">Nenhum registro de consumo para o período.</td></tr>
+                              ) : filteredFuelRecords.map(r => {
+                                  const bus = buses.find(b => b.id === r.busId);
+                                  const dist = (r.kmEnd && r.kmStart) ? r.kmEnd - r.kmStart : 0;
+                                  return (
+                                      <tr key={r.id} className="hover:bg-slate-50 transition-colors">
+                                          <td className="p-3 text-sm text-slate-600">{formatDate(r.date)}</td>
+                                          <td className="p-3 font-bold text-slate-800">{bus?.plate}</td>
+                                          <td className="p-3 text-sm text-slate-600">{dist > 0 ? `${dist} km` : '-'}</td>
+                                          <td className="p-3 text-sm font-bold text-blue-700">{r.dieselLiters} L</td>
+                                          <td className="p-3 font-bold text-blue-600">{r.averageConsumption ? `${r.averageConsumption.toFixed(2)} km/l` : '-'}</td>
+                                          <td className="p-3 text-right"><button onClick={() => handleDeleteFuel(r.id)} className="text-red-400 hover:text-red-600 transition-colors">✕</button></td>
+                                      </tr>
+                                  );
+                              })}
                           </tbody>
                       </table>
                   </div>
@@ -1023,64 +365,9 @@ const InventoryView: React.FC = () => {
           </div>
       )}
 
-      {/* ... REQUESTS VIEW ... */}
       {viewMode === 'REQUESTS' && (
-          <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-              {/* ... Same requests table ... */}
-              <div className="p-4 border-b border-slate-200 bg-yellow-50">
-                  <h3 className="font-bold text-yellow-800">Solicitações de Compra Pendentes</h3>
-                  <p className="text-sm text-yellow-600">Peças solicitadas pela equipe de manutenção</p>
-              </div>
-              <table className="w-full text-left">
-                  <thead className="bg-slate-50 text-slate-600 text-sm uppercase font-semibold border-b border-slate-100">
-                      <tr>
-                          <th className="p-4">Data</th>
-                          <th className="p-4">Item Solicitado</th>
-                          <th className="p-4">Qtd</th>
-                          <th className="p-4">Solicitante</th>
-                          <th className="p-4">Para Veículo</th>
-                          <th className="p-4 text-center">Status</th>
-                          {!isMechanic && <th className="p-4 text-right">Ação</th>}
-                      </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                      {purchaseRequests.length === 0 ? (
-                          <tr><td colSpan={7} className="p-8 text-center text-slate-500">Nenhuma solicitação de compra pendente.</td></tr>
-                      ) : (
-                          purchaseRequests.map(req => {
-                              const requester = users.find(u => u.id === req.requesterId);
-                              const relatedBus = buses.find(b => b.id === req.relatedBusId);
-                              return (
-                                  <tr key={req.id} className="hover:bg-slate-50">
-                                      <td className="p-4 text-sm text-slate-500">{formatDate(req.requestDate)}</td>
-                                      <td className="p-4 font-bold text-slate-800">{req.partName}</td>
-                                      <td className="p-4 text-slate-700">{req.quantity}</td>
-                                      <td className="p-4 text-sm text-slate-600">{requester?.name || 'Desconhecido'}</td>
-                                      <td className="p-4 text-sm text-slate-600">{relatedBus ? relatedBus.plate : '-'}</td>
-                                      <td className="p-4 text-center">
-                                          {req.status === 'PENDING' ? (
-                                              <span className="bg-yellow-100 text-yellow-800 text-xs px-2 py-1 rounded font-bold">Pendente</span>
-                                          ) : (
-                                              <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded font-bold">Comprado</span>
-                                          )}
-                                      </td>
-                                      {!isMechanic && req.status === 'PENDING' && (
-                                          <td className="p-4 text-right">
-                                              <button 
-                                                onClick={() => updatePurchaseRequestStatus(req.id, 'COMPLETED')}
-                                                className="text-xs bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded transition-colors"
-                                              >
-                                                  Marcar como Comprado
-                                              </button>
-                                          </td>
-                                      )}
-                                      {!isMechanic && req.status !== 'PENDING' && <td className="p-4"></td>}
-                                  </tr>
-                              );
-                          })
-                      )}
-                  </tbody>
-              </table>
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden p-6 text-center">
+              <p className="text-slate-500 italic">Solicitações de compra enviadas pela manutenção aparecerão aqui.</p>
           </div>
       )}
     </div>
