@@ -354,11 +354,13 @@ const CalendarView: React.FC<CalendarViewProps> = ({ onEventClick }) => {
                                                 colorClass: 'bg-orange-100'
                                             });
                                         }}
-                                        className="text-[10px] px-2 py-1 rounded truncate font-medium border bg-orange-100 text-orange-900 border-orange-300 cursor-pointer hover:bg-orange-200" 
+                                        className="text-[10px] px-2 py-1 rounded font-medium border bg-orange-100 text-orange-900 border-orange-300 cursor-pointer hover:bg-orange-200 flex items-center justify-between gap-1" 
                                         title={`Fretamento: ${c.clientName}`}
                                     >
-                                        🏭 {canViewAllSchedule ? `${c.route.substring(0,12)}.. (${driverName.split(' ')[0]})` : c.route}
-                                        {isConfirmed && <span className="ml-1 text-green-600 font-bold" title="Motorista Confirmou">✓</span>}
+                                        <span className="truncate">
+                                            🏭 {canViewAllSchedule ? `${c.route.substring(0,12)}.. (${driverName.split(' ')[0]})` : c.route}
+                                        </span>
+                                        {isConfirmed && <span className="flex-shrink-0 text-green-600 font-bold" title="Motorista Confirmou">✅</span>}
                                     </div>
                                 )
                             })}
@@ -384,15 +386,17 @@ const CalendarView: React.FC<CalendarViewProps> = ({ onEventClick }) => {
                                                 setSelectedBooking(b);
                                             }
                                         }}
-                                        className={`relative z-10 text-[10px] px-2 py-1 rounded truncate font-medium border cursor-pointer hover:opacity-80 transition-opacity hover:scale-[1.02] transform transition-transform ${
+                                        className={`relative z-10 text-[10px] px-2 py-1 rounded font-medium border cursor-pointer hover:opacity-80 transition-opacity hover:scale-[1.02] transform transition-transform flex items-center justify-between gap-1 ${
                                             b.driverId === currentUser.id && currentUser.role === UserRole.DRIVER 
                                             ? 'bg-blue-600 text-white border-blue-700' // Highlight own trips
                                             : 'bg-blue-100 text-blue-800 border-blue-200'
                                         }`} 
                                         title={`${b.destination} - ${driver?.name || 'S/ Motorista'}`}
                                     >
-                                        🚌 {canViewAllSchedule ? `${b.destination} (${driver?.name?.split(' ')[0] || '?'})` : b.destination}
-                                        {isConfirmed && <span className="ml-1 font-bold" title="Motorista Confirmou">✓</span>}
+                                        <span className="truncate">
+                                            🚌 {canViewAllSchedule ? `${b.destination} (${driver?.name?.split(' ')[0] || '?'})` : b.destination}
+                                        </span>
+                                        {isConfirmed && <span className="flex-shrink-0 font-bold" title="Motorista Confirmou">✅</span>}
                                     </div>
                                 );
                             })}
