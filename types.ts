@@ -6,12 +6,12 @@ export enum UserRole {
   DRIVER = 'MOTORISTA',
   MECHANIC = 'MECANICO',
   GARAGE_AUX = 'AUX_GARAGEM',
-  AGENT = 'AGENTE' // Novo perfil comercial
+  AGENT = 'AGENTE'
 }
 
 export interface PaymentRateProfile {
   debit: number;
-  creditCash: number; // À vista
+  creditCash: number;
   creditInstallment2to6: number;
   creditInstallment7to12: number;
 }
@@ -19,16 +19,14 @@ export interface PaymentRateProfile {
 export interface SystemSettings {
   id: string;
   companyName: string;
-  logoUrl: string; // Base64 or URL
+  logoUrl: string;
   cnpj?: string;
   phone?: string;
   address?: string;
-  aiApiKey?: string; // Nova chave para IA
-  
-  // Payment Rates Configuration
+  aiApiKey?: string;
   paymentRates?: {
     maquininha: PaymentRateProfile;
-    ecommerce: PaymentRateProfile; // Link de Pagamento
+    ecommerce: PaymentRateProfile;
     site: PaymentRateProfile;
   };
 }
@@ -37,10 +35,10 @@ export interface User {
   id: string;
   name: string;
   email: string;
-  role: UserRole | string; // Allow string for legacy data compatibility
+  role: UserRole | string;
   avatar: string;
-  status?: 'APPROVED' | 'PENDING' | 'REJECTED'; // New field for access control
-  dailyRate?: number; // Valor padrão da diária
+  status?: 'APPROVED' | 'PENDING' | 'REJECTED';
+  dailyRate?: number;
 }
 
 export interface Bus {
@@ -59,23 +57,14 @@ export interface Quote {
   clientEmail?: string;
   destination: string;
   departureLocation: string;
-  startTime: string; // ISO string
-  endTime: string; // ISO string
+  startTime: string;
+  endTime: string;
   passengerCount: number;
-  price?: number; // Defined by manager
+  price?: number;
   observations?: string;
   status: 'NEW' | 'PRICED' | 'SENT' | 'APPROVED' | 'REJECTED';
   createdAt: string;
-  convertedBookingId?: string; // Link if converted
-}
-
-export interface PriceRoute {
-  id: string;
-  origin: string;
-  destination: string;
-  vehicleType: string; // e.g. "Micro", "Convencional 46", "LD"
-  price: number;
-  description?: string; // e.g. "Ida e Volta", "Apenas Ida"
+  convertedBookingId?: string;
 }
 
 export interface Booking {
@@ -83,13 +72,13 @@ export interface Booking {
   busId: string;
   driverId: string | null;
   freelanceDriverName?: string | null;
-  driver2Id?: string | null; // Novo
-  freelanceDriver2Name?: string | null; // Novo
+  driver2Id?: string | null;
+  freelanceDriver2Name?: string | null;
   clientName: string;
   clientPhone?: string;
   destination: string;
-  startTime: string; // ISO string
-  endTime: string; // ISO string
+  startTime: string;
+  endTime: string;
   value: number;
   paymentStatus: 'PAID' | 'PENDING' | 'SCHEDULED';
   paymentDate?: string | null;
@@ -105,8 +94,8 @@ export interface Part {
   quantity: number;
   minQuantity: number;
   price: number;
-  lastSupplier?: string; // Fornecedor da última compra
-  lastNfe?: string;      // Nota Fiscal da última compra
+  lastSupplier?: string;
+  lastNfe?: string;
 }
 
 export interface Transaction {
@@ -118,90 +107,21 @@ export interface Transaction {
   date: string;
   description: string;
   relatedBookingId?: string;
-  // New fields for Expenses/Installments
   nfe?: string;
-  paymentMethod?: 'BOLETO' | 'CARTAO_CREDITO' | 'PIX' | 'DINHEIRO' | 'OUTROS';
-  installment?: {
-    current: number;
-    total: number;
-  };
+  paymentMethod?: string;
+  installment?: { current: number; total: number; };
 }
 
 export interface DriverFee {
   id: string;
-  driverId: string | null; // Pode ser null se for freelance
-  freelanceDriverName?: string; // Nome se for freelance
-  amount: number;
-  date: string; // Data da viagem ou referência
-  description: string; // Ex: "Viagem para Aparecida"
-  status: 'PENDING' | 'PAID';
-  paymentDate?: string; // Data que a empresa pagou
-  relatedBookingId?: string;
-}
-
-export interface TimeOff {
-  id: string;
-  driverId: string;
-  date: string; // YYYY-MM-DD (Start Date)
-  endDate?: string; // YYYY-MM-DD (End Date for Vacations)
-  type: 'FOLGA' | 'FERIAS' | 'PLANTAO';
-  startTime?: string; // HH:mm for Plantão
-  endTime?: string; // HH:mm for Plantão
-  status: 'APPROVED' | 'PENDING' | 'REJECTED';
-}
-
-export interface DriverDocument {
-  id: string;
-  driverId: string;
-  title: string;
-  fileName: string;
-  fileContent: string; // Base64
-  uploadDate: string;
-}
-
-export interface MaintenanceRecord {
-  id: string;
-  busId: string;
-  partId: string;
-  quantityUsed: number;
-  type: 'CORRETIVA' | 'PREVENTIVA';
-  date: string;
-  mechanicId: string;
-}
-
-export interface PurchaseRequest {
-  id: string;
-  partName: string;
-  quantity: number;
-  relatedBusId?: string;
-  requesterId: string;
-  status: 'PENDING' | 'COMPLETED';
-  requestDate: string;
-}
-
-export interface MaintenanceReport {
-  id: string;
-  busId: string;
-  driverId: string;
-  type: string; // MECANICA, ELETRICA, etc.
-  description: string;
-  date: string;
-  status: 'PENDING' | 'IN_PROGRESS' | 'RESOLVED';
-}
-
-export interface CharterContract {
-  id: string;
-  clientName: string;
-  route: string;
-  busId: string;
   driverId: string | null;
-  freelanceDriverName?: string | null; // Added support for freelance
-  weekDays: number[];
-  morningDeparture: string;
-  afternoonDeparture: string;
-  startDate: string;
-  endDate: string;
-  status: 'ACTIVE' | 'INACTIVE';
+  freelanceDriverName?: string;
+  amount: number;
+  date: string;
+  description: string;
+  status: 'PENDING' | 'PAID';
+  paymentDate?: string | null;
+  relatedBookingId?: string;
 }
 
 export interface TravelPackage {
@@ -216,10 +136,10 @@ export interface TravelPackage {
 
 export interface Client {
   id: string;
-  code?: string; // Código manual da planilha
+  code?: string;
   type: 'PF' | 'PJ';
   name: string;
-  cpf: string; // CPF ou CNPJ
+  cpf: string;
   rg?: string;
   birthDate?: string;
   phone?: string;
@@ -241,15 +161,22 @@ export interface PackagePassenger {
   agreedPrice: number;
   paidAmount: number;
   status: 'PENDING' | 'PARTIAL' | 'PAID';
-  
-  // Commission Fields
   saleType?: 'DIRECT' | 'AGENCY' | 'PROMOTER';
   agencyName?: string;
   agencyPhone?: string;
-  paxList?: string; // Text field for PAX names in agency sale
-  commissionRate?: number; // 0.01 or 0.12 or 0.10
+  paxList?: string;
   commissionValue?: number;
-  sellerId?: string;
+  paymentMethod?: string;
+  installments?: number;
+}
+
+export interface PackagePayment {
+  id: string;
+  passengerId: string;
+  amount: number;
+  date: string;
+  method: string;
+  notes?: string;
 }
 
 export interface PackageLead {
@@ -258,19 +185,46 @@ export interface PackageLead {
   phone: string;
   packageId: string;
   notes: string;
-  callbackDate: string; // YYYY-MM-DD
+  callbackDate: string;
   status: 'PENDING' | 'CONTACTED' | 'CONVERTED' | 'LOST';
   createdAt: string;
 }
 
-export interface PackagePayment {
+export interface DriverLiability {
   id: string;
-  passengerId: string;
-  amount: number;
+  driverId: string;
+  type: 'AVARIA' | 'MULTA';
   date: string;
-  method: 'PIX' | 'DINHEIRO' | 'CARTAO_CREDITO' | 'CARTAO_DEBITO';
-  installments?: number;
-  notes?: string;
+  description: string;
+  totalAmount: number;
+  paidAmount: number;
+  installments: number;
+  status: 'OPEN' | 'PAID';
+}
+
+export interface ScheduleConfirmation {
+  id: string;
+  driverId: string;
+  type: 'BOOKING' | 'CHARTER';
+  referenceId: string;
+  date: string;
+  status: 'CONFIRMED';
+  confirmedAt: string;
+}
+
+export interface CharterContract {
+  id: string;
+  clientName: string;
+  route: string;
+  busId: string;
+  driverId: string | null;
+  freelanceDriverName?: string | null;
+  weekDays: number[];
+  morningDeparture: string;
+  afternoonDeparture: string;
+  startDate: string;
+  endDate: string;
+  status: 'ACTIVE' | 'INACTIVE';
 }
 
 export interface FuelRecord {
@@ -284,11 +238,10 @@ export interface FuelRecord {
   cost: number;
   stationName?: string;
   loggedBy: string;
-  // NEW KM FIELDS (Optional to support legacy data)
   kmStart?: number;
   kmEnd?: number;
-  averageConsumption?: number; // KM/L
-  arlaCost?: number; // Custo específico do Arla quando na rua
+  averageConsumption?: number;
+  arlaCost?: number;
 }
 
 export interface FuelSupply {
@@ -296,29 +249,68 @@ export interface FuelSupply {
   date: string;
   liters: number;
   cost: number;
+  supplier: string;
+  nfe: string;
   receiverName: string;
   registeredInFinance: boolean;
-  type: 'DIESEL'; 
+  type: 'DIESEL' | 'ARLA';
 }
 
-export interface DriverLiability {
+export interface PriceRoute {
   id: string;
-  driverId: string;
-  type: 'AVARIA' | 'MULTA';
-  date: string; 
-  description: string; 
-  totalAmount: number;
-  paidAmount: number; 
-  installments: number; 
-  status: 'OPEN' | 'PAID';
+  origin: string;
+  destination: string;
+  vehicleType: string;
+  price: number;
+  description?: string;
 }
 
-export interface ScheduleConfirmation {
+export interface TimeOff {
   id: string;
   driverId: string;
-  type: 'BOOKING' | 'CHARTER';
-  referenceId: string; // Booking ID or Charter Contract ID
-  date: string; // YYYY-MM-DD
-  status: 'CONFIRMED';
-  confirmedAt: string;
+  date: string;
+  endDate?: string;
+  startTime?: string;
+  endTime?: string;
+  type: 'FOLGA' | 'FERIAS' | 'PLANTAO' | string;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+}
+
+export interface DriverDocument {
+  id: string;
+  driverId: string;
+  title: string;
+  fileName: string;
+  fileContent: string;
+  uploadDate: string;
+}
+
+export interface MaintenanceRecord {
+  id: string;
+  busId: string;
+  partId: string;
+  quantityUsed: number;
+  type: 'CORRETIVA' | 'PREVENTIVA';
+  date: string;
+  mechanicId: string;
+}
+
+export interface PurchaseRequest {
+  id: string;
+  partName: string;
+  quantity: number;
+  requesterId: string;
+  relatedBusId?: string;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  requestDate: string;
+}
+
+export interface MaintenanceReport {
+  id: string;
+  busId: string;
+  driverId: string;
+  type: string;
+  description: string;
+  date: string;
+  status: 'PENDING' | 'IN_PROGRESS' | 'RESOLVED';
 }
