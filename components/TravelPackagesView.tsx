@@ -1,13 +1,13 @@
 
 import React, { useState, useEffect } from 'react';
 import { useStore } from '../services/store';
-import { PackagePassenger, TravelPackage, Client, PackagePayment } from '../types';
+import { PackagePassenger, TravelPackage, Client, PackagePayment, User } from '../types';
 
 const TravelPackagesView: React.FC = () => {
   const { 
     travelPackages, packagePassengers, packagePayments, clients, 
     addTravelPackage, registerPackageSale, updatePackagePassenger, 
-    deletePackagePassenger, addPackagePayment, currentUser, 
+    deletePackagePassenger, addPackagePayment, currentUser, users,
     settings
   } = useStore();
   
@@ -18,7 +18,7 @@ const TravelPackagesView: React.FC = () => {
   const [isSavingSale, setIsSavingSale] = useState(false);
   
   const [editingPassenger, setEditingPassenger] = useState<PackagePassenger | null>(null);
-  const [newPkg, setNewPkg] = useState({ title: '', date: '', adultPrice: 0, divisionPrice: 0, childPrice: 0, seniorPrice: 0 });
+  const [newPkg, setNewPkg] = useState({ title: '', date: '', adultPrice: 0, childPrice: 0, seniorPrice: 0 });
 
   const [financeModal, setFinanceModal] = useState<{ open: boolean, passenger: PackagePassenger | null }>({ open: false, passenger: null });
   const [financeForm, setFinanceForm] = useState({ amount: 0, method: 'PIX', notes: '' });
@@ -55,7 +55,6 @@ const TravelPackagesView: React.FC = () => {
       
       const final = Math.max(0, gross - discount);
 
-      // Puxar Taxas Administrativas do Settings
       let feeRate = 0;
       const rates = settings?.paymentRates;
       if (rates) {
@@ -67,8 +66,7 @@ const TravelPackagesView: React.FC = () => {
       const feeValue = final * (feeRate / 100);
       const netAfterFees = final - feeValue;
 
-      // Calcular Comissão baseada no Canal de Venda
-      let commissionRate = 0.01; // Direct 1%
+      let commissionRate = 0.01; 
       if (saleForm.saleType === 'AGENCY') commissionRate = 0.12;
       if (saleForm.saleType === 'PROMOTER') commissionRate = 0.10;
       
@@ -111,7 +109,6 @@ const TravelPackagesView: React.FC = () => {
       } catch (err) { alert("Erro ao salvar."); } finally { setIsSavingSale(false); }
   };
 
-  // Fix: Added missing handleEditPassenger function to populate the form with existing passenger data
   const handleEditPassenger = (p: PackagePassenger) => {
       setEditingPassenger(p);
       const client = clients.find(c => c.id === p.clientId);
@@ -240,7 +237,7 @@ const TravelPackagesView: React.FC = () => {
                       <div className="lg:col-span-2 space-y-8">
                           {/* FORMULÁRIO DE NOVA VENDA COMPLETO */}
                           <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden" id="sale-form-anchor">
-                              <div className="bg-slate-50 p-4 border-b border-slate-200 flex items-center gap-2"><span className="text-xl">➕</span><h3 className="font-bold text-slate-700">Nova Venda / Registro Completo</h3></div>
+                              <div className="bg-slate-50 p-4 border-b border-slate-200 flex items-center gap-2"><span className="text-xl">➕</span><h3 className="font-bold text-slate-700">{editingPassenger ? 'Editar Venda' : 'Nova Venda / Registro Completo'}</h3></div>
                               <form onSubmit={handleRegisterSale} className="p-6 space-y-6">
                                   {/* Canal de Venda */}
                                   <div className="p-4 border rounded-xl bg-slate-50/50">
@@ -317,8 +314,11 @@ const TravelPackagesView: React.FC = () => {
                                   </div>
 
                                   <button type="submit" disabled={isSavingSale} className="w-full bg-slate-900 text-white py-4 rounded-xl font-black shadow-lg hover:bg-black transition-all">
-                                      {isSavingSale ? 'PROCESSANDO...' : 'CONFIRMAR REGISTRO DE VENDA'}
+                                      {isSavingSale ? 'PROCESSANDO...' : (editingPassenger ? 'SALVAR ALTERAÇÕES' : 'CONFIRMAR REGISTRO DE VENDA')}
                                   </button>
+                                  {editingPassenger && (
+                                    <button type="button" onClick={() => { setEditingPassenger(null); setSaleForm({ saleType: 'DIRECT', agencyName: '', agencyPhone: '', paxList: '', cpf: '', name: '', rg: '', birthDate: '', phone: '', address: '', qtdAdult: 0, qtdChild: 0, qtdSenior: 0, paymentMethod: 'PIX_DESCONTO', discountType: 'VALUE', discountInput: 0 }); }} className="w-full text-slate-500 font-bold py-2 hover:underline">Cancelar Edição</button>
+                                  )}
                               </form>
                           </div>
 
@@ -372,6 +372,112 @@ const TravelPackagesView: React.FC = () => {
                       </div>
                   </div>
               </div>
+
+              {/* MODAL RELATÓRIO DE COMISSÕES */}
+              {showCommissionReport && (
+                  <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[100] p-4 animate-fade-in backdrop-blur-md">
+                      <div className="bg-white rounded-[32px] shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col overflow-hidden">
+                          <div className="bg-emerald-700 p-8 text-white flex justify-between items-center shrink-0">
+                              <div>
+                                  <h3 className="font-black text-2xl tracking-tight uppercase">Relatório de Comissões</h3>
+                                  <p className="text-xs opacity-70 uppercase font-bold mt-1">{selectedPackage.title}</p>
+                              </div>
+                              <button onClick={() => setShowCommissionReport(false)} className="text-3xl">&times;</button>
+                          </div>
+                          <div className="p-8 overflow-y-auto bg-slate-50 flex-1 space-y-8">
+                              {/* Seção 1: Canais Externos (Agência e Promotor) */}
+                              <div className="space-y-4">
+                                  <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest">Comissões de Parceiros Externos</h4>
+                                  <div className="bg-white border rounded-2xl overflow-hidden">
+                                      <table className="w-full text-left">
+                                          <thead className="bg-slate-50 text-[10px] font-black text-slate-500 uppercase border-b">
+                                              <tr>
+                                                  <th className="p-4">Parceiro / Canal</th>
+                                                  <th className="p-4">Vendas</th>
+                                                  <th className="p-4 text-right">Volume</th>
+                                                  <th className="p-4 text-right">Comissão (R$)</th>
+                                              </tr>
+                                          </thead>
+                                          <tbody className="divide-y divide-slate-100">
+                                              {Array.from(new Set(paxs.filter(p => p.saleType !== 'DIRECT').map(p => p.agencyName))).map(name => {
+                                                  const partnerPaxs = paxs.filter(p => p.agencyName === name);
+                                                  const totalSales = partnerPaxs.reduce((acc, p) => acc + p.agreedPrice, 0);
+                                                  const totalCommission = partnerPaxs.reduce((acc, p) => acc + (p.commissionValue || 0), 0);
+                                                  const type = partnerPaxs[0]?.saleType;
+                                                  
+                                                  return (
+                                                      <tr key={name} className="text-sm font-bold">
+                                                          <td className="p-4">
+                                                              <div className="flex flex-col">
+                                                                  <span className="text-slate-800">{name}</span>
+                                                                  <span className={`text-[9px] uppercase px-1.5 py-0.5 rounded-full w-fit ${type === 'AGENCY' ? 'bg-blue-100 text-blue-600' : 'bg-purple-100 text-purple-600'}`}>
+                                                                      {type === 'AGENCY' ? 'Agência - 12%' : 'Promotor - 10%'}
+                                                                  </span>
+                                                              </div>
+                                                          </td>
+                                                          <td className="p-4 text-slate-500">{partnerPaxs.length} pax</td>
+                                                          <td className="p-4 text-right text-slate-500">R$ {totalSales.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
+                                                          <td className="p-4 text-right text-emerald-600">R$ {totalCommission.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
+                                                      </tr>
+                                                  );
+                                              })}
+                                              {paxs.filter(p => p.saleType !== 'DIRECT').length === 0 && (
+                                                  <tr><td colSpan={4} className="p-8 text-center text-slate-400 italic">Nenhuma comissão de parceiro externo.</td></tr>
+                                              )}
+                                          </tbody>
+                                      </table>
+                                  </div>
+                              </div>
+
+                              {/* Seção 2: Comissões Internas (Venda Direta - 1%) */}
+                              <div className="space-y-4">
+                                  <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest">Comissões Internas (Venda Direta - 1%)</h4>
+                                  <div className="bg-white border rounded-2xl overflow-hidden">
+                                      <table className="w-full text-left">
+                                          <thead className="bg-slate-50 text-[10px] font-black text-slate-500 uppercase border-b">
+                                              <tr>
+                                                  <th className="p-4">Vendedor Interno</th>
+                                                  <th className="p-4">Vendas</th>
+                                                  <th className="p-4 text-right">Volume</th>
+                                                  <th className="p-4 text-right">Comissão (R$)</th>
+                                              </tr>
+                                          </thead>
+                                          <tbody className="divide-y divide-slate-100">
+                                              {Array.from(new Set(paxs.filter(p => p.saleType === 'DIRECT').map(p => (p as any).sellerId || 'SISTEMA'))).map(sellerId => {
+                                                  const sellerPaxs = paxs.filter(p => p.saleType === 'DIRECT' && ((p as any).sellerId || 'SISTEMA') === sellerId);
+                                                  const totalSales = sellerPaxs.reduce((acc, p) => acc + p.agreedPrice, 0);
+                                                  const totalCommission = sellerPaxs.reduce((acc, p) => acc + (p.commissionValue || 0), 0);
+                                                  const seller = users.find(u => u.id === sellerId);
+                                                  
+                                                  return (
+                                                      <tr key={sellerId} className="text-sm font-bold">
+                                                          <td className="p-4 text-slate-800">{seller?.name || 'Administração / Site'}</td>
+                                                          <td className="p-4 text-slate-500">{sellerPaxs.length} pax</td>
+                                                          <td className="p-4 text-right text-slate-500">R$ {totalSales.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
+                                                          <td className="p-4 text-right text-emerald-600">R$ {totalCommission.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
+                                                      </tr>
+                                                  );
+                                              })}
+                                          </tbody>
+                                      </table>
+                                  </div>
+                              </div>
+
+                              {/* Resumo Final do Relatório */}
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                  <div className="bg-slate-900 text-white p-6 rounded-3xl">
+                                      <p className="text-[10px] font-black uppercase text-slate-400">Total Geral Vendido</p>
+                                      <p className="text-2xl font-black">R$ {paxs.reduce((acc, p) => acc + p.agreedPrice, 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</p>
+                                  </div>
+                                  <div className="bg-emerald-600 text-white p-6 rounded-3xl shadow-xl shadow-emerald-100">
+                                      <p className="text-[10px] font-black uppercase text-white/70">Total de Comissões a Pagar</p>
+                                      <p className="text-2xl font-black">R$ {paxs.reduce((acc, p) => acc + (p.commissionValue || 0), 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</p>
+                                  </div>
+                              </div>
+                          </div>
+                      </div>
+                  </div>
+              )}
 
               {/* MODAL HISTÓRICO DE PAGAMENTOS / REEMISSÃO DE RECIBOS */}
               {showPaymentHistory && (
