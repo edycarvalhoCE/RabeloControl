@@ -16,6 +16,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setView, isMobileOpen, s
   const [copyMsg, setCopyMsg] = useState('');
 
   const menuItems = [
+    // GESTÃO (MANAGER, FINANCE, DEVELOPER, AGENT)
     { id: 'dashboard', label: 'Dashboard', icon: '📊', roles: [UserRole.MANAGER, UserRole.FINANCE, UserRole.DEVELOPER, UserRole.AGENT] },
     { id: 'quotes', label: 'Orçamentos (CRM)', icon: '💬', roles: [UserRole.MANAGER, UserRole.FINANCE, UserRole.DEVELOPER, UserRole.AGENT] },
     { id: 'new-booking', label: 'Nova Locação', icon: '➕', roles: [UserRole.MANAGER, UserRole.DEVELOPER, UserRole.AGENT] },
@@ -26,20 +27,25 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setView, isMobileOpen, s
     { id: 'charter', label: 'Fretamento', icon: '🏭', roles: [UserRole.MANAGER, UserRole.DEVELOPER, UserRole.AGENT] },
     { id: 'vehicles', label: 'Veículos / Frota', icon: '🚐', roles: [UserRole.MANAGER, UserRole.DEVELOPER, UserRole.AGENT] },
     { id: 'maintenance', label: 'Manutenção', icon: '🛠️', roles: [UserRole.MANAGER, UserRole.MECHANIC, UserRole.DEVELOPER] },
-    { id: 'inventory', label: 'Estoque de Peças', icon: '🔧', roles: [UserRole.MANAGER, UserRole.MECHANIC, UserRole.FINANCE, UserRole.DEVELOPER] }, 
+    { id: 'inventory', label: 'Estoque / Insumos', icon: '🔧', roles: [UserRole.MANAGER, UserRole.MECHANIC, UserRole.FINANCE, UserRole.DEVELOPER] }, 
+    
+    // OPERACIONAL (MOTORISTA, MECANICO, AUX_GARAGEM)
+    { id: 'fuel', label: 'Abastecimento', icon: '⛽', roles: [UserRole.DRIVER, UserRole.MECHANIC, UserRole.MANAGER, UserRole.DEVELOPER] },
+    { id: 'driver-schedule', label: 'Minha Escala', icon: '📅', roles: [UserRole.DRIVER, UserRole.GARAGE_AUX, UserRole.DEVELOPER] },
+    { id: 'driver-finance', label: 'Financeiro', icon: '💰', roles: [UserRole.DRIVER, UserRole.DEVELOPER] },
+    { id: 'driver-report', label: 'Reportar Defeito', icon: '⚠️', roles: [UserRole.DRIVER, UserRole.MECHANIC, UserRole.GARAGE_AUX, UserRole.DEVELOPER] },
+
+    // SISTEMA
     { id: 'documents', label: 'Documentos', icon: '📂', roles: [UserRole.MANAGER, UserRole.DEVELOPER] },
     { id: 'finance', label: 'Financeiro (Caixa)', icon: '💰', roles: [UserRole.MANAGER, UserRole.FINANCE, UserRole.DEVELOPER] },
     { id: 'users', label: 'Usuários', icon: '👤', roles: [UserRole.MANAGER, UserRole.DEVELOPER] },
     { id: 'settings', label: 'Configurações', icon: '⚙️', roles: [UserRole.MANAGER, UserRole.DEVELOPER] },
-    { id: 'driver-portal', label: 'Portal do Colaborador', icon: 'steering-wheel', roles: [UserRole.DRIVER, UserRole.GARAGE_AUX, UserRole.DEVELOPER] },
   ];
 
-  // Regra rigorosa: O Agente Comercial NÃO vê Estoque, Configurações e Portal do Motorista
   const filteredMenu = menuItems.filter(item => {
       const hasRole = item.roles.includes(currentUser.role as UserRole);
-      // Trava extra de segurança visual
       if (currentUser.role === UserRole.AGENT) {
-          if (['settings', 'inventory', 'driver-portal'].includes(item.id)) return false;
+          if (['settings', 'inventory', 'fuel', 'driver-schedule', 'driver-finance', 'driver-report'].includes(item.id)) return false;
       }
       return hasRole;
   });
@@ -74,13 +80,13 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setView, isMobileOpen, s
     <>
       {isMobileOpen && (
         <div 
-          className="fixed inset-0 bg-black/50 z-20 md:hidden"
+          className="fixed inset-0 bg-black/50 z-[60] md:hidden"
           onClick={() => setIsMobileOpen(false)}
         ></div>
       )}
 
       <div className={`
-        fixed inset-y-0 left-0 z-30 w-64 bg-slate-900 text-white flex flex-col h-full shadow-2xl transition-transform duration-300 ease-in-out
+        fixed inset-y-0 left-0 z-[70] w-64 bg-slate-900 text-white flex flex-col h-full shadow-2xl transition-transform duration-300 ease-in-out
         ${isMobileOpen ? 'translate-x-0' : '-translate-x-full'} 
         md:translate-x-0 md:static md:h-screen
       `}>
@@ -97,18 +103,16 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setView, isMobileOpen, s
           </div>
         </div>
 
-        <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
+        <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
           {filteredMenu.map(item => (
             <button
               key={item.id}
               onClick={() => handleMenuClick(item.id)}
-              className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${
-                currentView === item.id ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-300 hover:bg-slate-800'
+              className={`w-full flex items-center space-x-3 px-4 py-2.5 rounded-lg transition-colors text-sm ${
+                currentView === item.id ? 'bg-blue-600 text-white shadow-lg font-bold' : 'text-slate-300 hover:bg-slate-800'
               }`}
             >
-              <span>{item.icon === 'steering-wheel' ? (
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-              ) : item.icon}</span>
+              <span className="text-lg">{item.icon}</span>
               <span className="font-medium">{item.label}</span>
             </button>
           ))}
@@ -129,7 +133,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setView, isMobileOpen, s
                   className="w-full flex items-center justify-center space-x-2 bg-slate-700 hover:bg-slate-600 text-blue-300 hover:text-white py-2 rounded transition-colors text-xs font-medium border border-slate-600"
               >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" /></svg>
-                  <span>{copyMsg || 'Compartilhar App'}</span>
+                  <span>{copyMsg || 'Compartilhar'}</span>
               </button>
 
               <button 

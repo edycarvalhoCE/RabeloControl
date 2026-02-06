@@ -1,6 +1,6 @@
-import { initializeApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
+import { initializeApp } from 'firebase/app';
+import { getAuth } from 'firebase/auth';
+import { getFirestore } from 'firebase/firestore';
 
 // --- CONFIGURAÇÃO DO FIREBASE ---
 const firebaseConfig = {
@@ -13,10 +13,9 @@ const firebaseConfig = {
   measurementId: "G-TXM4ERGKPQ"
 };
 
-// Verifica se o projeto está configurado (não é mais o placeholder)
-export const isConfigured = firebaseConfig.projectId !== "seu-projeto";
-
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
+
 export const auth = getAuth(app);
 export const db = getFirestore(app);
+export const isConfigured = firebaseConfig.projectId !== "seu-projeto";

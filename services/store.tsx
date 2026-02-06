@@ -1,10 +1,29 @@
-
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { User, Bus, Booking, Part, Transaction, TimeOff, UserRole, DriverDocument, MaintenanceRecord, PurchaseRequest, MaintenanceReport, CharterContract, TravelPackage, PackagePassenger, PackagePayment, Client, FuelRecord, FuelSupply, DriverLiability, PackageLead, SystemSettings, Quote, PriceRoute, DriverFee, ScheduleConfirmation } from '../types';
-import { MOCK_USERS, MOCK_BUSES, MOCK_PARTS } from '../constants';
 import { db, auth, isConfigured } from './firebase';
-import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, setDoc, query, where, writeBatch, getDocs, getDoc } from 'firebase/firestore';
-import { signInWithEmailAndPassword, signOut, onAuthStateChanged, createUserWithEmailAndPassword, updateProfile, sendPasswordResetEmail, updatePassword } from 'firebase/auth';
+import { 
+  collection, 
+  onSnapshot, 
+  addDoc, 
+  updateDoc, 
+  deleteDoc, 
+  doc, 
+  setDoc, 
+  query, 
+  where, 
+  writeBatch, 
+  getDocs, 
+  getDoc 
+} from 'firebase/firestore';
+import { 
+  signInWithEmailAndPassword, 
+  signOut, 
+  onAuthStateChanged, 
+  createUserWithEmailAndPassword, 
+  updateProfile, 
+  sendPasswordResetEmail, 
+  updatePassword 
+} from 'firebase/auth';
 
 interface StoreContextType {
   currentUser: User;
@@ -74,6 +93,8 @@ interface StoreContextType {
   updatePackagePassenger: (id: string, data: Partial<PackagePassenger>) => Promise<void>;
   deletePackagePassenger: (id: string) => Promise<void>;
   addPackagePayment: (payment: Omit<PackagePayment, 'id'>) => void;
+  addPackagePayment_only: (payment: Omit<PackagePayment, 'id'>) => Promise<void>;
+  addPackagePayment_only: (payment: Omit<PackagePayment, 'id'>) => Promise<void>;
   addPackageLead: (lead: Omit<PackageLead, 'id' | 'status' | 'createdAt'>) => void;
   updatePackageLead: (id: string, data: Partial<PackageLead>) => void;
   deletePackageLead: (id: string) => void;
@@ -141,10 +162,14 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
   useEffect(() => {
     if (!isConfigured) return;
-    const unsubAuth = onAuthStateChanged(auth, u => setIsAuthenticated(!!u));
-    const unsubSettings = onSnapshot(doc(db, 'settings', 'general'), d => d.exists() && setSettings({ id: 'general', ...d.data() } as any));
     
-    const collections: { n: string; s: (data: any[]) => void }[] = [
+    const unsubAuth = onAuthStateChanged(auth, u => setIsAuthenticated(!!u));
+    
+    const unsubSettings = onSnapshot(doc(db, 'settings', 'general'), d => {
+        if (d.exists()) setSettings({ id: 'general', ...d.data() } as any);
+    });
+    
+    const collectionsToSync: { n: string; s: (data: any[]) => void }[] = [
         { n: 'users', s: setUsers }, { n: 'buses', s: setBuses }, { n: 'bookings', s: setBookings }, { n: 'parts', s: setParts },
         { n: 'transactions', s: setTransactions }, { n: 'timeOffs', s: setTimeOffs }, { n: 'documents', s: setDocuments },
         { n: 'maintenanceRecords', s: setMaintenanceRecords }, { n: 'purchaseRequests', s: setPurchaseRequests },
@@ -154,8 +179,14 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         { n: 'fuelRecords', s: setFuelRecords }, { n: 'fuelSupplies', s: setFuelSupplies }, { n: 'driverLiabilities', s: setDriverLiabilities },
         { n: 'driverFees', s: setDriverFees }, { n: 'quotes', s: setQuotes }, { n: 'priceRoutes', s: setPriceRoutes }, { n: 'scheduleConfirmations', s: setScheduleConfirmations }
     ];
-    const unsubs = collections.map(c => onSnapshot(collection(db, c.n), s => c.s(s.docs.map(d => ({ id: d.id, ...d.data() } as any)))));
-    return () => { unsubAuth(); unsubSettings(); unsubs.forEach(u => u()); };
+    
+    const unsubs = collectionsToSync.map(c => onSnapshot(collection(db, c.n), s => c.s(s.docs.map(d => ({ id: d.id, ...d.data() } as any)))));
+    
+    return () => { 
+        unsubAuth(); 
+        unsubSettings(); 
+        unsubs.forEach(u => u()); 
+    };
   }, []);
 
   useEffect(() => {
@@ -177,63 +208,134 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   }, [users, isAuthenticated]);
 
   const login = async (e: string, p: string) => { try { await signInWithEmailAndPassword(auth, e, p); return { success: true }; } catch (err: any) { return { success: false, message: err.message }; } };
-  const register = async (e: string, p: string, n: string, r: UserRole) => { try { const res = await createUserWithEmailAndPassword(auth, e, p); await updateProfile(res.user, { displayName: n }); await setDoc(doc(db, 'users', res.user.uid), { id: res.user.uid, name: n, email: e, role: r, avatar: `https://ui-avatars.com/api/?name=${n}&background=random`, status: 'PENDING' }); return { success: true }; } catch (err: any) { return { success: false, message: err.message }; } };
+  
+  const register = async (e: string, p: string, n: string, r: UserRole) => { 
+      try { 
+          const res = await createUserWithEmailAndPassword(auth, e, p); 
+          if(res.user) { 
+              await updateProfile(res.user, { displayName: n }); 
+              await setDoc(doc(db, 'users', res.user.uid), { id: res.user.uid, name: n, email: e, role: r, avatar: `https://ui-avatars.com/api/?name=${n}&background=random`, status: 'PENDING' }); 
+          } 
+          return { success: true }; 
+      } catch (err: any) { return { success: false, message: err.message }; } 
+  };
+  
   const logout = async () => await signOut(auth);
+  
   const sendPasswordReset = async (e: string) => { try { await sendPasswordResetEmail(auth, e); return { success: true }; } catch (err: any) { return { success: false, message: err.message }; } };
+  
   const updateMyPassword = async (p: string) => { try { if(auth.currentUser) { await updatePassword(auth.currentUser, p); return { success: true }; } return { success: false }; } catch (err: any) { return { success: false, message: err.message }; } };
+  
   const updateSettings = async (d: any) => await setDoc(doc(db, 'settings', 'general'), { ...settings, ...d }, { merge: true });
+  
   const switchUser = (id: string) => { const u = users.find(x => x.id === id); if(u) setCurrentUser(u); };
+  
   const addUser = async (d: any) => await addDoc(collection(db, 'users'), { ...d, status: 'APPROVED', avatar: `https://ui-avatars.com/api/?name=${d.name}&background=random` });
+  
   const updateUser = async (id: string, d: any) => await updateDoc(doc(db, 'users', id), d);
+  
   const deleteUser = async (id: string) => await deleteDoc(doc(db, 'users', id));
   
   const addBooking = async (d: any, f1: number, f2: number) => {
       try {
           const res = await addDoc(collection(db, 'bookings'), { ...d, status: 'CONFIRMED' });
-          if (d.value > 0 && d.paymentStatus !== 'PENDING') await addDoc(collection(db, 'transactions'), { type: 'INCOME', status: d.paymentStatus === 'PAID' ? 'COMPLETED' : 'PENDING', category: 'Locação', amount: d.value, date: d.paymentDate || new Date().toISOString(), description: `Locação: ${d.clientName}`, relatedBookingId: res.id });
+          if (d.value > 0 && d.paymentStatus !== 'PENDING') {
+              await addDoc(collection(db, 'transactions'), { type: 'INCOME', status: d.paymentStatus === 'PAID' ? 'COMPLETED' : 'PENDING', category: 'Locação', amount: d.value, date: d.paymentDate || new Date().toISOString(), description: `Locação: ${d.clientName}`, relatedBookingId: res.id });
+          }
           if (f1 > 0) await addDoc(collection(db, 'driverFees'), { driverId: d.driverId, freelanceDriverName: d.freelanceDriverName, amount: f1, date: d.startTime.split('T')[0], description: `Diária: ${d.destination}`, relatedBookingId: res.id, status: 'PENDING' });
           if (f2 > 0) await addDoc(collection(db, 'driverFees'), { driverId: d.driver2Id, freelanceDriverName: d.freelanceDriver2Name, amount: f2, date: d.startTime.split('T')[0], description: `Diária 2: ${d.destination}`, relatedBookingId: res.id, status: 'PENDING' });
           return { success: true, message: 'Sucesso!' };
       } catch (err: any) { return { success: false, message: err.message }; }
   };
+  
   const updateBooking = async (id: string, d: any) => { try { await updateDoc(doc(db, 'bookings', id), d); return { success: true, message: 'Atualizado!' }; } catch (err: any) { return { success: false, message: err.message }; } };
+  
   const updateBookingStatus = async (id: string, s: any) => await updateDoc(doc(db, 'bookings', id), { status: s });
+  
   const addPart = async (d: any) => await addDoc(collection(db, 'parts'), d);
-  const updateStock = async (id: string, delta: number) => { const p = parts.find(x => x.id === id); if(p) await updateDoc(doc(db, 'parts', id), { quantity: Math.max(0, p.quantity + delta) }); };
-  const restockPart = async (id: string, q: number, c: number, s: string, n: string) => { const p = parts.find(x => x.id === id); if(p) { await updateDoc(doc(db, 'parts', id), { quantity: p.quantity + q, price: c, lastSupplier: s, lastNfe: n }); await addDoc(collection(db, 'transactions'), { type: 'EXPENSE', status: 'COMPLETED', category: 'Compra Peças', amount: q * c, date: new Date().toISOString().split('T')[0], description: `Compra: ${p.name}`, nfe: n }); } };
+  
+  const updateStock = async (id: string, delta: number) => { 
+      const p = parts.find(x => x.id === id); 
+      if(p) await updateDoc(doc(db, 'parts', id), { quantity: Math.max(0, p.quantity + delta) }); 
+  };
+  
+  const restockPart = async (id: string, q: number, c: number, s: string, n: string) => { 
+      const p = parts.find(x => x.id === id); 
+      if(p) { 
+          await updateDoc(doc(db, 'parts', id), { quantity: p.quantity + q, price: c, lastSupplier: s, lastNfe: n }); 
+          await addDoc(collection(db, 'transactions'), { type: 'EXPENSE', status: 'COMPLETED', category: 'Compra Peças', amount: q * c, date: new Date().toISOString().split('T')[0], description: `Compra: ${p.name}`, nfe: n }); 
+      } 
+  };
+  
   const addTransaction = async (d: any) => await addDoc(collection(db, 'transactions'), d);
+  
   const addTimeOff = async (d: any) => await addDoc(collection(db, 'timeOffs'), { ...d, status: (currentUser?.role === UserRole.MANAGER || currentUser?.role === UserRole.DEVELOPER) ? 'APPROVED' : 'PENDING' });
+  
   const updateTimeOffStatus = async (id: string, s: any) => await updateDoc(doc(db, 'timeOffs', id), { status: s });
+  
   const deleteTimeOff = async (id: string) => await deleteDoc(doc(db, 'timeOffs', id));
+  
   const addDocument = async (d: any) => await addDoc(collection(db, 'documents'), { ...d, uploadDate: new Date().toISOString() });
+  
   const deleteDocument = async (id: string) => await deleteDoc(doc(db, 'documents', id));
-  const addMaintenanceRecord = async (d: any) => { await addDoc(collection(db, 'maintenanceRecords'), d); await updateStock(d.partId, -d.quantityUsed); };
+  
+  const addMaintenanceRecord = async (d: any) => { 
+      await addDoc(collection(db, 'maintenanceRecords'), d); 
+      await updateStock(d.partId, -d.quantityUsed); 
+  };
+  
   const addPurchaseRequest = async (d: any) => await addDoc(collection(db, 'purchaseRequests'), { ...d, status: 'PENDING', requestDate: new Date().toISOString() });
+  
   const updatePurchaseRequestStatus = async (id: string, s: any) => await updateDoc(doc(db, 'purchaseRequests', id), { status: s });
+  
   const addMaintenanceReport = async (d: any) => await addDoc(collection(db, 'maintenanceReports'), { ...d, status: 'PENDING' });
+  
   const updateMaintenanceReportStatus = async (id: string, s: any) => await updateDoc(doc(db, 'maintenanceReports', id), { status: s });
+  
   const addBus = async (d: any) => await addDoc(collection(db, 'buses'), { ...d, status: 'AVAILABLE' });
+  
   const updateBusStatus = async (id: string, s: any) => await updateDoc(doc(db, 'buses', id), { status: s });
+  
   const deleteBus = async (id: string) => await deleteDoc(doc(db, 'buses', id));
+  
   const addCharterContract = async (d: any) => await addDoc(collection(db, 'charterContracts'), { ...d, status: 'ACTIVE' });
+  
   const updateCharterContract = async (id: string, d: any) => await updateDoc(doc(db, 'charterContracts', id), d);
+  
   const deleteCharterContract = async (id: string) => await deleteDoc(doc(db, 'charterContracts', id));
+  
   const addTravelPackage = async (d: any) => await addDoc(collection(db, 'travelPackages'), { ...d, status: 'OPEN' });
+  
   const registerPackageSale = async (c: any, s: any) => {
-      let cid = ''; const found = clients.find(x => x.cpf === c.cpf);
+      let cid = ''; 
+      const found = clients.find(x => x.cpf === c.cpf);
       if (found) { cid = found.id; await updateDoc(doc(db, 'clients', cid), c); }
       else { const ref = await addDoc(collection(db, 'clients'), { ...c, type: 'PF' }); cid = ref.id; }
       await addDoc(collection(db, 'packagePassengers'), { ...s, clientId: cid, titularName: c.name, titularCpf: c.cpf, paidAmount: 0, status: 'PENDING', sellerId: auth.currentUser?.uid || currentUser?.id || null });
   };
+  
   const updatePackagePassenger = async (id: string, d: any) => await updateDoc(doc(db, 'packagePassengers', id), d);
+  
   const deletePackagePassenger = async (id: string) => await deleteDoc(doc(db, 'packagePassengers', id));
+  
   const addPackagePayment = async (d: any) => {
       await addDoc(collection(db, 'packagePayments'), d);
       const pax = packagePassengers.find(x => x.id === d.passengerId);
-      if(pax) { const total = pax.paidAmount + d.amount; await updateDoc(doc(db, 'packagePassengers', pax.id), { paidAmount: total, status: total >= pax.agreedPrice ? 'PAID' : 'PARTIAL' }); await addDoc(collection(db, 'transactions'), { type: 'INCOME', status: 'COMPLETED', category: 'Pacotes', amount: d.amount, date: d.date, description: `Pagto: ${pax.titularName}` }); }
+      if(pax) { 
+          const total = pax.paidAmount + d.amount; 
+          await updateDoc(doc(db, 'packagePassengers', pax.id), { paidAmount: total, status: total >= pax.agreedPrice ? 'PAID' : 'PARTIAL' }); 
+          await addDoc(collection(db, 'transactions'), { type: 'INCOME', status: 'COMPLETED', category: 'Pacotes', amount: d.amount, date: d.date, description: `Pagto: ${pax.titularName}` }); 
+      }
   };
+
+  const addPackagePayment_only = async (d: any) => {
+      await addDoc(collection(db, 'packagePayments'), d);
+  };
+  
   const addPackageLead = async (d: any) => await addDoc(collection(db, 'packageLeads'), { ...d, status: 'PENDING', createdAt: new Date().toISOString() });
+  
   const updatePackageLead = async (id: string, d: any) => await updateDoc(doc(db, 'packageLeads', id), d);
+  
   const deletePackageLead = async (id: string) => await deleteDoc(doc(db, 'packageLeads', id));
   
   const addFuelRecord = async (d: any) => { 
@@ -245,11 +347,13 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
               category: 'Combustível Externo', 
               amount: d.cost, 
               date: d.date, 
-              description: `Abast. Externo: ${d.busId} (Placa)` 
+              description: `Abast. Externo: ${d.busId}` 
           }); 
       }
   };
+  
   const updateFuelRecord = async (id: string, d: any) => await updateDoc(doc(db, 'fuelRecords', id), d);
+  
   const deleteFuelRecord = async (id: string) => await deleteDoc(doc(db, 'fuelRecords', id));
   
   const addFuelSupply = async (d: any) => { 
@@ -267,25 +371,79 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       }
   };
 
-  const addDriverLiability = async (d: any, e: boolean) => { await addDoc(collection(db, 'driverLiabilities'), { ...d, paidAmount: 0, status: 'OPEN' }); if(e) await addDoc(collection(db, 'transactions'), { type: 'EXPENSE', status: 'COMPLETED', category: 'Avaria/Multa', amount: d.totalAmount, date: d.date, description: `Multa/Avaria: ${d.description}` }); };
-  const payDriverLiability = async (id: string, a: number) => { const l = driverLiabilities.find(x => x.id === id); if(l) { const total = l.paidAmount + a; await updateDoc(doc(db, 'driverLiabilities', id), { paidAmount: total, status: total >= l.totalAmount ? 'PAID' : 'OPEN' }); await addDoc(collection(db, 'transactions'), { type: 'INCOME', status: 'COMPLETED', category: 'Reembolso', amount: a, date: new Date().toISOString().split('T')[0], description: `Abatimento Mot: ${l.type}` }); } };
+  const addDriverLiability = async (d: any, e: boolean) => { 
+      await addDoc(collection(db, 'driverLiabilities'), { ...d, paidAmount: 0, status: 'OPEN' }); 
+      if(e) await addDoc(collection(db, 'transactions'), { type: 'EXPENSE', status: 'COMPLETED', category: 'Avaria/Multa', amount: d.totalAmount, date: d.date, description: `Multa/Avaria: ${d.description}` }); 
+  };
+  
+  const payDriverLiability = async (id: string, a: number) => { 
+      const l = driverLiabilities.find(x => x.id === id); 
+      if(l) { 
+          const total = l.paidAmount + a; 
+          await updateDoc(doc(db, 'driverLiabilities', id), { paidAmount: total, status: total >= l.totalAmount ? 'PAID' : 'OPEN' }); 
+          await addDoc(collection(db, 'transactions'), { type: 'INCOME', status: 'COMPLETED', category: 'Reembolso', amount: a, date: new Date().toISOString().split('T')[0], description: `Abatimento Mot: ${l.type}` }); 
+      } 
+  };
+  
   const addDriverFee = async (d: any) => await addDoc(collection(db, 'driverFees'), { ...d, status: 'PENDING' });
-  const payDriverFee = async (id: string) => { const f = driverFees.find(x => x.id === id); if(f) { const dt = new Date().toISOString().split('T')[0]; await updateDoc(doc(db, 'driverFees', id), { status: 'PAID', paymentDate: dt }); await addDoc(collection(db, 'transactions'), { type: 'EXPENSE', status: 'COMPLETED', category: 'Diária', amount: f.amount, date: dt, description: `Pagto Diária: ${f.description}` }); } };
+  
+  const payDriverFee = async (id: string) => { 
+      const f = driverFees.find(x => x.id === id); 
+      if(f) { 
+          const dt = new Date().toISOString().split('T')[0]; 
+          await updateDoc(doc(db, 'driverFees', id), { status: 'PAID', paymentDate: dt }); 
+          await addDoc(collection(db, 'transactions'), { type: 'EXPENSE', status: 'COMPLETED', category: 'Diária', amount: f.amount, date: dt, description: `Pagto Diária: ${f.description}` }); 
+      } 
+  };
+  
   const deleteDriverFee = async (id: string) => await deleteDoc(doc(db, 'driverFees', id));
+  
   const addQuote = async (d: any) => await addDoc(collection(db, 'quotes'), { ...d, status: 'NEW', createdAt: new Date().toISOString() });
+  
   const updateQuote = async (id: string, d: any) => await updateDoc(doc(db, 'quotes', id), d);
-  const convertQuoteToBooking = async (qid: string, bid: string) => { const q = quotes.find(x => x.id === qid); if(!q) return { success: false, message: 'Erro' }; const res = await addDoc(collection(db, 'bookings'), { busId: bid, clientName: q.clientName, clientPhone: q.clientPhone, destination: q.destination, startTime: q.startTime, endTime: q.endTime, value: q.price || 0, status: 'CONFIRMED', paymentStatus: 'PENDING' }); await updateDoc(doc(db, 'quotes', qid), { status: 'APPROVED', convertedBookingId: res.id }); return { success: true, message: 'Convertido!' }; };
+  
+  const convertQuoteToBooking = async (qid: string, bid: string) => { 
+      const q = quotes.find(x => x.id === qid); 
+      if(!q) return { success: false, message: 'Erro' }; 
+      const res = await addDoc(collection(db, 'bookings'), { busId: bid, clientName: q.clientName, clientPhone: q.clientPhone, destination: q.destination, startTime: q.startTime, endTime: q.endTime, value: q.price || 0, status: 'CONFIRMED', paymentStatus: 'PENDING' }); 
+      await updateDoc(doc(db, 'quotes', qid), { status: 'APPROVED', convertedBookingId: res.id }); 
+      return { success: true, message: 'Convertido!' }; 
+  };
+  
   const deleteQuote = async (id: string) => await deleteDoc(doc(db, 'quotes', id));
+  
   const addPriceRoute = async (d: any) => await addDoc(collection(db, 'priceRoutes'), d);
+  
   const updatePriceRoute = async (id: string, d: any) => await updateDoc(doc(db, 'priceRoutes', id), d);
+  
   const deletePriceRoute = async (id: string) => await deleteDoc(doc(db, 'priceRoutes', id));
-  const clearPriceTable = async () => { const s = await getDocs(collection(db, 'priceRoutes')); const b = writeBatch(db); s.docs.forEach(x => b.delete(x.ref)); await b.commit(); return { success: true, message: 'Limpo!' }; };
+  
+  const clearPriceTable = async () => { 
+      const s = await getDocs(collection(db, 'priceRoutes')); 
+      const b = writeBatch(db); 
+      s.docs.forEach(x => b.delete(x.ref)); 
+      await b.commit(); 
+      return { success: true, message: 'Limpo!' }; 
+  };
+  
   const addClient = async (d: any) => await addDoc(collection(db, 'clients'), d);
+  
   const updateClient = async (id: string, d: any) => await updateDoc(doc(db, 'clients', id), d);
+  
   const deleteClient = async (id: string) => await deleteDoc(doc(db, 'clients', id));
-  const importClients = async (l: any[]) => { try { const b = writeBatch(db); l.forEach(x => b.set(doc(collection(db, 'clients')), x)); await b.commit(); return { success: true, count: l.length, message: 'Importado!' }; } catch (err: any) { return { success: false, count: 0, message: err.message }; } };
+  
+  const importClients = async (l: any[]) => { 
+      try { 
+          const b = writeBatch(db); 
+          l.forEach(x => b.set(doc(collection(db, 'clients')), x)); 
+          await b.commit(); 
+          return { success: true, count: l.length, message: 'Importado!' }; 
+      } catch (err: any) { return { success: false, count: 0, message: err.message }; } 
+  };
+  
   const resetSystemData = async () => ({ success: true, message: 'Resetado!' });
   const seedDatabase = async () => {};
+  
   const confirmTrip = async (type: any, ref: string, date: string) => await addDoc(collection(db, 'scheduleConfirmations'), { driverId: currentUser?.id, type, referenceId: ref, date, status: 'CONFIRMED', confirmedAt: new Date().toISOString() });
 
   return (
@@ -293,7 +451,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       currentUser: currentUser!, isAuthenticated, settings, users, buses, bookings, parts, transactions, timeOffs, documents, maintenanceRecords, purchaseRequests, maintenanceReports, charterContracts, travelPackages, packagePassengers, packagePayments, clients, packageLeads, fuelRecords, fuelSupplies, dieselStockLevel, arlaStockLevel, driverLiabilities, quotes, priceRoutes, driverFees, scheduleConfirmations,
       switchUser, addUser, updateUser, deleteUser, addBooking, updateBooking, updateBookingStatus, addPart, updateStock, addTransaction, addTimeOff, updateTimeOffStatus, deleteTimeOff, addDocument, deleteDocument, addMaintenanceRecord, addPurchaseRequest, updatePurchaseRequestStatus, addMaintenanceReport, updateMaintenanceReportStatus, addBus, updateBusStatus, deleteBus, 
       addCharterContract, updateCharterContract, deleteCharterContract,
-      addTravelPackage, registerPackageSale, updatePackagePassenger, deletePackagePassenger, addPackagePayment, addPackageLead, updatePackageLead, deletePackageLead, addFuelRecord, updateFuelRecord, deleteFuelRecord, addFuelSupply, addDriverLiability, payDriverLiability,
+      addTravelPackage, registerPackageSale, updatePackagePassenger, deletePackagePassenger, addPackagePayment, addPackagePayment_only, addPackageLead, updatePackageLead, deletePackageLead, addFuelRecord, updateFuelRecord, deleteFuelRecord, addFuelSupply, addDriverLiability, payDriverLiability,
       login, logout, register, sendPasswordReset, updateMyPassword, updateSettings, seedDatabase, 
       addQuote, updateQuote, convertQuoteToBooking, deleteQuote,
       addPriceRoute, updatePriceRoute, deletePriceRoute, importDefaultPrices: async () => ({ success: true, message: '' }), clearPriceTable,

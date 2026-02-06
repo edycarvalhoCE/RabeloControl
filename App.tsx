@@ -28,7 +28,7 @@ const MainContent = () => {
   // Default view logic per role
   const getDefaultView = () => {
     if (!currentUser) return 'dashboard';
-    if (currentUser.role === UserRole.DRIVER || currentUser.role === UserRole.GARAGE_AUX) return 'driver-portal';
+    if (currentUser.role === UserRole.DRIVER || currentUser.role === UserRole.GARAGE_AUX) return 'driver-schedule';
     if (currentUser.role === UserRole.MECHANIC) return 'maintenance';
     if (currentUser.role === UserRole.AGENT) return 'dashboard';
     return 'dashboard';
@@ -71,16 +71,11 @@ const MainContent = () => {
                   <p className="text-slate-600 mb-6">
                       Seu cadastro foi realizado com sucesso, mas o acesso ao sistema precisa ser aprovado por um <strong>Gerente</strong> ou <strong>Administrador</strong>.
                   </p>
-                  <div className="bg-slate-50 p-4 rounded-lg text-sm text-slate-500 mb-6">
-                      <p>Nome: {currentUser.name}</p>
-                      <p>Email: {currentUser.email}</p>
-                      <p>Função Solicitada: {currentUser.role}</p>
-                  </div>
                   <button 
                     onClick={logout}
                     className="bg-slate-800 text-white px-6 py-2 rounded-lg font-bold hover:bg-slate-700 transition-colors w-full"
                   >
-                      Sair e Tentar Mais Tarde
+                      Sair
                   </button>
               </div>
           </div>
@@ -98,15 +93,27 @@ const MainContent = () => {
       case 'clients': return <ClientsView />;
       case 'vehicles': return <VehiclesView />;
       case 'charter': return <CharterView />;
-      case 'inventory': return <InventoryView />;
+      case 'inventory': 
+      case 'fuel': return <InventoryView />;
       case 'documents': return <DocumentsView />;
       case 'finance': return <FinanceView />;
-      case 'driver-portal': return <DriverPortal />;
+      
+      // Portal do Colaborador Individualizado
+      case 'driver-schedule': return <DriverPortal view="schedule" />;
+      case 'driver-finance': return <DriverPortal view="finance" />;
+      case 'driver-report': return <DriverPortal view="report" />;
+
       case 'maintenance': return <MaintenanceView />;
       case 'users': return <UsersView />;
       case 'settings': return <SettingsView />;
       default: return <Dashboard />;
     }
+  };
+
+  const getContextTitle = () => {
+      if (currentUser.role === UserRole.DRIVER) return 'Operacional';
+      if (currentUser.role === UserRole.MECHANIC) return 'Manutenção';
+      return 'Rabelo Tour';
   };
 
   return (
@@ -119,14 +126,15 @@ const MainContent = () => {
       />
       
       <div className="flex-1 flex flex-col h-full overflow-hidden">
-        {/* Mobile Header */}
-        <div className="md:hidden bg-slate-900 text-white p-4 flex justify-between items-center shadow-md shrink-0">
-            <div className="font-extrabold text-xl">
-                Rabelo<span className="text-blue-500">Tour</span>
+        {/* Mobile Header (UNIFICADO) */}
+        <div className="md:hidden bg-slate-900 text-white p-4 flex justify-between items-center shadow-lg shrink-0 z-50">
+            <div className="flex items-center gap-3">
+                <button onClick={() => setIsMobileOpen(true)} className="p-1 -ml-1">
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16m-7 6h7" /></svg>
+                </button>
+                <div className="font-bold text-sm uppercase tracking-wider">{getContextTitle()}</div>
             </div>
-            <button onClick={() => setIsMobileOpen(true)} className="p-2">
-                <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16m-7 6h7" /></svg>
-            </button>
+            <img src={currentUser.avatar} className="w-8 h-8 rounded-full border border-white/20" alt="" />
         </div>
 
         <main className="flex-1 overflow-y-auto p-4 md:p-8">
