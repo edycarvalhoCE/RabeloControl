@@ -10,12 +10,21 @@ const DriverPortal: React.FC = () => {
   
   const isAux = currentUser.role === UserRole.GARAGE_AUX;
 
-  const [activeTab, setActiveTab] = useState<'schedule' | 'documents' | 'requests' | 'report' | 'fuel' | 'finance'>('schedule');
+  const [activeTab, setActiveTab] = useState<'schedule' | 'finance' | 'report'>('schedule');
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   // Finance Filters
   const [financeStartDate, setFinanceStartDate] = useState('');
   const [financeEndDate, setFinanceEndDate] = useState('');
+
+  // Maintenance Report Form State
+  const [reportForm, setReportForm] = useState({
+    busId: '',
+    type: 'MECANICA',
+    description: ''
+  });
+  const [reportLoading, setReportLoading] = useState(false);
 
   const getTodayLocal = () => {
     const d = new Date();
@@ -89,9 +98,86 @@ const DriverPortal: React.FC = () => {
   const totalFeesPending = myFees.filter(f => f.status === 'PENDING').reduce((acc, f) => acc + f.amount, 0);
   const totalLiabilitiesPending = myLiabilities.reduce((acc, l) => acc + (l.totalAmount - l.paidAmount), 0);
 
+  const handleReportSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!reportForm.busId || !reportForm.description) {
+      alert("Por favor, selecione o ônibus e descreva o defeito.");
+      return;
+    }
+    setReportLoading(true);
+    try {
+      await addMaintenanceReport({
+        busId: reportForm.busId,
+        driverId: currentUser.id,
+        type: reportForm.type,
+        description: reportForm.description,
+        date: new Date().toISOString()
+      });
+      alert("Defeito reportado com sucesso! A manutenção será notificada.");
+      setReportForm({ busId: '', type: 'MECANICA', description: '' });
+      setActiveTab('schedule');
+    } catch (err) {
+      alert("Erro ao enviar reporte. Tente novamente.");
+    } finally {
+      setReportLoading(false);
+    }
+  };
+
+  const navItems = [
+    { id: 'schedule', label: 'MINHA ESCALA', icon: '📅', color: 'blue' },
+    { id: 'finance', label: 'FINANCEIRO', icon: '💰', color: 'emerald' },
+    { id: 'report', label: 'REPORTAR DEFEITO', icon: '⚠️', color: 'red' },
+  ];
+
+  const handleTabChange = (id: any) => {
+    setActiveTab(id);
+    setIsMobileMenuOpen(false);
+  };
+
   return (
-    <div className="space-y-6 animate-fade-in max-w-6xl mx-auto">
-      <div className="flex justify-between items-center bg-gradient-to-r from-blue-700 to-slate-800 rounded-2xl p-8 text-white shadow-xl relative overflow-hidden">
+    <div className="min-h-screen bg-slate-50 -m-4 md:m-0 pb-20">
+      {/* MOBILE HEADER CON MENU */}
+      <div className="md:hidden bg-slate-900 text-white p-4 flex justify-between items-center sticky top-0 z-50 shadow-md">
+        <div className="flex items-center gap-2">
+          <button onClick={() => setIsMobileMenuOpen(true)} className="p-2 -ml-2">
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16m-7 6h7" /></svg>
+          </button>
+          <span className="font-bold text-sm tracking-tight uppercase">Portal do Colaborador</span>
+        </div>
+        <img src={currentUser.avatar} className="w-8 h-8 rounded-full border border-white/20" alt="" />
+      </div>
+
+      {/* MOBILE DRAWER MENU */}
+      {isMobileMenuOpen && (
+        <div className="fixed inset-0 z-[60] md:hidden">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setIsMobileMenuOpen(false)}></div>
+          <div className="absolute inset-y-0 left-0 w-72 bg-slate-900 shadow-2xl p-6 animate-fade-in-right">
+            <div className="flex justify-between items-center mb-8">
+              <Logo variant="light" size="sm" />
+              <button onClick={() => setIsMobileMenuOpen(false)} className="text-slate-400">&times;</button>
+            </div>
+            <div className="space-y-2">
+              {navItems.map(item => (
+                <button
+                  key={item.id}
+                  onClick={() => handleTabChange(item.id as any)}
+                  className={`w-full flex items-center gap-4 p-4 rounded-xl font-bold text-sm transition-all ${
+                    activeTab === item.id 
+                    ? `bg-${item.color}-600 text-white shadow-lg` 
+                    : 'text-slate-400 hover:bg-slate-800'
+                  }`}
+                >
+                  <span className="text-xl">{item.icon}</span>
+                  {item.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* DESKTOP HEADER */}
+      <div className="hidden md:flex justify-between items-center bg-gradient-to-r from-blue-700 to-slate-800 rounded-2xl p-8 text-white shadow-xl relative overflow-hidden mb-6">
         <div className="z-10">
           <h1 className="text-3xl font-bold mb-2">Portal {isAux ? 'da Garagem' : 'do Motorista'}</h1>
           <div className="flex items-center gap-3">
@@ -99,31 +185,47 @@ const DriverPortal: React.FC = () => {
               <p className="opacity-80 font-medium">Olá, {currentUser.name}.</p>
           </div>
         </div>
-        <div className="hidden md:block z-10 opacity-20">
+        <div className="hidden lg:block z-10 opacity-20">
              <Logo variant="light" size="xl" />
         </div>
       </div>
 
-      <div className="flex border-b border-slate-300 space-x-4 overflow-x-auto bg-white px-4 rounded-t-xl">
-        <button onClick={() => setActiveTab('schedule')} className={`py-4 px-2 font-bold text-sm transition-all ${activeTab === 'schedule' ? 'border-b-4 border-blue-600 text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}>📅 MINHA ESCALA</button>
-        <button onClick={() => setActiveTab('finance')} className={`py-4 px-2 font-bold text-sm transition-all ${activeTab === 'finance' ? 'border-b-4 border-emerald-600 text-emerald-600' : 'text-slate-500 hover:text-slate-700'}`}>💰 FINANCEIRO</button>
-        <button onClick={() => setActiveTab('report')} className={`py-4 px-2 font-bold text-sm transition-all ${activeTab === 'report' ? 'border-b-4 border-red-600 text-red-600' : 'text-slate-500 hover:text-slate-700'}`}>⚠️ REPORTAR DEFEITO</button>
+      {/* DESKTOP TABS */}
+      <div className="hidden md:flex border-b border-slate-300 space-x-4 overflow-x-auto bg-white px-4 rounded-t-xl mb-6">
+        {navItems.map(item => (
+          <button 
+            key={item.id}
+            onClick={() => setActiveTab(item.id as any)} 
+            className={`py-4 px-2 font-bold text-sm transition-all border-b-4 ${
+              activeTab === item.id 
+              ? `border-${item.color}-600 text-${item.color}-600` 
+              : 'border-transparent text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            {item.icon} {item.label}
+          </button>
+        ))}
       </div>
 
-      <div className="mt-2">
+      {/* MAIN CONTENT AREA */}
+      <div className="p-4 md:p-0">
         {activeTab === 'schedule' && (
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-fade-in">
                 <div className="lg:col-span-2">
-                     <CalendarView onEventClick={(b) => setSelectedBooking(b)} />
+                     <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                        <CalendarView onEventClick={(b) => setSelectedBooking(b)} />
+                     </div>
                 </div>
                 <div className="space-y-4">
-                    <h2 className="text-lg font-bold text-slate-800">Próximas Viagens</h2>
+                    <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2 px-1">
+                      <span>🚌</span> Minhas Próximas Viagens
+                    </h2>
                     <div className="space-y-3">
                         {combinedSchedule.length === 0 ? (
                             <p className="text-sm text-slate-500 italic bg-white p-6 rounded-xl border border-dashed text-center">Nenhuma viagem agendada para os próximos 15 dias.</p>
                         ) : (
                             combinedSchedule.slice(0, 10).map((booking: any) => (
-                                <div key={booking.id} onClick={() => setSelectedBooking(booking)} className="p-4 rounded-xl border-l-4 border-l-blue-500 bg-white shadow-sm cursor-pointer hover:bg-slate-50 transition-colors group">
+                                <div key={booking.id} onClick={() => setSelectedBooking(booking)} className="p-4 rounded-xl border-l-4 border-l-blue-500 bg-white shadow-sm cursor-pointer hover:bg-slate-50 transition-colors group border border-slate-200">
                                     <div className="flex justify-between items-start">
                                         <h3 className="font-bold text-slate-800 group-hover:text-blue-700 transition-colors">{booking.destination}</h3>
                                         {booking.driver2Id === currentUser.id && <span className="text-[9px] bg-purple-100 text-purple-700 px-2 py-0.5 rounded font-bold border border-purple-200">2º MOTORISTA</span>}
@@ -248,6 +350,83 @@ const DriverPortal: React.FC = () => {
                         </div>
                     </div>
                 </div>
+            </div>
+        )}
+
+        {activeTab === 'report' && (
+            <div className="max-w-2xl mx-auto animate-fade-in">
+              <div className="bg-white rounded-2xl shadow-lg border border-slate-200 overflow-hidden">
+                <div className="bg-red-600 p-6 text-white">
+                  <h3 className="text-xl font-bold flex items-center gap-2">
+                    <span>🛠️</span> Reportar Defeito no Veículo
+                  </h3>
+                  <p className="text-red-100 text-sm mt-1">Sua mensagem será enviada diretamente para a equipe de manutenção.</p>
+                </div>
+                <form onSubmit={handleReportSubmit} className="p-6 space-y-5">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Veículo com Defeito *</label>
+                    <select 
+                      required 
+                      value={reportForm.busId} 
+                      onChange={e => setReportForm({...reportForm, busId: e.target.value})}
+                      className="w-full border border-slate-300 p-3 rounded-lg bg-slate-50 focus:bg-white focus:ring-2 focus:ring-red-500 outline-none transition-all"
+                    >
+                      <option value="">Selecione o ônibus...</option>
+                      {buses.map(b => (
+                        <option key={b.id} value={b.id}>{b.plate} - {b.model}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Tipo de Problema</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {['MECANICA', 'ELETRICA', 'LIMPEZA', 'PNEUS', 'OUTROS'].map(type => (
+                        <button
+                          key={type}
+                          type="button"
+                          onClick={() => setReportForm({...reportForm, type})}
+                          className={`py-2 px-3 rounded-lg text-xs font-bold border transition-all ${
+                            reportForm.type === type 
+                            ? 'bg-red-50 border-red-500 text-red-700' 
+                            : 'bg-white border-slate-200 text-slate-500'
+                          }`}
+                        >
+                          {type}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Descrição do Defeito *</label>
+                    <textarea
+                      required
+                      value={reportForm.description}
+                      onChange={e => setReportForm({...reportForm, description: e.target.value})}
+                      placeholder="Descreva detalhadamente o que está acontecendo..."
+                      className="w-full border border-slate-300 p-3 rounded-lg bg-slate-50 focus:bg-white focus:ring-2 focus:ring-red-500 outline-none transition-all h-40"
+                    ></textarea>
+                  </div>
+
+                  <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200 flex gap-3">
+                    <span className="text-yellow-600 text-xl">💡</span>
+                    <p className="text-xs text-yellow-800 leading-relaxed">
+                      <strong>Dica:</strong> Seja específico. Informe se o problema ocorre em movimento, parado, ou em situações específicas (ex: chuva, subida).
+                    </p>
+                  </div>
+
+                  <button 
+                    type="submit" 
+                    disabled={reportLoading}
+                    className="w-full bg-red-600 text-white font-bold py-4 rounded-xl hover:bg-red-700 transition-all shadow-lg hover:shadow-red-200 disabled:opacity-50 flex justify-center items-center gap-2"
+                  >
+                    {reportLoading ? (
+                      <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                    ) : 'Enviar Reporte para Manutenção'}
+                  </button>
+                </form>
+              </div>
             </div>
         )}
 
