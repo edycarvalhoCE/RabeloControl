@@ -9,10 +9,11 @@ interface DriverPortalProps {
 }
 
 const DriverPortal: React.FC<DriverPortalProps> = ({ view = 'schedule' }) => {
-  const { currentUser, bookings, buses, addMaintenanceReport, driverLiabilities, charterContracts, driverFees } = useStore();
+  const { currentUser, bookings, buses, addMaintenanceReport, driverLiabilities, charterContracts, driverFees, scheduleConfirmations, confirmTrip, users } = useStore();
   
   const isAux = currentUser.role === UserRole.GARAGE_AUX;
-  const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
+  const [selectedBooking, setSelectedBooking] = useState<any>(null);
+  const [confirming, setConfirming] = useState<string | null>(null);
 
   // Finance Filters
   const [financeStartDate, setFinanceStartDate] = useState('');
@@ -65,7 +66,8 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ view = 'schedule' }) => {
                       isCharter: true,
                       observations: `Rota: ${c.route}`,
                       sortTime: new Date(`${dStr}T${c.morningDeparture}`).getTime(),
-                      originalContractId: c.id
+                      originalContractId: c.id,
+                      occurenceDate: dStr
                   });
               }
           });
@@ -73,6 +75,27 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ view = 'schedule' }) => {
   }
 
   const combinedSchedule = [...myRegularBookings, ...myCharterOccurrences].sort((a, b) => a.sortTime - b.sortTime);
+
+  const handleConfirmAction = async (e: React.MouseEvent, type: 'BOOKING' | 'CHARTER', refId: string, date?: string) => {
+      e.stopPropagation();
+      setConfirming(refId);
+      try {
+          await confirmTrip(type, refId, date || new Date().toISOString().split('T')[0]);
+      } catch (err) {
+          alert("Erro ao confirmar.");
+      } finally {
+          setConfirming(null);
+      }
+  };
+
+  const isConfirmed = (type: 'BOOKING' | 'CHARTER', refId: string, date?: string) => {
+      return scheduleConfirmations.some(c => 
+          c.type === type && 
+          c.referenceId === refId && 
+          c.driverId === currentUser.id &&
+          (!date || c.date === date)
+      );
+  };
 
   const myFees = driverFees.filter(f => {
       const matchDriver = f.driverId === currentUser.id;
@@ -137,22 +160,37 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ view = 'schedule' }) => {
                       {combinedSchedule.length === 0 ? (
                           <p className="text-sm text-slate-500 italic bg-white p-6 rounded-xl border border-dashed text-center">Nenhuma viagem agendada para os próximos 15 dias.</p>
                       ) : (
-                          combinedSchedule.slice(0, 10).map((booking: any) => (
-                              <div key={booking.id} onClick={() => setSelectedBooking(booking)} className="p-4 rounded-xl border-l-4 border-l-blue-600 bg-white shadow-sm cursor-pointer hover:bg-slate-50 transition-colors border border-slate-200">
-                                  <div className="flex justify-between items-start">
-                                      <h3 className="font-bold text-slate-800 text-sm uppercase">{booking.destination}</h3>
-                                      {booking.driver2Id === currentUser.id && <span className="text-[8px] bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded font-black">2º MOTORISTA</span>}
-                                  </div>
-                                  <p className="text-xs text-slate-500 mt-1 font-bold">📅 {new Date(booking.startTime).toLocaleDateString()} às {new Date(booking.startTime).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</p>
-                              </div>
-                          ))
+                          combinedSchedule.slice(0, 10).map((booking: any) => {
+                              const confirmed = isConfirmed(booking.isCharter ? 'CHARTER' : 'BOOKING', booking.isCharter ? (booking.originalContractId || booking.id.split('_')[0]) : booking.id, booking.occurenceDate);
+                              return (
+                                <div key={booking.id} onClick={() => setSelectedBooking(booking)} className={`p-4 rounded-xl border-l-4 ${confirmed ? 'border-l-emerald-500 bg-emerald-50/30' : 'border-l-blue-600 bg-white'} shadow-sm cursor-pointer hover:bg-slate-50 transition-colors border border-slate-200`}>
+                                    <div className="flex justify-between items-start">
+                                        <div>
+                                            <h3 className="font-bold text-slate-800 text-sm uppercase">{booking.destination}</h3>
+                                            <p className="text-[10px] text-slate-500 mt-1 font-bold">📅 {new Date(booking.startTime).toLocaleDateString()} às {new Date(booking.startTime).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</p>
+                                        </div>
+                                        {confirmed ? (
+                                            <span className="bg-emerald-100 text-emerald-700 text-[8px] font-black px-1.5 py-0.5 rounded border border-emerald-200 uppercase">Ciente ✅</span>
+                                        ) : (
+                                            <button 
+                                                onClick={(e) => handleConfirmAction(e, booking.isCharter ? 'CHARTER' : 'BOOKING', booking.isCharter ? (booking.originalContractId || booking.id.split('_')[0]) : booking.id, booking.occurenceDate)}
+                                                disabled={confirming === booking.id}
+                                                className="bg-blue-600 hover:bg-blue-700 text-white text-[8px] font-black px-2 py-1 rounded shadow-sm transition-all uppercase"
+                                            >
+                                                {confirming === booking.id ? '...' : 'Confirmar'}
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+                              );
+                          })
                       )}
                   </div>
               </div>
           </div>
       )}
 
-      {/* FINANCE VIEW */}
+      {/* FINANCE & REPORT VIEWS (Mantidos como estavam) */}
       {view === 'finance' && (
           <div className="space-y-6">
               <h2 className="text-2xl font-black text-slate-800 uppercase">Meu Financeiro</h2>
@@ -216,7 +254,6 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ view = 'schedule' }) => {
           </div>
       )}
 
-      {/* REPORT VIEW */}
       {view === 'report' && (
           <div className="max-w-xl mx-auto">
             <div className="bg-white rounded-3xl shadow-xl border border-slate-200 overflow-hidden">
@@ -264,13 +301,28 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ view = 'schedule' }) => {
                       <button onClick={() => setSelectedBooking(null)} className="font-black text-xl">&times;</button>
                   </div>
                   <div className="p-8 space-y-6">
-                      <div className="text-center">
-                          <h2 className="text-2xl font-black text-slate-800 uppercase leading-tight">{selectedBooking.destination}</h2>
-                          {(() => {
-                              const bus = buses.find(b => b.id === selectedBooking.busId);
-                              return bus ? <p className="text-blue-600 font-black text-xs mt-1 uppercase">{bus.plate} • {bus.model}</p> : null;
-                          })()}
-                      </div>
+                      {(() => {
+                          const type = selectedBooking.isCharter ? 'CHARTER' : 'BOOKING';
+                          const refId = selectedBooking.isCharter ? (selectedBooking.originalContractId || selectedBooking.id.split('_')[0]) : selectedBooking.id;
+                          const confirmed = isConfirmed(type, refId, selectedBooking.occurenceDate);
+                          return (
+                            <div className="text-center">
+                                <h2 className="text-2xl font-black text-slate-800 uppercase leading-tight">{selectedBooking.destination}</h2>
+                                {confirmed ? (
+                                    <div className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-600 px-3 py-1 rounded-full text-[10px] font-black uppercase mt-2 border border-emerald-100">
+                                        <span>Você confirmou ciência ✅</span>
+                                    </div>
+                                ) : (
+                                    <button 
+                                        onClick={(e) => handleConfirmAction(e, type, refId, selectedBooking.occurenceDate)}
+                                        className="bg-blue-600 text-white px-6 py-2 rounded-full font-black text-xs mt-3 shadow-lg uppercase active:scale-95 transition-transform"
+                                    >
+                                        Confirmar Ciência Agora
+                                    </button>
+                                )}
+                            </div>
+                          );
+                      })()}
 
                       <div className="grid grid-cols-2 gap-4 bg-slate-50 p-4 rounded-2xl border border-slate-100">
                           <div><p className="text-[9px] font-black text-slate-400 uppercase">Saída</p><p className="text-xs font-black text-slate-800">{formatDateTime(selectedBooking.startTime)}</p></div>

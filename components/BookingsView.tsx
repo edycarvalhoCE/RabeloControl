@@ -14,10 +14,6 @@ const BookingsView: React.FC = () => {
   const [editForm, setEditForm] = useState<any>({});
   const [msg, setMsg] = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
-  const [showConflictModal, setShowConflictModal] = useState(false);
-  const [conflictDetails, setConflictDetails] = useState('');
-  const [selectedBus, setSelectedBus] = useState<Bus | null>(null);
-
   const drivers = users.filter(u => u.role === UserRole.DRIVER);
 
   const getStatusLabel = (status: string) => {
@@ -83,18 +79,13 @@ const BookingsView: React.FC = () => {
   };
 
   const handleEditChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
-    const { name, value, type } = e.target as HTMLInputElement;
+    const { name, value } = e.target as HTMLInputElement;
     if (name === 'isFreelance' || name === 'isFreelance2') {
         const isChecked = (e.target as HTMLInputElement).checked;
         setEditForm((prev: any) => ({ ...prev, [name]: isChecked }));
     } else {
         setEditForm((prev: any) => ({ ...prev, [name]: value }));
     }
-  };
-
-  const handleEditCurrencyChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value.replace(/\D/g, "");
-    setEditForm((prev: any) => ({ ...prev, value: Number(value) / 100 }));
   };
 
   const handleEditSubmit = async (e: React.FormEvent) => {
@@ -115,20 +106,36 @@ const BookingsView: React.FC = () => {
     }
   };
 
+  const isDriverConfirmed = (bookingId: string) => {
+      return scheduleConfirmations.some(c => c.referenceId === bookingId && c.type === 'BOOKING');
+  };
+
   const getDriverNames = (booking: Booking) => {
       const names = [];
-      if (booking.driverId) names.push(users.find(u => u.id === booking.driverId)?.name || 'Motorista 1');
-      else if (booking.freelanceDriverName) names.push(`${booking.freelanceDriverName} (F)`);
-      
-      if (booking.driver2Id) names.push(users.find(u => u.id === booking.driver2Id)?.name || 'Motorista 2');
-      else if (booking.freelanceDriver2Name) names.push(`${booking.freelanceDriver2Name} (F)`);
+      const confirmed = isDriverConfirmed(booking.id);
 
-      return names.length > 0 ? names.join(' e ') : 'Não atribuído';
+      if (booking.driverId) {
+          const d = users.find(u => u.id === booking.driverId);
+          names.push(
+              <span key="d1" className="flex items-center gap-1">
+                  {d?.name || 'Motorista 1'} {confirmed && <span className="text-emerald-500" title="Confirmou Escala">✅</span>}
+              </span>
+          );
+      }
+      else if (booking.freelanceDriverName) names.push(<span key="f1">{booking.freelanceDriverName} (F)</span>);
+      
+      if (booking.driver2Id) {
+          const d = users.find(u => u.id === booking.driver2Id);
+          names.push(<span key="d2">{d?.name || 'Motorista 2'}</span>);
+      }
+      else if (booking.freelanceDriver2Name) names.push(<span key="f2">{booking.freelanceDriver2Name} (F)</span>);
+
+      return names.length > 0 ? names : 'Não atribuído';
   };
 
   const handlePrintOS = (booking: Booking) => {
       const bus = buses.find(b => b.id === booking.busId);
-      const drivers = getDriverNames(booking);
+      const driversLabel = users.find(u => u.id === booking.driverId)?.name || booking.freelanceDriverName || 'Não atribuído';
       const printContent = `
         <html><head><title>OS - ${booking.destination}</title>
         <style>body{font-family:Arial,sans-serif;padding:20px;color:#000}.header{text-align:center;border-bottom:2px solid #000;margin-bottom:20px}.row{display:flex;margin-bottom:8px;border-bottom:1px dotted #ccc}.label{font-weight:bold;width:160px}h3{background:#eee;padding:5px;text-transform:uppercase}</style>
@@ -136,7 +143,7 @@ const BookingsView: React.FC = () => {
             <h3>Dados da Viagem</h3>
             <div class="row"><span class="label">Destino:</span><span>${booking.destination}</span></div>
             <div class="row"><span class="label">Saída:</span><span>${safeDate(booking.startTime)} ${safeTime(booking.startTime)} - ${booking.departureLocation}</span></div>
-            <div class="row"><span class="label">Motoristas:</span><span>${drivers}</span></div>
+            <div class="row"><span class="label">Motorista:</span><span>${driversLabel}</span></div>
             <div class="row"><span class="label">Veículo:</span><span>${bus?.plate} - ${bus?.model}</span></div>
             <h3>Observações</h3><div style="background:#f9f9f9;padding:10px;border:1px solid #ccc">${booking.observations || 'N/A'}</div>
             <script>window.print();</script></body></html>`;
@@ -172,7 +179,6 @@ const BookingsView: React.FC = () => {
                           {buses.map(b => <option key={b.id} value={b.id}>{b.plate} - {b.model}</option>)}
                       </select>
                       
-                      {/* Edição de Motoristas */}
                       <div className="grid grid-cols-2 gap-4">
                           <div className="bg-slate-50 p-2 rounded border">
                               <label className="block text-xs font-bold mb-1">1º Motorista</label>
@@ -213,9 +219,9 @@ const BookingsView: React.FC = () => {
                   </div>
                   <p className="text-slate-600 text-sm">Cliente: <strong>{booking.clientName}</strong></p>
                   <div className="mt-3 flex flex-wrap gap-4 text-sm text-slate-500">
-                    <div className="bg-slate-50 px-2 py-1 rounded border">📅 {safeDate(booking.startTime)} {safeTime(booking.startTime)}</div>
-                    <div className="bg-slate-50 px-2 py-1 rounded border">🚌 {bus?.plate}</div>
-                    <div className="bg-slate-50 px-2 py-1 rounded border">👤 {driverNames}</div>
+                    <div className="bg-slate-50 px-2 py-1 rounded border font-bold">📅 {safeDate(booking.startTime)} {safeTime(booking.startTime)}</div>
+                    <div className="bg-slate-50 px-2 py-1 rounded border font-bold">🚌 {bus?.plate}</div>
+                    <div className="bg-slate-50 px-2 py-1 rounded border font-bold flex items-center gap-2">👤 {driverNames}</div>
                   </div>
                 </div>
                 <div className="text-right flex flex-col gap-2 min-w-[150px]">
